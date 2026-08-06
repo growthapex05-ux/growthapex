@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Employee Dashboard — GrowthApex EMS</title>
+  <link rel="shortcut icon" href="../assets/images/fav.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Urbanist:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #F3F4F6; --sidebar: #ffffff; --card: #ffffff;
+      --border: rgba(3,7,18,.1); --purple: #00D4FF; --purple-lt: #1BA2DB;
+      --cyan: #00D4FF; --green: #26CF4B; --amber: #FF8F3C; --red: #FF0003;
+      --text: #1F1F25; --muted: #6B7280; --radius: 0px;
+    }
+    body { font-family:'Urbanist',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 240px; background: var(--sidebar); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; position: fixed; top:0; left:0; bottom:0; z-index:100; transition: width .3s;
+    }
+    .sidebar-logo {
+      padding: 20px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .sidebar-logo img { height: 28px; }
+    .sidebar-logo span { font-family:'Space Grotesk',sans-serif; font-size:16px; font-weight:800; color:var(--text); }
+    .nav-section { padding: 12px 0; overflow-y:auto; }
+    .nav-label { padding: 6px 20px; font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px; padding: 11px 20px;
+      cursor: pointer; color: var(--muted); font-size: 14px; font-weight: 600; font-family:'Urbanist',sans-serif;
+      transition: all .2s; border-left: 3px solid transparent; text-decoration: none; user-select: none;
+    }
+    .nav-item:hover { background: rgba(0,0,0,.02); color: var(--text); }
+    .nav-item.active { border-color: var(--purple); background: rgba(0,212,255,.05); color: var(--purple-lt); }
+    .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+    .sidebar-footer { margin-top: auto; padding: 16px; border-top: 1px solid var(--border); }
+    .emp-badge { display: flex; align-items: center; gap: 10px; }
+    .emp-avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--purple), var(--cyan));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .emp-info { flex: 1; min-width: 0; }
+    .emp-info strong { font-size: 12px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .emp-info span { font-size: 11px; color: var(--muted); }
+    .logout-btn {
+      background: none; border: none; color: var(--red); cursor: pointer;
+      font-size: 16px; padding: 4px; transition: opacity .2s;
+    }
+    .logout-btn:hover { opacity: .7; }
+
+    /* ── Main ── */
+    .main { margin-left: 240px; flex: 1; padding: 28px; min-height: 100vh; transition: margin .3s; }
+
+    /* ── Topbar ── */
+    .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+    .topbar-left h2 { font-family:'Space Grotesk',sans-serif; font-size: 22px; font-weight: 700; }
+    .topbar-left p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .topbar-right { display: flex; align-items: center; gap: 12px; }
+    .clock-badge { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--cyan); }
+
+    /* ── Cards ── */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px,1fr)); gap: 16px; margin-bottom: 24px; }
+    .stat-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 20px; position: relative; overflow: hidden; transition: transform .2s, box-shadow .2s; cursor: default;
+    }
+    .stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,.3); }
+    .stat-card::before { content:''; position:absolute; top:-20px; right:-20px; width:80px; height:80px; border-radius:50%; opacity:.15; }
+    .stat-card.purple::before { background:var(--purple); }
+    .stat-card.cyan::before   { background:var(--cyan); }
+    .stat-card.green::before  { background:var(--green); }
+    .stat-card.amber::before  { background:var(--amber); }
+    .stat-icon { font-size: 24px; margin-bottom: 10px; }
+    .stat-val { font-size: 30px; font-weight: 800; font-family:'Space Grotesk',sans-serif; transition: all .3s; color:var(--text);}
+    .stat-label { font-size: 13px; font-weight: 600; color: var(--muted); margin-top: 4px; }
+
+    /* Charts */
+    .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .chart-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+    .chart-card h4 { font-size: 14px; font-weight: 700; margin-bottom: 16px; color: var(--text); font-family:'Space Grotesk',sans-serif; }
+    .chart-wrap { position: relative; height: 200px; }
+
+    /* section card */
+    .section-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:22px; margin-bottom:20px; }
+    .section-card h3 { font-size:16px; font-weight:700; margin-bottom:16px; display:flex; align-items:center; gap:8px; font-family:'Space Grotesk',sans-serif; }
+    .section-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:10px; }
+    .toolbar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+
+    /* table */
+    .table-wrap { overflow-x: auto; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th { text-align:left; padding:10px 12px; font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; border-bottom:1px solid var(--border); white-space:nowrap; }
+    td { padding:11px 12px; border-bottom:1px solid rgba(255,255,255,.04); }
+    tr:last-child td { border-bottom:none; }
+    tr:hover td { background:rgba(255,255,255,.02); }
+
+    /* badges */
+    .badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; }
+    .badge-green  { background:rgba(16,185,129,.15); color:#34d399; }
+    .badge-amber  { background:rgba(245,158,11,.15); color:#fbbf24; }
+    .badge-red    { background:rgba(239,68,68,.15);  color:#f87171; }
+    .badge-purple { background:rgba(124,58,237,.15); color:#a78bfa; }
+    .badge-blue   { background:rgba(59,130,246,.15); color:#93c5fd; }
+    .badge-cyan   { background:rgba(6,182,212,.15); color:#67e8f9; }
+
+    /* profile */
+    .profile-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .profile-field label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+    .profile-field p { font-size:14px; font-weight:500; margin-top:4px; }
+
+    /* attendance btn */
+    .att-row { display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+    .btn { padding:10px 20px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; border:none; font-family:'Inter',sans-serif; transition:all .2s; white-space:nowrap; }
+    .btn-green { background:rgba(16,185,129,.15); color:#34d399; border:1px solid rgba(16,185,129,.3); }
+    .btn-green:hover { background:rgba(16,185,129,.25); }
+    .btn-red { background:rgba(239,68,68,.15); color:#f87171; border:1px solid rgba(239,68,68,.3); }
+    .btn-red:hover { background:rgba(239,68,68,.25); }
+    .btn-primary { background:var(--purple); color:#fff; }
+    .btn-primary:hover { background:var(--purple-lt); }
+
+    /* leave form */
+    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display:block; font-size:12px; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px; font-family:'Space Grotesk',sans-serif; }
+    input, select, textarea {
+      width:100%; background:#f9f9f9; border:1px solid var(--border);
+      border-radius:8px; padding:10px 12px; color:var(--text); font-size:14px; font-weight:500; font-family:'Urbanist',sans-serif;
+      outline:none; transition:all .2s;
+    }
+    input:focus, select:focus, textarea:focus { border-color:var(--purple); background:#fff; }
+    select option { background:#fff; color:var(--text); }
+    .search-input { background:#f9f9f9; border:1px solid var(--border); border-radius:8px; padding:8px 14px; color:var(--text); font-size:14px; font-weight:500; font-family:'Urbanist',sans-serif; outline:none; transition:all .2s; }
+    .search-input:focus { border-color:var(--purple); background:#fff; }
+    .filter-select { background:#f9f9f9; border:1px solid var(--border); border-radius:8px; padding:7px 12px; color:var(--text); font-size:14px; font-weight:500; font-family:'Urbanist',sans-serif; outline:none; cursor:pointer; }
+    .filter-select option { background:#fff; color:var(--text); }
+
+    /* page sections */
+    .page { display:none; animation: fadeIn .25s ease; }
+    .page.active { display:block; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .empty-state { text-align:center; padding:40px 20px; color:var(--muted); }
+    .empty-state div { font-size:36px; margin-bottom:12px; }
+
+    /* Toast */
+    .toast-container{position:fixed;bottom:24px;right:24px;z-index:1000;display:flex;flex-direction:column;gap:8px}
+    .toast{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 18px;font-size:13px;font-weight:500;display:flex;align-items:center;gap:10px;box-shadow:0 8px 30px rgba(0,0,0,.4);animation:toastIn .3s ease;min-width:240px}
+    .toast.success{border-color:rgba(16,185,129,.3)}.toast.error{border-color:rgba(239,68,68,.3)}.toast.info{border-color:rgba(124,58,237,.3)}
+    @keyframes toastIn{from{transform:translateX(100px);opacity:0}to{transform:translateX(0);opacity:1}}
+    @keyframes toastOut{to{transform:translateX(120px);opacity:0}}
+    .toast.removing{animation:toastOut .3s ease forwards}
+
+    /* Progress bar */
+    .progress{height:6px;background:rgba(0,0,0,.08);border-radius:3px;overflow:hidden;margin-top:6px}
+    .progress-bar{height:100%;border-radius:3px;transition:width .5s ease}
+
+    @media (max-width:768px) {
+      .sidebar { width:60px; }
+      .sidebar .nav-item span, .sidebar .nav-label, .sidebar-logo span, .emp-info { display:none; }
+      .main { margin-left:60px; padding:16px; }
+      .stats-grid { grid-template-columns:1fr 1fr; }
+      .charts-grid { grid-template-columns:1fr; }
+      .profile-grid, .form-row { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toasts"></div>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <img src="../assets/images/logo/image.svg" alt="logo" onerror="this.style.display='none'">
+    <span>GrowthApex EMS</span>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">Main</div>
+    <a class="nav-item active" onclick="showPage('dashboard',this)">
+      <span class="nav-icon">🏠</span><span>Dashboard</span>
+    </a>
+    <a class="nav-item" onclick="showPage('profile',this)">
+      <span class="nav-icon">👤</span><span>My Profile</span>
+    </a>
+    <a class="nav-item" onclick="showPage('attendance',this)">
+      <span class="nav-icon">📅</span><span>Attendance</span>
+    </a>
+    <a class="nav-item" onclick="showPage('tasks',this)">
+      <span class="nav-icon">✅</span><span>My Tasks</span>
+    </a>
+    <a class="nav-item" onclick="showPage('leaves',this)">
+      <span class="nav-icon">🌴</span><span>Leave Request</span>
+    </a>
+    <a class="nav-item" onclick="showPage('salary',this)">
+      <span class="nav-icon">💰</span><span>Salary Slip</span>
+    </a>
+  </div>
+  <div class="sidebar-footer">
+    <div class="emp-badge">
+      <div class="emp-avatar" id="sidebar-avatar">?</div>
+      <div class="emp-info">
+        <strong id="sidebar-name">Loading…</strong>
+        <span id="sidebar-desig">—</span>
+      </div>
+      <button class="logout-btn" onclick="logout()" title="Logout">⏻</button>
+    </div>
+  </div>
+</nav>
+
+<!-- Main -->
+<main class="main">
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <h2 id="page-title">Dashboard</h2>
+      <p id="page-sub">Welcome back, <span id="welcome-name"></span>!</p>
+    </div>
+    <div class="topbar-right">
+      <div class="clock-badge" id="clock">--:--:--</div>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div class="page active" id="page-dashboard">
+    <div class="stats-grid">
+      <div class="stat-card purple">
+        <div class="stat-icon">📅</div>
+        <div class="stat-val" id="stat-present">0</div>
+        <div class="stat-label">Days Present (Month)</div>
+      </div>
+      <div class="stat-card cyan">
+        <div class="stat-icon">✅</div>
+        <div class="stat-val" id="stat-tasks">0</div>
+        <div class="stat-label">Pending Tasks</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-icon">🌴</div>
+        <div class="stat-val" id="stat-leaves">0</div>
+        <div class="stat-label">Leaves Approved</div>
+      </div>
+      <div class="stat-card amber">
+        <div class="stat-icon">💰</div>
+        <div class="stat-val" id="stat-salary">—</div>
+        <div class="stat-label">Monthly Salary</div>
+      </div>
+    </div>
+    
+    <div class="charts-grid">
+      <div class="chart-card"><h4>✅ My Task Progress</h4><div class="chart-wrap"><canvas id="taskChart"></canvas></div></div>
+      <div class="chart-card"><h4>📅 My Attendance Trend</h4><div class="chart-wrap"><canvas id="myAttChart"></canvas></div></div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head"><h3>📋 Recent Tasks</h3></div>
+      <div class="table-wrap" id="dash-tasks-table"></div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head"><h3>📅 Recent Attendance</h3></div>
+      <div class="table-wrap" id="dash-att-table"></div>
+    </div>
+  </div>
+
+  <!-- Profile -->
+  <div class="page" id="page-profile">
+    <div class="section-card">
+      <h3>👤 My Profile</h3>
+      <div class="profile-grid" id="profile-grid"></div>
+    </div>
+    <div class="section-card">
+      <h3>🔒 Change Password</h3>
+      <div style="max-width:400px">
+        <div class="form-group">
+          <label>Current Password</label>
+          <input type="password" id="cur-pass" placeholder="Current password">
+        </div>
+        <div class="form-group">
+          <label>New Password</label>
+          <input type="password" id="new-pass" placeholder="New password">
+        </div>
+        <div class="form-group">
+          <label>Confirm Password</label>
+          <input type="password" id="confirm-pass" placeholder="Confirm new password">
+        </div>
+        <button class="btn btn-primary" onclick="changePassword()">Update Password</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Attendance -->
+  <div class="page" id="page-attendance">
+    <div class="section-card">
+      <h3>📅 Today's Attendance</h3>
+      <div class="att-row">
+        <button class="btn btn-green" onclick="markAtt('present')">✅ Mark Check-In</button>
+        <button class="btn btn-red"   onclick="markAtt('absent')">❌ Mark Check-Out</button>
+        <div id="today-att-status"></div>
+      </div>
+      <div id="today-att-info" style="font-size:13px;color:var(--muted)"></div>
+    </div>
+    <div class="section-card">
+      <div class="section-head"><h3>📊 Attendance History</h3>
+        <div class="toolbar">
+           <select class="filter-select" id="my-att-filter" onchange="renderAttendanceTable()">
+             <option value="">All Time</option>
+             <option value="this-month">This Month</option>
+           </select>
+        </div>
+      </div>
+      <div class="table-wrap" id="att-history-table"></div>
+    </div>
+  </div>
+
+  <!-- Tasks -->
+  <div class="page" id="page-tasks">
+    <div class="section-card">
+      <div class="section-head"><h3>✅ My Tasks</h3>
+        <div class="toolbar">
+          <input class="search-input" id="my-task-search" placeholder="🔍 Search tasks..." oninput="renderTasks()">
+          <select class="filter-select" id="my-task-status" onchange="renderTasks()">
+            <option value="">All Statuses</option>
+            <option value="todo">To Do</option>
+            <option value="in-progress">In Progress</option>
+            <option value="done">Done</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap" id="my-tasks-table"></div>
+    </div>
+  </div>
+
+  <!-- Leaves -->
+  <div class="page" id="page-leaves">
+    <div class="section-card">
+      <h3>🌴 Apply for Leave</h3>
+      <div style="max-width:500px">
+        <div class="form-row">
+          <div class="form-group">
+            <label>From Date</label>
+            <input type="date" id="leave-from">
+          </div>
+          <div class="form-group">
+            <label>To Date</label>
+            <input type="date" id="leave-to">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Leave Type</label>
+          <select id="leave-type">
+            <option value="casual">Casual Leave</option>
+            <option value="sick">Sick Leave</option>
+            <option value="earned">Earned Leave</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Reason</label>
+          <textarea id="leave-reason" rows="3" placeholder="Reason for leave…"></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="applyLeave()">Submit Leave Request</button>
+      </div>
+    </div>
+    <div class="section-card">
+      <div class="section-head"><h3>📋 My Leave History</h3>
+         <div class="toolbar">
+           <select class="filter-select" id="my-leave-status" onchange="renderLeavesTable()">
+             <option value="">All Statuses</option>
+             <option value="pending">Pending</option>
+             <option value="approved">Approved</option>
+             <option value="rejected">Rejected</option>
+           </select>
+         </div>
+      </div>
+      <div class="table-wrap" id="leave-history-table"></div>
+    </div>
+  </div>
+
+  <!-- Salary -->
+  <div class="page" id="page-salary">
+    <div class="section-card">
+      <h3>💰 Salary Details</h3>
+      <div id="salary-info"></div>
+    </div>
+  </div>
+
+</main>
+
+<script src="/EMS_login/ems-db.js"></script>
+<script>
+  // Auth guard
+  const sess = EMS_DB.getSession();
+  if (!sess || sess.role !== 'employee') window.location.href = 'index.html';
+
+  const empId = sess.id;
+  const emp   = EMS_DB.getEmployee(empId);
+  
+  if(!emp) { EMS_DB.clearSession(); window.location.href = 'index.html'; }
+
+  // Sidebar setup
+  document.getElementById('sidebar-name').textContent  = emp.name;
+  document.getElementById('welcome-name').textContent  = emp.name.split(' ')[0];
+  document.getElementById('sidebar-desig').textContent = emp.designation;
+  document.getElementById('sidebar-avatar').textContent = emp.name.split(' ').map(n=>n[0]).join('').slice(0,2);
+
+  // Clock
+  function updateClock() {
+    document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-IN');
+  }
+  updateClock(); setInterval(updateClock, 1000);
+
+  // Toast
+  function toast(msg, type='info') {
+    const icons = { success:'✅', error:'❌', info:'ℹ️', warning:'⚠️' };
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.innerHTML = `<span>${icons[type]||'ℹ️'}</span>${msg}`;
+    document.getElementById('toasts').appendChild(el);
+    setTimeout(() => { el.classList.add('removing'); setTimeout(() => el.remove(), 300); }, 3500);
+  }
+
+  // Formatting helpers
+  const fmt = (date) => new Date(date).toLocaleDateString('en-IN');
+  const money = (n) => '₹' + Number(n||0).toLocaleString('en-IN');
+  function sBadge(s) {
+    const map = { present:'green', absent:'red', pending:'amber', approved:'green', rejected:'red', done:'green', 'in-progress':'purple', todo:'blue', 'half-day':'amber', 'leave':'cyan' };
+    return `<span class="badge badge-${map[s]||'blue'}">${s}</span>`;
+  }
+
+  // Page switch
+  const pageTitles = { dashboard:'Dashboard', profile:'My Profile', attendance:'Attendance', tasks:'My Tasks', leaves:'Leave Requests', salary:'Salary Slip' };
+  const pageSubs = { dashboard:'Live data from GrowthApex EMS', profile:'Manage your personal information', attendance:'Track your daily check-ins', tasks:'View and update your assignments', leaves:'Apply and track time off', salary:'View your current compensation details' };
+  function showPage(id, el) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('page-'+id).classList.add('active');
+    if (el) el.classList.add('active');
+    document.getElementById('page-title').textContent = pageTitles[id];
+    document.getElementById('page-sub').innerHTML = id === 'dashboard' ? `Welcome back, <span id="welcome-name">${emp.name.split(' ')[0]}</span>!` : pageSubs[id];
+    
+    renderPage(id);
+  }
+
+  function renderPage(id) {
+    if (id==='dashboard')  renderDashboard();
+    if (id==='profile')    renderProfile();
+    if (id==='attendance') renderAttendance();
+    if (id==='tasks')      renderTasks();
+    if (id==='leaves')     renderLeavesTable();
+    if (id==='salary')     renderSalary();
+  }
+  
+  function animateVal(id, target) {
+    const el = document.getElementById(id); if (!el) return;
+    const start = parseInt(el.textContent.replace(/\D/g, ''))||0; const diff = target - start;
+    if(diff === 0 && start === target) return;
+    const steps = 20; let i = 0;
+    const prefix = el.textContent.startsWith('₹') ? '₹' : '';
+    const t = setInterval(() => {
+      i++; el.textContent = prefix + (Math.round(start + diff*(i/steps))).toLocaleString('en-IN');
+      if (i >= steps) { clearInterval(t); el.textContent = prefix + target.toLocaleString('en-IN'); }
+    }, 20);
+  }
+
+  // ── Dashboard ──────────────────────────────────────────────
+  let taskChart, myAttChart;
+  function renderDashboard() {
+    const att    = EMS_DB.getAttendance(empId);
+    const tasks  = EMS_DB.getTasks(empId);
+    const leaves = EMS_DB.getLeaves(empId);
+    const month  = new Date().getMonth();
+    const present = att.filter(a => new Date(a.date).getMonth()===month && a.status==='present').length;
+    const pendingTasks = tasks.filter(t => t.status !== 'done').length;
+    const approvedLeaves = leaves.filter(l => l.status==='approved').length;
+
+    animateVal('stat-present', present);
+    animateVal('stat-tasks', pendingTasks);
+    animateVal('stat-leaves', approvedLeaves);
+    animateVal('stat-salary', emp.salary);
+
+    const tHTML = tasks.length ? `<table><thead><tr><th>Task</th><th>Deadline</th><th>Status</th></tr></thead><tbody>
+      ${tasks.slice(0,5).map(t=>`<tr><td><div style="font-weight:600">${t.title}</div><div style="font-size:11px;color:var(--muted)">${t.description||''}</div></td><td>${fmt(t.deadline)}</td><td>${sBadge(t.status)}</td></tr>`).join('')}
+    </tbody></table>` : '<div class="empty-state"><div>✅</div>No tasks assigned to you</div>';
+
+    const aHTML = att.length ? `<table><thead><tr><th>Date</th><th>Status</th><th>Check-In</th><th>Check-Out</th></tr></thead><tbody>
+      ${att.slice(-5).reverse().map(a=>`<tr><td>${fmt(a.date)}</td><td>${sBadge(a.status)}</td><td>${a.checkIn||'—'}</td><td>${a.checkOut||'—'}</td></tr>`).join('')}
+    </tbody></table>` : '<div class="empty-state"><div>📅</div>No attendance records yet</div>';
+
+    document.getElementById('dash-tasks-table').innerHTML = tHTML;
+    document.getElementById('dash-att-table').innerHTML   = aHTML;
+    
+    // Task Chart
+    const taskCount = { todo: 0, 'in-progress': 0, done: 0 };
+    tasks.forEach(t => taskCount[t.status]++);
+    if (taskChart) taskChart.destroy();
+    taskChart = new Chart(document.getElementById('taskChart'), {
+      type: 'doughnut',
+      data: { labels: ['To Do', 'In Progress', 'Done'], datasets: [{ data: [taskCount.todo, taskCount['in-progress'], taskCount.done], backgroundColor: ['#3b82f6', '#8b5cf6', '#10b981'], borderWidth: 0 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#94a3b8', font: { size: 11 }, padding: 10, boxWidth: 12 } } } }
+    });
+    
+    // Att Chart
+    const last7 = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate()-6+i); return d.toISOString().split('T')[0]; });
+    const pData = last7.map(d => att.some(a => a.date === d && (a.status === 'present' || a.status === 'half-day')) ? 1 : 0);
+    const colors = pData.map(v => v ? 'rgba(16,185,129,.7)' : 'rgba(239,68,68,.3)');
+    if (myAttChart) myAttChart.destroy();
+    myAttChart = new Chart(document.getElementById('myAttChart'), {
+      type: 'bar',
+      data: { labels: last7.map(d => new Date(d).toLocaleDateString('en-IN',{weekday:'short',day:'numeric'})), datasets: [{ data: pData, backgroundColor: colors, borderRadius: 4 }] },
+      options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false},ticks:{color:'#64748b',font:{size:10}}},y:{display:false}} }
+    });
+  }
+
+  // ── Profile ────────────────────────────────────────────────
+  function renderProfile() {
+    const fields = [
+      ['Employee ID', emp.id], ['Full Name', emp.name], ['Email', emp.email],
+      ['Phone', emp.phone], ['Department', emp.department], ['Designation', emp.designation],
+      ['Join Date', fmt(emp.joinDate)], ['Status', sBadge(emp.status)],
+    ];
+    document.getElementById('profile-grid').innerHTML = fields.map(([l,v])=>
+      `<div class="profile-field"><label>${l}</label><p>${v}</p></div>`
+    ).join('');
+  }
+
+  function changePassword() {
+    const cur = document.getElementById('cur-pass').value;
+    const nw  = document.getElementById('new-pass').value;
+    const cn  = document.getElementById('confirm-pass').value;
+    if (cur !== emp.password) { toast('Current password is incorrect', 'error'); return; }
+    if (nw.length < 6)        { toast('New password must be at least 6 characters', 'error'); return; }
+    if (nw !== cn)            { toast('Passwords do not match', 'error'); return; }
+    EMS_DB.updateEmployee(empId, { password: nw });
+    emp.password = nw;
+    toast('Password updated successfully!', 'success');
+    ['cur-pass','new-pass','confirm-pass'].forEach(id => document.getElementById(id).value='');
+  }
+
+  // ── Attendance ─────────────────────────────────────────────
+  function renderAttendance() {
+    const todayRec = EMS_DB.getTodayAttendance(empId);
+    document.getElementById('today-att-status').innerHTML = todayRec
+      ? sBadge(todayRec.status)
+      : '<span style="color:var(--muted);font-size:13px">Not marked yet</span>';
+    document.getElementById('today-att-info').innerHTML = todayRec
+      ? `<strong>Check-In:</strong> ${todayRec.checkIn||'—'} &nbsp;|&nbsp; <strong>Check-Out:</strong> ${todayRec.checkOut||'—'}`
+      : '';
+    renderAttendanceTable();
+  }
+
+  function renderAttendanceTable() {
+    const filter = document.getElementById('my-att-filter').value;
+    let att = EMS_DB.getAttendance(empId);
+    if(filter === 'this-month') {
+        const month = new Date().getMonth();
+        att = att.filter(a => new Date(a.date).getMonth() === month);
+    }
+    
+    const html = att.length ? `<table><thead><tr><th>Date</th><th>Status</th><th>Check-In</th><th>Check-Out</th></tr></thead><tbody>
+      ${att.slice().reverse().map(a=>`<tr><td>${fmt(a.date)}</td><td>${sBadge(a.status)}</td><td>${a.checkIn||'—'}</td><td>${a.checkOut||'—'}</td></tr>`).join('')}
+    </tbody></table>` : '<div class="empty-state"><div>📅</div>No attendance records found</div>';
+    document.getElementById('att-history-table').innerHTML = html;
+  }
+
+  function markAtt(type) {
+    const today = new Date().toISOString().split('T')[0];
+    const time  = new Date().toLocaleTimeString('en-IN', { hour12: false });
+    const rec   = EMS_DB.getTodayAttendance(empId);
+    
+    if (type === 'present') {
+        if(rec && rec.checkIn) { toast('Check-in already marked for today', 'info'); return; }
+        EMS_DB.markAttendance({ empId, date:today, status:'present', checkIn:time });
+        toast('Checked in successfully', 'success');
+    } else {
+        if(!rec || !rec.checkIn) { toast('You must check in first', 'error'); return; }
+        if(rec.checkOut) { toast('Check-out already marked for today', 'info'); return; }
+        EMS_DB.markAttendance({ empId, date:today, status:rec.status, checkIn:rec.checkIn, checkOut:time });
+        toast('Checked out successfully', 'success');
+    }
+    renderAttendance();
+  }
+
+  // ── Tasks ──────────────────────────────────────────────────
+  function renderTasks() {
+    const q = document.getElementById('my-task-search').value.toLowerCase();
+    const s = document.getElementById('my-task-status').value;
+    let tasks = EMS_DB.getTasks(empId);
+    if(q) tasks = tasks.filter(t => (t.title+t.description).toLowerCase().includes(q));
+    if(s) tasks = tasks.filter(t => t.status === s);
+    
+    const html = tasks.length ? `<table><thead><tr><th>Task</th><th>Deadline</th><th>Status</th><th>Update Progress</th></tr></thead><tbody>
+      ${tasks.slice().reverse().map(t=>`<tr>
+        <td><div style="font-weight:600">${t.title}</div><div style="font-size:11px;color:var(--muted)">${t.description||''}</div></td>
+        <td style="${t.status!=='done' && t.deadline < new Date().toISOString().split('T')[0] ? 'color:var(--red)' : ''}">${fmt(t.deadline)}</td>
+        <td>${sBadge(t.status)}</td>
+        <td><select class="filter-select" onchange="updateTaskStatus(${t.id},this.value)" style="width:auto">
+          ${['todo','in-progress','done'].map(st=>`<option value="${st}" ${t.status===st?'selected':''}>${st}</option>`).join('')}
+        </select></td>
+      </tr>`).join('')}
+    </tbody></table>` : '<div class="empty-state"><div>✅</div>No tasks found</div>';
+    document.getElementById('my-tasks-table').innerHTML = html;
+  }
+
+  function updateTaskStatus(id, status) {
+    EMS_DB.updateTask(id, { status });
+    toast('Task status updated', 'success');
+    renderTasks();
+  }
+
+  // ── Leaves ─────────────────────────────────────────────────
+  function applyLeave() {
+    const from   = document.getElementById('leave-from').value;
+    const to     = document.getElementById('leave-to').value;
+    const type   = document.getElementById('leave-type').value;
+    const reason = document.getElementById('leave-reason').value.trim();
+    if (!from||!to||!reason) { toast('Please fill all fields', 'error'); return; }
+    if (from>to)             { toast('To date must be after From date', 'error'); return; }
+    EMS_DB.applyLeave({ empId, from, to, type, reason });
+    toast('Leave request submitted successfully!', 'success');
+    ['leave-from','leave-to','leave-reason'].forEach(id => document.getElementById(id).value='');
+    renderLeavesTable();
+  }
+  
+  function renderLeavesTable() {
+    const filter = document.getElementById('my-leave-status').value;
+    let leaves = EMS_DB.getLeaves(empId);
+    if(filter) leaves = leaves.filter(l => l.status === filter);
+    const html = leaves.length ? `<table><thead><tr><th>From</th><th>To</th><th>Type</th><th>Reason</th><th>Status</th></tr></thead><tbody>
+      ${leaves.slice().reverse().map(l=>`<tr>
+        <td>${fmt(l.from)}</td><td>${fmt(l.to)}</td>
+        <td><span class="badge badge-cyan">${l.type}</span></td>
+        <td style="color:var(--muted); max-width: 200px;">${l.reason}</td>
+        <td>${sBadge(l.status)}</td>
+      </tr>`).join('')}
+    </tbody></table>` : '<div class="empty-state"><div>🌴</div>No leave requests found</div>';
+    document.getElementById('leave-history-table').innerHTML = html;
+  }
+
+  // ── Salary ─────────────────────────────────────────────────
+  function renderSalary() {
+    const basic   = emp.salary;
+    const hra     = Math.round(basic * 0.4);
+    const ta      = Math.round(basic * 0.1);
+    const gross   = basic + hra + ta;
+    const pf      = Math.round(basic * 0.12);
+    const net     = gross - pf;
+
+    document.getElementById('salary-info').innerHTML = `
+      <div style="max-width:500px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;background:#f9f9f9;padding:16px;border-radius:12px;border:1px solid var(--border)">
+          <div>
+            <div style="font-size:12px;color:var(--text);text-transform:uppercase;letter-spacing:.05em;font-weight:700">Pay Period</div>
+            <div style="font-weight:700;font-size:16px;margin-top:4px">${new Date().toLocaleDateString('en-IN',{month:'long',year:'numeric'})}</div>
+          </div>
+          <span class="badge badge-green" style="font-size:14px;padding:6px 12px">Paid</span>
+        </div>
+        <table style="margin-bottom:16px">
+          <thead><tr><th>Earnings</th><th style="text-align:right">Amount</th></tr></thead>
+          <tbody>
+            <tr><td>Basic Salary</td><td style="text-align:right">${money(basic)}</td></tr>
+            <tr><td>HRA (40%)</td><td style="text-align:right">${money(hra)}</td></tr>
+            <tr><td>Travel Allowance (10%)</td><td style="text-align:right">${money(ta)}</td></tr>
+            <tr style="background:#f9f9f9;font-weight:700"><td style="padding:16px 12px;color:var(--text)">Gross Pay</td><td style="text-align:right;padding:16px 12px;color:var(--text)">${money(gross)}</td></tr>
+          </tbody>
+        </table>
+        <table>
+          <thead><tr><th>Deductions</th><th style="text-align:right">Amount</th></tr></thead>
+          <tbody>
+            <tr><td>PF (12%)</td><td style="text-align:right;color:var(--red)">-${money(pf)}</td></tr>
+            <tr style="background:rgba(38,207,75,.1);font-weight:700;color:var(--green)"><td style="padding:16px 12px;font-size:16px">Net Pay</td><td style="text-align:right;padding:16px 12px;font-size:16px">${money(net)}</td></tr>
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  function logout() {
+    EMS_DB.clearSession();
+    window.location.href = 'index.html';
+  }
+
+  // Initial render
+  renderDashboard();
+</script>
+</body>
+</html>

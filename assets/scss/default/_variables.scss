@@ -1,7 +1,7 @@
 :root {
 
     // themes color
-    --color-primary: #98FF03;
+    --color-primary: #00D4FF;
     --color-secondary: #1F1F25;
     --color-black: #000000;
     // bg color
@@ -44,7 +44,7 @@
     --subscribe-form: linear-gradient(0deg, rgba(255, 255, 255, 0.80) 0%, rgba(255, 255, 255, 0.80) 100%), #BCBFDB;
     
     // footer background
-    --footer-bg: linear-gradient(257deg, #DEFFE6 1.73%, rgba(201, 192, 255, 0.08) 98.79%);
+    --footer-bg: linear-gradient(257deg, #E0F7FF 1.73%, rgba(201, 192, 255, 0.08) 98.79%);
 
     // Font weight
     --p-light: 300;
@@ -104,5 +104,6 @@ $md-layout:'only screen and (min-width: 768px) and (max-width: 991px)';
 $sm-layout:'only screen and (max-width: 767px)';
 $large-mobile: 'only screen and (max-width: 575px)';
 $small-mobile: 'only screen and (max-width: 479px)';
+
 
 

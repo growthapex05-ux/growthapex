@@ -1,8 +1,9 @@
 <svg width="1408" height="356" viewBox="0 0 1408 356" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect x="234.667" y="356" width="234.667" height="356" transform="rotate(180 234.667 356)" fill="#98FF03"/>
-<rect x="469.333" y="356" width="234.667" height="237" transform="rotate(180 469.333 356)" fill="#98FF03"/>
-<rect x="704" y="356" width="234.667" height="119" transform="rotate(180 704 356)" fill="#98FF03"/>
-<rect x="938.667" y="356" width="234.667" height="59.5" transform="rotate(180 938.667 356)" fill="#98FF03"/>
-<rect x="1173.33" y="356" width="234.667" height="237" transform="rotate(180 1173.33 356)" fill="#98FF03"/>
-<rect x="1408" y="356" width="234.667" height="356" transform="rotate(180 1408 356)" fill="#98FF03"/>
+<rect x="234.667" y="356" width="234.667" height="356" transform="rotate(180 234.667 356)" fill="#00D4FF"/>
+<rect x="469.333" y="356" width="234.667" height="237" transform="rotate(180 469.333 356)" fill="#00D4FF"/>
+<rect x="704" y="356" width="234.667" height="119" transform="rotate(180 704 356)" fill="#00D4FF"/>
+<rect x="938.667" y="356" width="234.667" height="59.5" transform="rotate(180 938.667 356)" fill="#00D4FF"/>
+<rect x="1173.33" y="356" width="234.667" height="237" transform="rotate(180 1173.33 356)" fill="#00D4FF"/>
+<rect x="1408" y="356" width="234.667" height="356" transform="rotate(180 1408 356)" fill="#00D4FF"/>
 </svg>
+

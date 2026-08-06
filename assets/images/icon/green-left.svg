@@ -16,8 +16,9 @@
 </g>
 <defs>
 <linearGradient id="paint0_linear_41_305" x1="10.3332" y1="6.33381" x2="2.00003" y2="6.33381" gradientUnits="userSpaceOnUse">
-<stop stop-color="#98FF03" stop-opacity="0.3"/>
-<stop offset="1" stop-color="#98FF03"/>
+<stop stop-color="#00D4FF" stop-opacity="0.3"/>
+<stop offset="1" stop-color="#00D4FF"/>
 </linearGradient>
 </defs>
 </svg>
+

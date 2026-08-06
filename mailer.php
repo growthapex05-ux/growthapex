@@ -15,7 +15,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 
     // Your receiving email
-    $recipient = "your@email.com"; // <-- CHANGE THIS
+    $recipient = "support@growthapex.in";
 
     $subject = "New Contact Message from $name";
 

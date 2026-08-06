@@ -12,8 +12,9 @@
 </g>
 <path d="M0 6.15456e-05L4.37118e-08 1.00006L1408 1L1408 0L1408 -1L-4.3711e-08 -0.999938L0 6.15456e-05Z" fill="#030712" fill-opacity="0.1" mask="url(#path-1-inside-1_88_494)"/>
 <defs>
+<filter id="hue-rotate"><feColorMatrix type="hueRotate" values="105"/></filter>
 <pattern id="pattern0_88_494" patternContentUnits="objectBoundingBox" width="6.39999" height="0.290909">
-<use xlink:href="#image0_88_494" transform="scale(0.0015625 7.10227e-05)"/>
+<use xlink:href="#image0_88_494" transform="scale(0.0015625 7.10227e-05)" filter="url(#hue-rotate)"/>
 </pattern>
 <clipPath id="clip0_88_494">
 <path d="M2.79753e-06 64L0 6.15456e-05L1408 0L1408 63.9999L2.79753e-06 64Z" fill="white"/>

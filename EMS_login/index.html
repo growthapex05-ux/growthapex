@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EMS Login — GrowthApex</title>
+  <link rel="shortcut icon" href="../assets/images/fav.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Urbanist:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #F3F4F6;
+      --card:      #ffffff;
+      --border:    rgba(3,7,18,.1);
+      --purple:    #00D4FF;
+      --purple-lt: #1BA2DB;
+      --cyan:      #00D4FF;
+      --green:     #26CF4B;
+      --red:       #FF0003;
+      --text:      #1F1F25;
+      --muted:     #6B7280;
+      --radius:    0px;
+    }
+
+    body {
+      font-family: 'Urbanist', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* background decor */
+    body::before {
+      content: '';
+      position: absolute; top:0; left:0; width:100%; height:300px;
+      background: var(--purple);
+      opacity: .05;
+      z-index: 0;
+    }
+
+    /* grid overlay */
+    .grid-bg {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background-image:
+        linear-gradient(rgba(0,0,0,.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,0,0,.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    .wrapper {
+      position: relative; z-index: 1;
+      width: 100%; max-width: 460px;
+      padding: 24px;
+    }
+
+    /* logo */
+    .logo-area {
+      text-align: center; margin-bottom: 32px;
+    }
+    .logo-area img { height: 36px; margin-bottom: 12px; }
+    .logo-area h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 26px; font-weight: 800;
+      color: var(--text);
+    }
+    .logo-area p { font-size: 14px; color: var(--muted); margin-top: 4px; font-weight: 500; }
+
+    /* card */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 40px;
+      position: relative;
+      box-shadow: 0 10px 40px rgba(0,0,0,.05);
+    }
+
+    /* tabs */
+    .tabs {
+      display: flex; gap: 8px;
+      background: rgba(0,0,0,.03);
+      padding: 6px;
+      margin-bottom: 32px;
+    }
+    .tab-btn {
+      flex: 1; padding: 12px;
+      border: none;
+      font-family: 'Urbanist', sans-serif;
+      font-size: 14px; font-weight: 700;
+      cursor: pointer; transition: all .3s;
+      background: transparent; color: var(--muted);
+    }
+    .tab-btn.active {
+      background: #fff;
+      color: var(--text);
+      box-shadow: 0 2px 10px rgba(0,0,0,.05);
+    }
+
+    /* form */
+    .form-group { margin-bottom: 20px; }
+    label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
+    
+    .input-wrap { position: relative; }
+    .input-wrap .icon {
+      position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+      font-size: 16px; color: var(--muted); pointer-events: none;
+    }
+
+    input[type="text"], input[type="password"] {
+      width: 100%;
+      background: #f9f9f9;
+      border: 1px solid var(--border);
+      padding: 14px 14px 14px 42px;
+      color: var(--text); font-size: 15px; font-weight: 500;
+      font-family: 'Urbanist', sans-serif;
+      outline: none; transition: all .3s;
+    }
+    input:focus {
+      border-color: var(--purple);
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(0,212,255,.15);
+    }
+    input::placeholder { color: var(--muted); }
+
+    .eye-btn {
+      position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px;
+    }
+
+    .btn-login {
+      width: 100%;
+      background: var(--text);
+      color: #fff; border: none;
+      padding: 16px; font-size: 16px; font-weight: 700;
+      font-family: 'Space Grotesk', sans-serif; text-transform: uppercase; letter-spacing: .05em;
+      cursor: pointer; transition: all .3s; margin-top: 8px;
+      position: relative; overflow: hidden;
+    }
+    .btn-login::after {
+      content: ''; position: absolute; inset: 0;
+      background: var(--purple); transition: transform .3s;
+      transform: scaleX(0); transform-origin: right; z-index: 1;
+    }
+    .btn-login:hover::after { transform: scaleX(1); transform-origin: left; }
+    .btn-login span { position: relative; z-index: 2; }
+    .btn-login:active { transform: translateY(2px); }
+
+    .error-msg {
+      background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3);
+      color: #fca5a5; border-radius: 8px;
+      padding: 10px 14px; font-size: 13px;
+      margin-bottom: 16px; display: none;
+    }
+    .error-msg.show { display: block; animation: shake .4s ease; }
+    @keyframes shake {
+      0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)}
+    }
+
+    .hint {
+      background: rgba(6,182,212,.07); border: 1px solid rgba(6,182,212,.2);
+      border-radius: 8px; padding: 12px 14px; margin-top: 20px; font-size: 12px; color: var(--muted);
+    }
+    .hint strong { color: var(--cyan); display: block; margin-bottom: 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+    .hint span { display: block; margin-top: 3px; }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* loading spinner */
+    .spinner {
+      display: inline-block; width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
+      border-radius: 50%; animation: spin .7s linear infinite;
+      vertical-align: middle; margin-right: 8px; display: none;
+    }
+    .btn-login.loading .spinner { display: inline-block; }
+    .btn-login.loading .btn-text { display: none; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Corner squares for agency theme */
+    .card .square-shape { position: absolute; width: 10px; height: 10px; background: var(--purple); z-index: 5; }
+    .card .top-left { top: -5px; left: -5px; }
+    .card .top-right { top: -5px; right: -5px; }
+    .card .bottom-left { bottom: -5px; left: -5px; }
+    .card .bottom-right { bottom: -5px; right: -5px; }
+
+    @media (max-width: 480px) { .card { padding: 24px; } }
+  </style>
+</head>
+<body>
+  <div class="grid-bg"></div>
+  <div class="wrapper">
+    <div class="logo-area">
+      <img src="../assets/images/logo/image.svg" alt="GrowthApex" onerror="this.style.display='none'">
+      <h1>GrowthApex EMS</h1>
+      <p>Employee Management System</p>
+    </div>
+
+    <div class="card">
+      <span class="square-shape top-left"></span>
+      <span class="square-shape bottom-left"></span>
+      <span class="square-shape top-right"></span>
+      <span class="square-shape bottom-right"></span>
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('employee')" id="tab-emp">👤 Employee</button>
+        <button class="tab-btn" onclick="switchTab('admin')" id="tab-admin">🔐 Admin</button>
+      </div>
+
+      <div id="error-box" class="error-msg"></div>
+
+      <!-- Employee Login -->
+      <div id="panel-employee" class="panel active">
+        <div class="form-group">
+          <label>Employee ID</label>
+          <div class="input-wrap">
+            <span class="icon">🪪</span>
+            <input type="text" id="emp-id" placeholder="e.g. EMP001" autocomplete="off">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <div class="input-wrap">
+            <span class="icon">🔒</span>
+            <input type="password" id="emp-pass" placeholder="Enter your password">
+            <button class="eye-btn" onclick="togglePass('emp-pass', this)" type="button">👁</button>
+          </div>
+        </div>
+        <button class="btn-login" onclick="loginEmployee()">
+          <span class="spinner"></span>
+          <span class="btn-text">Login as Employee →</span>
+        </button>
+      </div>
+
+      <!-- Admin Login -->
+      <div id="panel-admin" class="panel">
+        <div class="form-group">
+          <label>Admin Username</label>
+          <div class="input-wrap">
+            <span class="icon">👨‍💼</span>
+            <input type="text" id="admin-user" placeholder="admin" autocomplete="off">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Admin Password</label>
+          <div class="input-wrap">
+            <span class="icon">🔒</span>
+            <input type="password" id="admin-pass" placeholder="Enter admin password">
+            <button class="eye-btn" onclick="togglePass('admin-pass', this)" type="button">👁</button>
+          </div>
+        </div>
+        <button class="btn-login" onclick="loginAdmin()">
+          <span class="spinner"></span>
+          <span class="btn-text">Login as Admin →</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/EMS_login/ems-db.js"></script>
+  <script>
+    function switchTab(tab) {
+      ['employee','admin'].forEach(t => {
+        document.getElementById('panel-'+t).classList.toggle('active', t===tab);
+        document.getElementById('tab-'+t.replace('employee','emp')).classList.toggle('active', t===tab);
+      });
+      hideError();
+    }
+
+    function showError(msg) {
+      const box = document.getElementById('error-box');
+      box.textContent = msg; box.classList.add('show');
+    }
+    function hideError() {
+      document.getElementById('error-box').classList.remove('show');
+    }
+
+    function togglePass(id, btn) {
+      const inp = document.getElementById(id);
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+      btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+    }
+
+    function loginEmployee() {
+      hideError();
+      const id   = document.getElementById('emp-id').value.trim().toUpperCase();
+      const pass = document.getElementById('emp-pass').value;
+      if (!id || !pass) { showError('Please enter Employee ID and Password.'); return; }
+      if (EMS_DB.loginEmployee(id, pass)) {
+        window.location.href = 'employee-dashboard.html';
+      } else {
+        showError('❌ Invalid Employee ID or Password. Try: EMP001 / surya@123');
+      }
+    }
+
+    function loginAdmin() {
+      hideError();
+      const user = document.getElementById('admin-user').value.trim();
+      const pass = document.getElementById('admin-pass').value;
+      if (!user || !pass) { showError('Please enter Username and Password.'); return; }
+      // Clear any stale session before logging in
+      EMS_DB.clearSession();
+      if (EMS_DB.loginAdmin(user, pass)) {
+        window.location.href = 'admin-dashboard.html';
+      } else {
+        const admin = EMS_DB.getAdmin();
+        console.log('Admin record:', admin);
+        showError('❌ Invalid credentials. Try: admin / admin@123');
+      }
+    }
+
+    function resetDB() {
+      if (confirm('This will reset all EMS data to defaults. Continue?')) {
+        EMS_DB.reset();
+        alert('Database reset! Use: admin / admin@123 to login.');
+      }
+    }
+
+    // Enter key support
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        const activePanel = document.querySelector('.panel.active').id;
+        activePanel === 'panel-employee' ? loginEmployee() : loginAdmin();
+      }
+    });
+
+    // Check existing valid session
+    const sess = EMS_DB.getSession();
+    if (sess && sess.role) {
+      window.location.href = sess.role === 'admin' ? 'admin-dashboard.html' : 'employee-dashboard.html';
+    }
+  </script>
+</body>
+</html>
