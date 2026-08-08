@@ -261,7 +261,12 @@
     </div>
   </div>
 
-  <script src="/EMS_login/ems-db.js"></script>
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="ems-firebase.js"></script>
   <script>
     function switchTab(tab) {
       ['employee','admin'].forEach(t => {
@@ -285,30 +290,36 @@
       btn.textContent = inp.type === 'password' ? '👁' : '🙈';
     }
 
-    function loginEmployee() {
+    async function loginEmployee() {
       hideError();
       const id   = document.getElementById('emp-id').value.trim().toUpperCase();
       const pass = document.getElementById('emp-pass').value;
       if (!id || !pass) { showError('Please enter Employee ID and Password.'); return; }
-      if (EMS_DB.loginEmployee(id, pass)) {
+      const btn = document.querySelector('#panel-employee .btn-login');
+      btn.classList.add('loading');
+      const ok = await EMS_DB.loginEmployee(id, pass);
+      btn.classList.remove('loading');
+      if (ok) {
         window.location.href = 'employee-dashboard.html';
       } else {
         showError('❌ Invalid Employee ID or Password. Try: EMP001 / surya@123');
       }
     }
 
-    function loginAdmin() {
+    async function loginAdmin() {
       hideError();
       const user = document.getElementById('admin-user').value.trim();
       const pass = document.getElementById('admin-pass').value;
       if (!user || !pass) { showError('Please enter Username and Password.'); return; }
       // Clear any stale session before logging in
       EMS_DB.clearSession();
-      if (EMS_DB.loginAdmin(user, pass)) {
+      const btn = document.querySelector('#panel-admin .btn-login');
+      btn.classList.add('loading');
+      const ok = await EMS_DB.loginAdmin(user, pass);
+      btn.classList.remove('loading');
+      if (ok) {
         window.location.href = 'admin-dashboard.html';
       } else {
-        const admin = EMS_DB.getAdmin();
-        console.log('Admin record:', admin);
         showError('❌ Invalid credentials. Try: admin / admin@123');
       }
     }
@@ -333,6 +344,16 @@
     if (sess && sess.role) {
       window.location.href = sess.role === 'admin' ? 'admin-dashboard.html' : 'employee-dashboard.html';
     }
+
+    // Also check Firebase Auth state
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        const s = EMS_DB.getSession();
+        if (s && s.role) {
+          window.location.href = s.role === 'admin' ? 'admin-dashboard.html' : 'employee-dashboard.html';
+        }
+      }
+    });
   </script>
 </body>
 </html>

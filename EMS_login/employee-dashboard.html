@@ -394,22 +394,38 @@
 
 </main>
 
-<script src="/EMS_login/ems-db.js"></script>
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="ems-firebase.js"></script>
 <script>
   // Auth guard
   const sess = EMS_DB.getSession();
   if (!sess || sess.role !== 'employee') window.location.href = 'index.html';
 
-  const empId = sess.id;
-  const emp   = EMS_DB.getEmployee(empId);
-  
-  if(!emp) { EMS_DB.clearSession(); window.location.href = 'index.html'; }
+  // Auth guard + Employee load
+  const sess = EMS_DB.getSession();
+  if (!sess || sess.role !== 'employee') window.location.href = 'index.html';
 
-  // Sidebar setup
-  document.getElementById('sidebar-name').textContent  = emp.name;
-  document.getElementById('welcome-name').textContent  = emp.name.split(' ')[0];
-  document.getElementById('sidebar-desig').textContent = emp.designation;
-  document.getElementById('sidebar-avatar').textContent = emp.name.split(' ').map(n=>n[0]).join('').slice(0,2);
+  const empId = sess.id;
+  let emp = null;
+
+  // Load employee profile from Firestore
+  async function initEmployee() {
+    emp = await EMS_DB.getEmployee(empId);
+    if (!emp) { EMS_DB.clearSession(); window.location.href = 'index.html'; return; }
+
+    // Sidebar setup
+    document.getElementById('sidebar-name').textContent  = emp.name;
+    document.getElementById('welcome-name').textContent  = emp.name.split(' ')[0];
+    document.getElementById('sidebar-desig').textContent = emp.designation;
+    document.getElementById('sidebar-avatar').textContent = emp.name.split(' ').map(n=>n[0]).join('').slice(0,2);
+
+    renderDashboard();
+  }
+  initEmployee();
 
   // Clock
   function updateClock() {
@@ -472,10 +488,11 @@
 
   // ── Dashboard ──────────────────────────────────────────────
   let taskChart, myAttChart;
-  function renderDashboard() {
-    const att    = EMS_DB.getAttendance(empId);
-    const tasks  = EMS_DB.getTasks(empId);
-    const leaves = EMS_DB.getLeaves(empId);
+  async function renderDashboard() {
+    if (!emp) return;
+    const att    = await EMS_DB.getAttendance(empId);
+    const tasks  = await EMS_DB.getTasks(empId);
+    const leaves = await EMS_DB.getLeaves(empId);
     const month  = new Date().getMonth();
     const present = att.filter(a => new Date(a.date).getMonth()===month && a.status==='present').length;
     const pendingTasks = tasks.filter(t => t.status !== 'done').length;
@@ -535,18 +552,29 @@
     const cur = document.getElementById('cur-pass').value;
     const nw  = document.getElementById('new-pass').value;
     const cn  = document.getElementById('confirm-pass').value;
-    if (cur !== emp.password) { toast('Current password is incorrect', 'error'); return; }
     if (nw.length < 6)        { toast('New password must be at least 6 characters', 'error'); return; }
     if (nw !== cn)            { toast('Passwords do not match', 'error'); return; }
-    EMS_DB.updateEmployee(empId, { password: nw });
-    emp.password = nw;
-    toast('Password updated successfully!', 'success');
+    // Update Firebase Auth password
+    const user = auth.currentUser;
+    if (user) {
+      user.updatePassword(nw)
+        .then(() => toast('Password updated successfully!', 'success'))
+        .catch(e => {
+          if (e.code === 'auth/requires-recent-login') {
+            toast('Please log out and log back in to change your password.', 'warning');
+          } else {
+            toast('Error: ' + e.message, 'error');
+          }
+        });
+    } else {
+      toast('Not authenticated. Please log in again.', 'error');
+    }
     ['cur-pass','new-pass','confirm-pass'].forEach(id => document.getElementById(id).value='');
   }
 
   // ── Attendance ─────────────────────────────────────────────
-  function renderAttendance() {
-    const todayRec = EMS_DB.getTodayAttendance(empId);
+  async function renderAttendance() {
+    const todayRec = await EMS_DB.getTodayAttendance(empId);
     document.getElementById('today-att-status').innerHTML = todayRec
       ? sBadge(todayRec.status)
       : '<span style="color:var(--muted);font-size:13px">Not marked yet</span>';
@@ -556,9 +584,9 @@
     renderAttendanceTable();
   }
 
-  function renderAttendanceTable() {
+  async function renderAttendanceTable() {
     const filter = document.getElementById('my-att-filter').value;
-    let att = EMS_DB.getAttendance(empId);
+    let att = await EMS_DB.getAttendance(empId);
     if(filter === 'this-month') {
         const month = new Date().getMonth();
         att = att.filter(a => new Date(a.date).getMonth() === month);
@@ -570,29 +598,29 @@
     document.getElementById('att-history-table').innerHTML = html;
   }
 
-  function markAtt(type) {
+  async function markAtt(type) {
     const today = new Date().toISOString().split('T')[0];
     const time  = new Date().toLocaleTimeString('en-IN', { hour12: false });
-    const rec   = EMS_DB.getTodayAttendance(empId);
+    const rec   = await EMS_DB.getTodayAttendance(empId);
     
     if (type === 'present') {
         if(rec && rec.checkIn) { toast('Check-in already marked for today', 'info'); return; }
-        EMS_DB.markAttendance({ empId, date:today, status:'present', checkIn:time });
+        await EMS_DB.markAttendance({ empId, date:today, status:'present', checkIn:time });
         toast('Checked in successfully', 'success');
     } else {
         if(!rec || !rec.checkIn) { toast('You must check in first', 'error'); return; }
         if(rec.checkOut) { toast('Check-out already marked for today', 'info'); return; }
-        EMS_DB.markAttendance({ empId, date:today, status:rec.status, checkIn:rec.checkIn, checkOut:time });
+        await EMS_DB.markAttendance({ empId, date:today, status:rec.status, checkIn:rec.checkIn, checkOut:time });
         toast('Checked out successfully', 'success');
     }
     renderAttendance();
   }
 
-  // ── Tasks ──────────────────────────────────────────────────
-  function renderTasks() {
+  // ── Tasks ────────────────────────────────────────────────────
+  async function renderTasks() {
     const q = document.getElementById('my-task-search').value.toLowerCase();
     const s = document.getElementById('my-task-status').value;
-    let tasks = EMS_DB.getTasks(empId);
+    let tasks = await EMS_DB.getTasks(empId);
     if(q) tasks = tasks.filter(t => (t.title+t.description).toLowerCase().includes(q));
     if(s) tasks = tasks.filter(t => t.status === s);
     
@@ -609,21 +637,21 @@
     document.getElementById('my-tasks-table').innerHTML = html;
   }
 
-  function updateTaskStatus(id, status) {
-    EMS_DB.updateTask(id, { status });
+  async function updateTaskStatus(id, status) {
+    await EMS_DB.updateTask(id, { status });
     toast('Task status updated', 'success');
     renderTasks();
   }
 
-  // ── Leaves ─────────────────────────────────────────────────
-  function applyLeave() {
+  // ── Leaves ──────────────────────────────────────────────────
+  async function applyLeave() {
     const from   = document.getElementById('leave-from').value;
     const to     = document.getElementById('leave-to').value;
     const type   = document.getElementById('leave-type').value;
     const reason = document.getElementById('leave-reason').value.trim();
     if (!from||!to||!reason) { toast('Please fill all fields', 'error'); return; }
     if (from>to)             { toast('To date must be after From date', 'error'); return; }
-    EMS_DB.applyLeave({ empId, from, to, type, reason });
+    await EMS_DB.applyLeave({ empId, from, to, type, reason });
     toast('Leave request submitted successfully!', 'success');
     ['leave-from','leave-to','leave-reason'].forEach(id => document.getElementById(id).value='');
     renderLeavesTable();
@@ -686,8 +714,8 @@
     window.location.href = 'index.html';
   }
 
-  // Initial render
-  renderDashboard();
+  // Initial render — called by initEmployee() after emp loads
+  // renderDashboard() is called inside initEmployee()
 </script>
 </body>
 </html>

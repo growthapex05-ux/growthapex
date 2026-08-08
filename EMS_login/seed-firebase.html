@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Firebase Seed — GrowthApex EMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700;800&family=Urbanist:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Urbanist', sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .container {
+      width: 100%;
+      max-width: 700px;
+    }
+    h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 28px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #00D4FF, #26CF4B);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .subtitle {
+      font-size: 14px;
+      color: #64748b;
+      margin-bottom: 28px;
+    }
+    .warning {
+      background: rgba(245,158,11,.1);
+      border: 1px solid rgba(245,158,11,.3);
+      border-radius: 12px;
+      padding: 14px 18px;
+      font-size: 13px;
+      color: #fbbf24;
+      margin-bottom: 24px;
+    }
+    .warning strong { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; }
+    .card {
+      background: #1a1f2e;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 20px;
+    }
+    h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn {
+      padding: 14px 28px;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      font-family: 'Space Grotesk', sans-serif;
+      transition: all .2s;
+      width: 100%;
+      margin-bottom: 12px;
+    }
+    .btn-seed {
+      background: linear-gradient(135deg, #00D4FF, #26CF4B);
+      color: #000;
+    }
+    .btn-seed:hover { opacity: .9; transform: translateY(-1px); }
+    .btn-seed:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+    .btn-reset {
+      background: rgba(239,68,68,.15);
+      color: #f87171;
+      border: 1px solid rgba(239,68,68,.3);
+    }
+    .btn-reset:hover { background: rgba(239,68,68,.25); }
+    .log-area {
+      background: #0a0d14;
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 10px;
+      padding: 16px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      line-height: 1.8;
+      min-height: 200px;
+      max-height: 400px;
+      overflow-y: auto;
+      margin-top: 16px;
+    }
+    .log-line { display: flex; gap: 8px; }
+    .log-line .ts { color: #475569; flex-shrink: 0; }
+    .log-line.ok    .msg { color: #34d399; }
+    .log-line.err   .msg { color: #f87171; }
+    .log-line.info  .msg { color: #67e8f9; }
+    .log-line.warn  .msg { color: #fbbf24; }
+    .progress-bar-wrap { background: rgba(255,255,255,.05); border-radius: 4px; height: 6px; margin-top: 16px; overflow: hidden; }
+    .progress-bar { height: 100%; background: linear-gradient(90deg, #00D4FF, #26CF4B); transition: width .4s ease; border-radius: 4px; }
+    .done-banner {
+      text-align: center;
+      padding: 20px;
+      background: rgba(38,207,75,.1);
+      border: 1px solid rgba(38,207,75,.3);
+      border-radius: 12px;
+      margin-top: 16px;
+      display: none;
+    }
+    .done-banner.show { display: block; }
+    .done-banner h3 { font-family: 'Space Grotesk', sans-serif; color: #34d399; font-size: 18px; margin-bottom: 8px; }
+    .done-banner a {
+      display: inline-block;
+      margin-top: 12px;
+      padding: 10px 24px;
+      background: #34d399;
+      color: #000;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .seed-table { width: 100%; font-size: 12px; border-collapse: collapse; }
+    .seed-table th { text-align: left; padding: 6px 10px; color: #475569; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid rgba(255,255,255,.06); }
+    .seed-table td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,.04); }
+    .seed-table tr:last-child td { border: none; }
+    code { background: rgba(0,212,255,.1); color: #67e8f9; padding: 1px 6px; border-radius: 4px; font-size: 11px; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>🌱 Firebase Seed Utility</h1>
+  <p class="subtitle">GrowthApex EMS — One-time data migration to Firebase</p>
+
+  <div class="warning">
+    <strong>⚠️ Run this only once</strong>
+    Running seed multiple times will try to create duplicate Firebase Auth accounts (which will fail gracefully), but Firestore documents will be overwritten. Safe to re-run if needed.
+  </div>
+
+  <div class="card">
+    <h2>👤 Users to be seeded</h2>
+    <table class="seed-table">
+      <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Password</th><th>Role</th></tr></thead>
+      <tbody>
+        <tr><td><code>ADMIN</code></td><td>Admin</td><td>admin@growthapex.in</td><td>admin@123</td><td>Admin</td></tr>
+        <tr><td><code>EMP001</code></td><td>Surya Pratap Singh</td><td>surya@growthapex.in</td><td>surya@123</td><td>Employee</td></tr>
+        <tr><td><code>EMP002</code></td><td>Naresh Mandal</td><td>naresh@growthapex.in</td><td>naresh@123</td><td>Employee</td></tr>
+        <tr><td><code>EMP003</code></td><td>Priya Sharma</td><td>priya@growthapex.in</td><td>priya@123</td><td>Employee</td></tr>
+        <tr><td><code>EMP004</code></td><td>Rohan Verma</td><td>rohan@growthapex.in</td><td>rohan@123</td><td>Employee</td></tr>
+        <tr><td><code>EMP005</code></td><td>Anjali Gupta</td><td>anjali@growthapex.in</td><td>anjali@123</td><td>Employee</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>🚀 Run Migration</h2>
+    <button class="btn btn-seed" id="seed-btn" onclick="runSeed()">⚡ Seed All Data to Firebase</button>
+    <button class="btn btn-reset" onclick="location.href='index.html'">← Back to Login</button>
+
+    <div class="progress-bar-wrap" id="progress-wrap" style="display:none">
+      <div class="progress-bar" id="progress-bar" style="width:0%"></div>
+    </div>
+
+    <div class="log-area" id="log"></div>
+    <div class="done-banner" id="done-banner">
+      <h3>✅ Migration Complete!</h3>
+      <p style="color:#94a3b8;font-size:13px">All admin and employee data has been seeded to Firebase.<br>You can now delete this file and use the EMS normally.</p>
+      <a href="index.html">→ Go to EMS Login</a>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+  const SEED_DATA = {
+    admin: {
+      username: 'admin',
+      name:     'Admin',
+      email:    'admin@growthapex.in',
+      password: 'admin@123',
+    },
+    employees: [
+      { id:'EMP001', name:'Surya Pratap Singh', email:'surya@growthapex.in',   phone:'9217648531', department:'Management', designation:'Founder & CEO',            salary:150000, password:'surya@123',  joinDate:'2022-01-01', status:'active' },
+      { id:'EMP002', name:'Naresh Mandal',       email:'naresh@growthapex.in',  phone:'9876543210', department:'Technology', designation:'Co-Founder & CTO',          salary:120000, password:'naresh@123', joinDate:'2022-01-15', status:'active' },
+      { id:'EMP003', name:'Priya Sharma',        email:'priya@growthapex.in',   phone:'9988776655', department:'Marketing',  designation:'Social Media Manager',      salary:55000,  password:'priya@123',  joinDate:'2023-03-01', status:'active' },
+      { id:'EMP004', name:'Rohan Verma',         email:'rohan@growthapex.in',   phone:'9112233445', department:'Design',     designation:'Graphic Designer',          salary:50000,  password:'rohan@123',  joinDate:'2023-06-01', status:'active' },
+      { id:'EMP005', name:'Anjali Gupta',        email:'anjali@growthapex.in',  phone:'9654321098', department:'Sales',      designation:'Business Dev Executive',    salary:45000,  password:'anjali@123', joinDate:'2024-01-10', status:'active' },
+    ],
+  };
+
+  let total = 0, done = 0;
+
+  function log(msg, type = 'info') {
+    const area = document.getElementById('log');
+    const ts   = new Date().toLocaleTimeString('en-IN', { hour12: false });
+    const line = document.createElement('div');
+    line.className = `log-line ${type}`;
+    line.innerHTML = `<span class="ts">[${ts}]</span><span class="msg">${msg}</span>`;
+    area.appendChild(line);
+    area.scrollTop = area.scrollHeight;
+  }
+
+  function setProgress(pct) {
+    document.getElementById('progress-bar').style.width = pct + '%';
+  }
+
+  async function createAuthUser(email, password, displayName) {
+    try {
+      const cred = await auth.createUserWithEmailAndPassword(email, password);
+      await cred.user.updateProfile({ displayName });
+      log(`✅ Auth account created: ${email}`, 'ok');
+    } catch (e) {
+      if (e.code === 'auth/email-already-in-use') {
+        log(`ℹ️  Auth account already exists: ${email}`, 'warn');
+      } else {
+        log(`❌ Auth error for ${email}: ${e.message}`, 'err');
+      }
+    }
+  }
+
+  async function runSeed() {
+    const btn = document.getElementById('seed-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Seeding...';
+    document.getElementById('progress-wrap').style.display = 'block';
+    document.getElementById('log').innerHTML = '';
+
+    total = 1 + SEED_DATA.employees.length; // admin + employees
+    done  = 0;
+
+    log('🚀 Starting Firebase seed migration...', 'info');
+    log('──────────────────────────────────────', 'info');
+
+    // ── Seed Admin ────────────────────────────────────────────
+    log('📋 Creating admin Firestore document...', 'info');
+    try {
+      await db.collection('admin').doc('config').set({
+        username: SEED_DATA.admin.username,
+        name:     SEED_DATA.admin.name,
+        email:    SEED_DATA.admin.email,
+      });
+      log('✅ Admin Firestore document saved', 'ok');
+    } catch (e) {
+      log(`❌ Admin Firestore error: ${e.message}`, 'err');
+    }
+
+    log('🔑 Creating admin Firebase Auth account...', 'info');
+    await createAuthUser(SEED_DATA.admin.email, SEED_DATA.admin.password, SEED_DATA.admin.name);
+
+    // Sign out admin before creating employee accounts
+    await auth.signOut();
+
+    done++;
+    setProgress(Math.round(done / total * 100));
+    log('──────────────────────────────────────', 'info');
+
+    // ── Seed Employees ────────────────────────────────────────
+    for (const emp of SEED_DATA.employees) {
+      log(`👤 Seeding ${emp.name} (${emp.id})...`, 'info');
+
+      // Firestore profile (no password stored)
+      try {
+        await db.collection('employees').doc(emp.id).set({
+          name:        emp.name,
+          email:       emp.email,
+          phone:       emp.phone,
+          department:  emp.department,
+          designation: emp.designation,
+          salary:      emp.salary,
+          joinDate:    emp.joinDate,
+          status:      emp.status,
+          createdAt:   new Date().toISOString(),
+        });
+        log(`✅ Firestore profile saved: ${emp.id}`, 'ok');
+      } catch (e) {
+        log(`❌ Firestore error for ${emp.id}: ${e.message}`, 'err');
+      }
+
+      // Firebase Auth account
+      await createAuthUser(emp.email, emp.password, emp.name);
+      await auth.signOut();
+
+      done++;
+      setProgress(Math.round(done / total * 100));
+    }
+
+    log('──────────────────────────────────────', 'info');
+    log('🎉 Seed migration complete!', 'ok');
+    log('ℹ️  You can now login via the EMS login page.', 'info');
+    log('ℹ️  Delete this file (seed-firebase.html) after use.', 'warn');
+
+    setProgress(100);
+    document.getElementById('done-banner').classList.add('show');
+    btn.textContent = '✅ Done!';
+  }
+</script>
+</body>
+</html>
