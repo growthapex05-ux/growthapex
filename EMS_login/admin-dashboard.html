@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Dashboard — GrowthApex EMS</title>
-  <link rel="shortcut icon" href="../assets/images/fav.svg">
+  <link rel="shortcut icon" type="image/svg+xml" href="../assets/images/logo/favicon.svg">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Urbanist:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
@@ -414,7 +414,7 @@
 <script>
 // ─── Auth Guard ───────────────────────────────────────────────
 const sess = EMS_DB.getSession();
-if (!sess || sess.role !== 'admin') { window.location.href = '/EMS_login/index.html'; }
+if (!sess || sess.role !== 'admin') { window.location.href = '/EMS_login/'; }
 
 // ─── Clock ────────────────────────────────────────────────────
 function updateClock() {
@@ -903,7 +903,7 @@ async function exportCSV(type) {
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
 
-function logout() { EMS_DB.clearSession(); window.location.href = '/EMS_login/index.html'; }
+function logout() { EMS_DB.clearSession(); window.location.href = '/EMS_login/'; }
 
 // ─── Init ─────────────────────────────────────────────────────
 renderOverview();

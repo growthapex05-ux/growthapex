@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Employee Dashboard — GrowthApex EMS</title>
-  <link rel="shortcut icon" href="../assets/images/fav.svg">
+  <link rel="shortcut icon" type="image/svg+xml" href="../assets/images/logo/favicon.svg">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Urbanist:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
@@ -416,7 +416,7 @@
 <script>
   // Auth guard
   const sess = JSON.parse(localStorage.getItem('ems_session'));
-  if (!sess || sess.role !== 'employee') window.location.href = '/EMS_login/index.html';
+  if (!sess || sess.role !== 'employee') window.location.href = '/EMS_login/';
 
   const empId = sess.id;
   let emp = null;
@@ -424,7 +424,7 @@
   // Load employee profile from Firestore
   async function initEmployee() {
     emp = await EMS_DB.getEmployee(empId);
-    if (!emp) { EMS_DB.clearSession(); window.location.href = '/EMS_login/index.html'; return; }
+    if (!emp) { EMS_DB.clearSession(); window.location.href = '/EMS_login/'; return; }
 
     // Sidebar setup
     document.getElementById('sidebar-name').textContent  = emp.name;
@@ -720,7 +720,7 @@
 
   function logout() {
     EMS_DB.clearSession();
-    window.location.href = '/EMS_login/index.html';
+    window.location.href = '/EMS_login/';
   }
 
   // Initial render — called by initEmployee() after emp loads

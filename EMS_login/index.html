@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EMS Login — GrowthApex</title>
-  <link rel="shortcut icon" href="../assets/images/fav.svg">
+  <link rel="shortcut icon" type="image/svg+xml" href="../assets/images/logo/favicon.svg">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Urbanist:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -348,7 +348,7 @@
         }
 
         setSession({ role: 'admin', name: 'GrowthApex Admin', email: cred.user.email });
-        window.location.href = '/EMS_login/admin-dashboard.html';
+        window.location.href = '/EMS_login/admin-dashboard';
       } catch (e) {
         btn.classList.remove('loading');
         let msg = '❌ Login failed: ' + e.message;
@@ -423,7 +423,7 @@
           designation: emp.designation || '',
           department:  emp.department  || '',
         });
-        window.location.href = '/EMS_login/employee-dashboard.html';
+        window.location.href = '/EMS_login/employee-dashboard';
       } catch (e) {
         btn.classList.remove('loading');
         let msg = '❌ Login failed: ' + e.message;
