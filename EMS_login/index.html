@@ -216,10 +216,10 @@
       <!-- Employee Login -->
       <div id="panel-employee" class="panel active">
         <div class="form-group">
-          <label>Email Address</label>
+          <label>Employee ID or Email Address</label>
           <div class="input-wrap">
             <span class="icon">📧</span>
-            <input type="text" id="emp-id" placeholder="your@email.com" autocomplete="off">
+            <input type="text" id="emp-id" placeholder="e.g. EMP001 or yourname@gmail.com" autocomplete="off">
           </div>
         </div>
         <div class="form-group">
@@ -364,25 +364,48 @@
     // ── Employee Login ─────────────────────────────────────────
     async function loginEmployee() {
       hideError();
-      const emailInput = document.getElementById('emp-id').value.trim();
-      const pass       = document.getElementById('emp-pass').value;
-      if (!emailInput || !pass) { showError('Please enter your email and password.'); return; }
+      const inputVal = document.getElementById('emp-id').value.trim();
+      const pass     = document.getElementById('emp-pass').value;
+      if (!inputVal || !pass) { showError('Please enter your ID/email and password.'); return; }
 
       const btn = document.querySelector('#panel-employee .btn-login');
       btn.classList.add('loading');
 
       try {
-        // Validate email format on client side before hitting Firebase
-        if (!emailInput.includes('@') || !emailInput.includes('.')) {
-          btn.classList.remove('loading');
-          showError('❌ Please enter a valid email address (e.g. yourname@gmail.com).');
-          return;
+        let emailToAuth = inputVal;
+
+        // If the user inputs an Employee ID (e.g. EMP001, which does not contain @)
+        if (!inputVal.includes('@')) {
+          const formattedId = inputVal.toUpperCase();
+          try {
+            // Step 1: Sign in with read-only resolver account silently
+            await auth.signInWithEmailAndPassword('ems-system-resolver@growthapex.com', 'SystemResolverPassword123!');
+            
+            // Step 2: Retrieve employee document by ID to get their real email
+            const empDoc = await db.collection('employees').doc(formattedId).get();
+            
+            // Sign out the resolver immediately
+            await auth.signOut();
+
+            if (!empDoc.exists) {
+              btn.classList.remove('loading');
+              showError('❌ Employee ID not found.');
+              return;
+            }
+            
+            emailToAuth = empDoc.data().email;
+          } catch (resErr) {
+            await auth.signOut().catch(() => {});
+            btn.classList.remove('loading');
+            showError('❌ Failed to look up Employee ID: ' + resErr.message);
+            return;
+          }
         }
 
-        // Step 1: Sign in with Firebase Auth (no Firestore needed yet)
-        const cred = await auth.signInWithEmailAndPassword(emailInput, pass);
+        // Step 3: Sign in with the resolved/typed email and password
+        const cred = await auth.signInWithEmailAndPassword(emailToAuth, pass);
 
-        // Step 2: Now authenticated — find employee record by email
+        // Step 4: Now authenticated — find employee record by email
         const emps = await EMS_DB.getEmployees();
         const emp  = emps.find(e => e.email === cred.user.email);
 
