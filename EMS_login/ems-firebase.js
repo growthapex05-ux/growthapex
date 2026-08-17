@@ -173,32 +173,37 @@ const EMS_DB = {
   // ── Auth + Session ────────────────────────────────────────
 
   /**
-   * Login Admin via Firebase Auth.
-   * Admin email is stored in Firestore admin/config.email
+   * Login Admin via Firebase Auth only — no pre-auth Firestore dependency.
+   * Signs in directly, verifies email matches known admin, then sets session.
    */
   async loginAdmin(username, password) {
+    // Known admin email (set during project setup)
+    const ADMIN_EMAIL = 'growthapex05@gmail.com';
+
     try {
-      const adminDoc = await this.getAdmin();
-      // Allow login by username OR email
-      const email = adminDoc.email || (username.includes('@') ? username : null);
-      if (!email) { console.error('Admin email not configured'); return false; }
+      // Use input directly if it looks like an email, otherwise use admin email
+      const email = (username && username.includes('@')) ? username : ADMIN_EMAIL;
 
-      await auth.signInWithEmailAndPassword(email, password);
+      // Sign in with Firebase Auth
+      const cred = await auth.signInWithEmailAndPassword(email, password);
 
-      // Verify this is indeed an admin (check Firestore admin/config)
-      const currentAdmin = await this.getAdmin();
-      if (!currentAdmin || currentAdmin.username !== username) {
-        // Try email match
-        if (currentAdmin.email !== username) {
-          await auth.signOut();
-          return false;
-        }
+      // Verify the signed-in account is the admin account
+      if (cred.user.email !== ADMIN_EMAIL) {
+        await auth.signOut();
+        return false;
       }
+
+      // Optionally enrich session with Firestore data (non-blocking)
+      let adminName = 'GrowthApex Admin';
+      try {
+        const adminDoc = await this.getAdmin();
+        if (adminDoc && adminDoc.name) adminName = adminDoc.name;
+      } catch (_) { /* Firestore enrichment optional */ }
 
       this.setSession({
         role:  'admin',
-        name:  currentAdmin.name || 'Admin',
-        email: currentAdmin.email || email,
+        name:  adminName,
+        email: cred.user.email,
       });
       return true;
     } catch (e) {

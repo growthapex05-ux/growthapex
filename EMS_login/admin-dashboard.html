@@ -396,12 +396,25 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js"></script>
-<script src="ems-firebase.js"></script>
+<!-- Firebase Init inline — avoids relative path issues -->
+<script>
+  const firebaseConfig = {
+    apiKey:            "AIzaSyAA84W6KghuGz8C3usn26igTGv_WAOCP34",
+    authDomain:        "growthapex-f811b.firebaseapp.com",
+    projectId:         "growthapex-f811b",
+    storageBucket:     "growthapex-f811b.firebasestorage.app",
+    messagingSenderId: "1047657399663",
+    appId:             "1:1047657399663:web:32f0d5b33c64e28d7f149a"
+  };
+  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  const db   = firebase.firestore();
+  const auth = firebase.auth();
+</script>
+<script src="/EMS_login/ems-firebase.js"></script>
 <script>
 // ─── Auth Guard ───────────────────────────────────────────────
 const sess = EMS_DB.getSession();
-if (!sess || sess.role !== 'admin') { window.location.href = 'index.html'; }
+if (!sess || sess.role !== 'admin') { window.location.href = '/EMS_login/index.html'; }
 
 // ─── Clock ────────────────────────────────────────────────────
 function updateClock() {
@@ -585,15 +598,32 @@ async function saveEmployee() {
     department:  document.getElementById('f-dept').value,
     designation: document.getElementById('f-desig').value.trim(),
     salary:      Number(document.getElementById('f-salary').value),
-    password:    document.getElementById('f-pass').value,
+    password:    document.getElementById('f-pass').value || 'emp@123',
     joinDate:    document.getElementById('f-join').value,
     status:      document.getElementById('f-status').value,
   };
   const msg = document.getElementById('emp-modal-msg');
   if (!data.name||!data.email) { msg.innerHTML='<span style="color:#f87171">Name and Email are required.</span>'; return; }
-  if (id) { await EMS_DB.updateEmployee(id, data); toast('Employee updated!','success'); }
-  else    { const e = await EMS_DB.addEmployee(data); toast(`${e.name} added (${e.id})!`,'success'); }
-  closeModal('emp-modal'); renderEmpTable();
+  const btnSave = document.querySelector('#emp-modal .btn-save');
+  if (btnSave) { btnSave.disabled = true; btnSave.textContent = 'Saving...'; }
+  try {
+    if (id) {
+      await EMS_DB.updateEmployee(id, data);
+      toast('Employee updated!','success');
+    } else {
+      // Save admin session before adding employee (Firebase Auth may switch users)
+      const adminSession = JSON.parse(localStorage.getItem('ems_session'));
+      const e = await EMS_DB.addEmployee(data);
+      // Restore admin session
+      if (adminSession) localStorage.setItem('ems_session', JSON.stringify(adminSession));
+      toast(`${e.name} added (${e.id})!`,'success');
+    }
+    closeModal('emp-modal'); renderEmpTable();
+  } catch(err) {
+    msg.innerHTML = `<span style="color:#f87171">Error: ${err.message}</span>`;
+  } finally {
+    if (btnSave) { btnSave.disabled = false; btnSave.textContent = '💾 Save Employee'; }
+  }
 }
 
 // ─── ATTENDANCE ───────────────────────────────────────────────
@@ -625,24 +655,18 @@ async function renderAdminAtt() {
     <div class="att-chip" style="border-color:rgba(6,182,212,.3)"><strong style="color:#67e8f9">${onLeave}</strong>On Leave</div>
     <div class="att-chip"><strong>${att.length}</strong>Total</div>`;
 
+  const emps2 = await EMS_DB.getEmployees();
+  const empMap2 = Object.fromEntries(emps2.map(e => [e.id, e]));
+
   document.getElementById('admin-att-table').innerHTML = att.length ? `
     <table><thead><tr><th>Employee</th><th>Date</th><th>Status</th><th>Check-In</th><th>Check-Out</th><th>Action</th></tr></thead>
-    <tbody>${att.slice().reverse().map(a=>{ const empId=a.empId; return `<tr>
-      <td><div style="font-weight:600" id="att-name-${a.id}">${a.empId}</div><div style="font-size:11px;color:var(--muted)">${a.empId}</div></td>
+    <tbody>${att.slice().reverse().map(a=>{ const emp=empMap2[a.empId]||{}; return `<tr>
+      <td><div style="font-weight:600">${emp.name||a.empId}</div><div style="font-size:11px;color:var(--muted)">${a.empId}</div></td>
       <td>${fmt(a.date)}</td><td>${sBadge(a.status)}</td>
       <td>${a.checkIn||'—'}</td><td>${a.checkOut||'—'}</td>
       <td><button class="btn btn-sm btn-edit" onclick="editAtt('${a.empId}','${a.date}')">✏</button></td>
     </tr>`;}).join('')}</tbody></table>`
   : '<div class="empty-state"><div>📅</div>No attendance records for selected filters</div>';
-
-  // Resolve employee names asynchronously
-  att.forEach(async a => {
-    const el = document.getElementById('att-name-'+a.id);
-    if (el) {
-      const emp = await EMS_DB.getEmployee(a.empId);
-      if (emp && el) el.textContent = emp.name;
-    }
-  });
 }
 async function editAtt(empId, date) {
   const attList = await EMS_DB.getAttendance(empId);
@@ -727,30 +751,6 @@ async function updateTaskStatus(id, status) {
 async function deleteTask(id) {
   await EMS_DB.deleteTask(id); renderAdminTasks(); toast('Task deleted','error');
 }
-
-  document.getElementById('admin-tasks-table').innerHTML = tasks.length ? `
-    <table><thead><tr><th>Task</th><th>Assigned To</th><th>Deadline</th><th>Status</th><th>Actions</th></tr></thead>
-    <tbody>${tasks.slice().reverse().map(t=>{
-      const emp = EMS_DB.getEmployee(t.empId)||{};
-      const overdue = t.status!=='done' && t.deadline < new Date().toISOString().split('T')[0];
-      return `<tr>
-        <td><div style="font-weight:600">${t.title}${overdue?'<span class="badge badge-red" style="margin-left:6px;font-size:10px">OVERDUE</span>':''}</div>
-            <div style="font-size:11px;color:var(--muted)">${t.description||''}</div></td>
-        <td><div style="font-weight:600">${emp.name||t.empId}</div><div style="font-size:11px;color:var(--muted)">${emp.department||''}</div></td>
-        <td style="color:${overdue?'#f87171':'inherit'}">${fmt(t.deadline)}</td>
-        <td>
-          <select onchange="EMS_DB.updateTask(${t.id},{status:this.value});renderAdminTasks();toast('Task updated!','success')" style="padding:4px 8px;font-size:12px;width:auto">
-            ${['todo','in-progress','done'].map(s=>`<option value="${s}" ${t.status===s?'selected':''}>${s}</option>`).join('')}
-          </select>
-        </td>
-        <td style="white-space:nowrap">
-          <button class="btn btn-sm btn-edit" onclick="editTask(${t.id})">✏</button>
-          <button class="btn btn-sm btn-del" onclick="EMS_DB.deleteTask(${t.id});renderAdminTasks();toast('Task deleted','error')" style="margin-left:4px">🗑</button>
-        </td>
-      </tr>`;
-    }).join('')}</tbody></table>`
-  : '<div class="empty-state"><div>✅</div>No tasks — assign one!</div>';
-}
 function openTaskModal() {
   document.getElementById('task-modal-title').textContent = 'Assign Task';
   document.getElementById('task-title').value   = '';
@@ -825,37 +825,11 @@ async function renderAdminLeaves() {
 }
 async function actLeave(id, status) {
   await EMS_DB.updateLeave(id, status);
-  renderAdminLeaves();
+  await renderAdminLeaves();
   toast(`Leave ${status}!`, status==='approved'?'success':'error');
+  // Update notif badge
   const leaves = await EMS_DB.getLeaves();
   const pending = leaves.filter(l=>l.status==='pending').length;
-  document.getElementById('notif-dot').style.display = pending ? 'block' : 'none';
-}
-
-  document.getElementById('admin-leaves-table').innerHTML = leaves.length ? `
-    <table><thead><tr><th>Employee</th><th>From</th><th>To</th><th>Type</th><th>Reason</th><th>Status</th><th>Actions</th></tr></thead>
-    <tbody>${leaves.slice().reverse().map(l=>{
-      const emp = EMS_DB.getEmployee(l.empId)||{};
-      return `<tr>
-        <td><div style="font-weight:600">${emp.name||l.empId}</div><div style="font-size:11px;color:var(--muted)">${emp.department||''}</div></td>
-        <td>${fmt(l.from)}</td><td>${fmt(l.to)}</td>
-        <td><span class="badge badge-blue">${l.type}</span></td>
-        <td style="color:var(--muted);max-width:180px">${l.reason}</td>
-        <td>${sBadge(l.status)}</td>
-        <td style="white-space:nowrap">${l.status==='pending'?`
-          <button class="btn btn-sm btn-approve" onclick="actLeave(${l.id},'approved')">✅ Approve</button>
-          <button class="btn btn-sm btn-reject" onclick="actLeave(${l.id},'rejected')" style="margin-left:4px">❌ Reject</button>`:'—'}
-        </td>
-      </tr>`;
-    }).join('')}</tbody></table>`
-  : '<div class="empty-state"><div>🌴</div>No leave requests</div>';
-}
-function actLeave(id, status) {
-  EMS_DB.updateLeave(id, status);
-  renderAdminLeaves();
-  toast(`Leave ${status}!`, status==='approved'?'success':'error');
-  // Update notif dot
-  const pending = EMS_DB.getLeaves().filter(l=>l.status==='pending').length;
   document.getElementById('notif-dot').style.display = pending ? 'block' : 'none';
 }
 
@@ -865,9 +839,13 @@ async function renderSalary() {
   let emps = (await EMS_DB.getEmployees()).filter(e=>e.status==='active');
   if (q) emps = emps.filter(e=>(e.name+e.department).toLowerCase().includes(q));
 
-  const totalGross = emps.reduce((s,e)=>{ const b=Number(e.salary); return s+b+Math.round(b*.4)+Math.round(b*.1); }, 0);
-  const totalPF    = emps.reduce((s,e)=>s+Math.round(Number(e.salary)*.12), 0);
-  const totalNet   = emps.reduce((s,e)=>{ const b=Number(e.salary); return s+b+Math.round(b*.4)+Math.round(b*.1)-Math.round(b*.12); }, 0);
+  const totalNet   = emps.reduce((s,e)=>s+Number(e.salary||0), 0);
+  const totalPF    = emps.reduce((s,e)=>s+Math.round(Math.round(Number(e.salary||0)/1.38)*0.12), 0);
+  const totalGross = emps.reduce((s,e)=>{
+    const n = Number(e.salary||0);
+    const b = Math.round(n/1.38);
+    return s + b + Math.round(b*0.4) + Math.round(b*0.1);
+  }, 0);
   const avg        = emps.length ? Math.round(totalNet/emps.length) : 0;
 
   document.getElementById('p-total').textContent = money(totalNet);
@@ -878,7 +856,7 @@ async function renderSalary() {
   document.getElementById('admin-salary-table').innerHTML = emps.length ? `
     <table><thead><tr><th>Employee</th><th>Department</th><th>Basic</th><th>HRA</th><th>TA</th><th>PF</th><th>Net Pay</th></tr></thead>
     <tbody>${emps.map(e=>{
-      const b=Number(e.salary), hra=Math.round(b*.4), ta=Math.round(b*.1), pf=Math.round(b*.12), net=b+hra+ta-pf;
+      const net=Number(e.salary||0), b=Math.round(net/1.38), hra=Math.round(b*.4), ta=Math.round(b*.1), pf=Math.round(b*.12);
       const pct = Math.round((net/(b+hra+ta))*100);
       return `<tr>
         <td><div style="font-weight:600">${e.name}</div><div style="font-size:11px;color:var(--muted)">${e.id}</div></td>
@@ -908,7 +886,10 @@ async function exportCSV(type) {
     filename = 'attendance.csv';
   } else {
     const h = ['ID','Name','Department','Basic','HRA','TA','PF','Net Pay'];
-    rows = [h, ...(await EMS_DB.getEmployees()).filter(e=>e.status==='active').map(e=>{ const b=Number(e.salary),hra=Math.round(b*.4),ta=Math.round(b*.1),pf=Math.round(b*.12); return [e.id,e.name,e.department,b,hra,ta,pf,b+hra+ta-pf]; })];
+    rows = [h, ...(await EMS_DB.getEmployees()).filter(e=>e.status==='active').map(e=>{
+      const net=Number(e.salary||0), b=Math.round(net/1.38), hra=Math.round(b*.4), ta=Math.round(b*.1), pf=Math.round(b*.12);
+      return [e.id,e.name,e.department,b,hra,ta,pf,net];
+    })];
     filename = 'payroll.csv';
   }
   const csv = rows.map(r=>r.join(',')).join('\n');
@@ -922,7 +903,7 @@ async function exportCSV(type) {
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
 
-function logout() { EMS_DB.clearSession(); window.location.href = 'index.html'; }
+function logout() { EMS_DB.clearSession(); window.location.href = '/EMS_login/index.html'; }
 
 // ─── Init ─────────────────────────────────────────────────────
 renderOverview();

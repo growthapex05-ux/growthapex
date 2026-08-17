@@ -398,16 +398,25 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js"></script>
-<script src="ems-firebase.js"></script>
+<!-- Firebase Init inline -->
+<script>
+  const firebaseConfig = {
+    apiKey:            "AIzaSyAA84W6KghuGz8C3usn26igTGv_WAOCP34",
+    authDomain:        "growthapex-f811b.firebaseapp.com",
+    projectId:         "growthapex-f811b",
+    storageBucket:     "growthapex-f811b.firebasestorage.app",
+    messagingSenderId: "1047657399663",
+    appId:             "1:1047657399663:web:32f0d5b33c64e28d7f149a"
+  };
+  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  const db   = firebase.firestore();
+  const auth = firebase.auth();
+</script>
+<script src="/EMS_login/ems-firebase.js"></script>
 <script>
   // Auth guard
-  const sess = EMS_DB.getSession();
-  if (!sess || sess.role !== 'employee') window.location.href = 'index.html';
-
-  // Auth guard + Employee load
-  const sess = EMS_DB.getSession();
-  if (!sess || sess.role !== 'employee') window.location.href = 'index.html';
+  const sess = JSON.parse(localStorage.getItem('ems_session'));
+  if (!sess || sess.role !== 'employee') window.location.href = '/EMS_login/index.html';
 
   const empId = sess.id;
   let emp = null;
@@ -415,7 +424,7 @@
   // Load employee profile from Firestore
   async function initEmployee() {
     emp = await EMS_DB.getEmployee(empId);
-    if (!emp) { EMS_DB.clearSession(); window.location.href = 'index.html'; return; }
+    if (!emp) { EMS_DB.clearSession(); window.location.href = '/EMS_login/index.html'; return; }
 
     // Sidebar setup
     document.getElementById('sidebar-name').textContent  = emp.name;
@@ -674,12 +683,12 @@
 
   // ── Salary ─────────────────────────────────────────────────
   function renderSalary() {
-    const basic   = emp.salary;
+    const net     = Number(emp.salary || 0);
+    const basic   = Math.round(net / 1.38);
     const hra     = Math.round(basic * 0.4);
     const ta      = Math.round(basic * 0.1);
     const gross   = basic + hra + ta;
     const pf      = Math.round(basic * 0.12);
-    const net     = gross - pf;
 
     document.getElementById('salary-info').innerHTML = `
       <div style="max-width:500px">
@@ -711,7 +720,7 @@
 
   function logout() {
     EMS_DB.clearSession();
-    window.location.href = 'index.html';
+    window.location.href = '/EMS_login/index.html';
   }
 
   // Initial render — called by initEmployee() after emp loads

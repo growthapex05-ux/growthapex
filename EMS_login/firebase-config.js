@@ -8,12 +8,13 @@
 // ============================================================
 
 const firebaseConfig = {
-  apiKey:            "YOUR_API_KEY",
-  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId:         "YOUR_PROJECT_ID",
-  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId:             "YOUR_APP_ID",
+  apiKey:            "AIzaSyAA84W6KghuGz8C3usn26igTGv_WAOCP34",
+  authDomain:        "growthapex-f811b.firebaseapp.com",
+  projectId:         "growthapex-f811b",
+  storageBucket:     "growthapex-f811b.firebasestorage.app",
+  messagingSenderId: "1047657399663",
+  appId:             "1:1047657399663:web:32f0d5b33c64e28d7f149a",
+  measurementId:     "G-PM0R8V81RE"
 };
 
 // ── Firebase SDK (via CDN — loaded by the HTML page before this script) ──

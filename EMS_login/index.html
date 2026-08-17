@@ -216,10 +216,10 @@
       <!-- Employee Login -->
       <div id="panel-employee" class="panel active">
         <div class="form-group">
-          <label>Employee ID</label>
+          <label>Email Address</label>
           <div class="input-wrap">
-            <span class="icon">🪪</span>
-            <input type="text" id="emp-id" placeholder="e.g. EMP001" autocomplete="off">
+            <span class="icon">📧</span>
+            <input type="text" id="emp-id" placeholder="your@email.com" autocomplete="off">
           </div>
         </div>
         <div class="form-group">
@@ -239,10 +239,10 @@
       <!-- Admin Login -->
       <div id="panel-admin" class="panel">
         <div class="form-group">
-          <label>Admin Username</label>
+          <label>Admin Email</label>
           <div class="input-wrap">
             <span class="icon">👨‍💼</span>
-            <input type="text" id="admin-user" placeholder="admin" autocomplete="off">
+            <input type="text" id="admin-user" placeholder="growthapex05@gmail.com" autocomplete="off">
           </div>
         </div>
         <div class="form-group">
@@ -265,9 +265,28 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-  <script src="firebase-config.js"></script>
-  <script src="ems-firebase.js"></script>
+
+  <!-- Firebase Init (inline — avoids relative path issues) -->
   <script>
+    const firebaseConfig = {
+      apiKey:            "AIzaSyAA84W6KghuGz8C3usn26igTGv_WAOCP34",
+      authDomain:        "growthapex-f811b.firebaseapp.com",
+      projectId:         "growthapex-f811b",
+      storageBucket:     "growthapex-f811b.firebasestorage.app",
+      messagingSenderId: "1047657399663",
+      appId:             "1:1047657399663:web:32f0d5b33c64e28d7f149a"
+    };
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    const db   = firebase.firestore();
+    const auth = firebase.auth();
+  </script>
+
+  <!-- EMS Database Engine -->
+  <script src="/EMS_login/ems-firebase.js"></script>
+  <script>
+    const ADMIN_EMAIL = 'growthapex05@gmail.com';
+
+    // ── Tab switching ─────────────────────────────────────────
     function switchTab(tab) {
       ['employee','admin'].forEach(t => {
         document.getElementById('panel-'+t).classList.toggle('active', t===tab);
@@ -290,48 +309,98 @@
       btn.textContent = inp.type === 'password' ? '👁' : '🙈';
     }
 
-    async function loginEmployee() {
-      hideError();
-      const id   = document.getElementById('emp-id').value.trim().toUpperCase();
-      const pass = document.getElementById('emp-pass').value;
-      if (!id || !pass) { showError('Please enter Employee ID and Password.'); return; }
-      const btn = document.querySelector('#panel-employee .btn-login');
-      btn.classList.add('loading');
-      const ok = await EMS_DB.loginEmployee(id, pass);
-      btn.classList.remove('loading');
-      if (ok) {
-        window.location.href = 'employee-dashboard.html';
-      } else {
-        showError('❌ Invalid Employee ID or Password. Try: EMP001 / surya@123');
-      }
+    // ── Session helpers (localStorage) ────────────────────────
+    function getSession() {
+      try {
+        const s = JSON.parse(localStorage.getItem('ems_session'));
+        if (s && (Date.now() - s._ts) < 8 * 3600 * 1000) return s;
+        clearSession();
+        return null;
+      } catch (_) { return null; }
+    }
+    function setSession(data) {
+      localStorage.setItem('ems_session', JSON.stringify({ ...data, _ts: Date.now() }));
+    }
+    function clearSession() {
+      localStorage.removeItem('ems_session');
     }
 
+    // ── Admin Login — uses Firebase Auth directly ─────────────
     async function loginAdmin() {
       hideError();
       const user = document.getElementById('admin-user').value.trim();
       const pass = document.getElementById('admin-pass').value;
-      if (!user || !pass) { showError('Please enter Username and Password.'); return; }
-      // Clear any stale session before logging in
-      EMS_DB.clearSession();
+      if (!user || !pass) { showError('Please enter your email and password.'); return; }
+
+      clearSession();
       const btn = document.querySelector('#panel-admin .btn-login');
       btn.classList.add('loading');
-      const ok = await EMS_DB.loginAdmin(user, pass);
-      btn.classList.remove('loading');
-      if (ok) {
-        window.location.href = 'admin-dashboard.html';
-      } else {
-        showError('❌ Invalid credentials. Try: admin / admin@123');
+
+      try {
+        const email = user.includes('@') ? user : ADMIN_EMAIL;
+        const cred  = await auth.signInWithEmailAndPassword(email, pass);
+
+        if (cred.user.email !== ADMIN_EMAIL) {
+          await auth.signOut();
+          btn.classList.remove('loading');
+          showError('❌ Not an admin account.');
+          return;
+        }
+
+        setSession({ role: 'admin', name: 'GrowthApex Admin', email: cred.user.email });
+        window.location.href = '/EMS_login/admin-dashboard.html';
+      } catch (e) {
+        btn.classList.remove('loading');
+        const msg = e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found'
+          ? '❌ Wrong email or password.'
+          : '❌ Login failed: ' + e.message;
+        showError(msg);
       }
     }
 
-    function resetDB() {
-      if (confirm('This will reset all EMS data to defaults. Continue?')) {
-        EMS_DB.reset();
-        alert('Database reset! Use: admin / admin@123 to login.');
+    // ── Employee Login ─────────────────────────────────────────
+    async function loginEmployee() {
+      hideError();
+      const emailInput = document.getElementById('emp-id').value.trim();
+      const pass       = document.getElementById('emp-pass').value;
+      if (!emailInput || !pass) { showError('Please enter your email and password.'); return; }
+
+      const btn = document.querySelector('#panel-employee .btn-login');
+      btn.classList.add('loading');
+
+      try {
+        // Step 1: Sign in with Firebase Auth (no Firestore needed yet)
+        const cred = await auth.signInWithEmailAndPassword(emailInput, pass);
+
+        // Step 2: Now authenticated — find employee record by email
+        const emps = await EMS_DB.getEmployees();
+        const emp  = emps.find(e => e.email === cred.user.email);
+
+        if (!emp || emp.status !== 'active') {
+          await auth.signOut();
+          btn.classList.remove('loading');
+          showError('❌ Employee account not found or inactive.');
+          return;
+        }
+
+        setSession({
+          role:        'employee',
+          id:          emp.id,
+          name:        emp.name,
+          designation: emp.designation || '',
+          department:  emp.department  || '',
+        });
+        window.location.href = '/EMS_login/employee-dashboard.html';
+      } catch (e) {
+        btn.classList.remove('loading');
+        const msg = e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential'
+          ? '❌ Wrong email or password.'
+          : '❌ Login failed: ' + e.message;
+        showError(msg);
       }
     }
 
-    // Enter key support
+    // ── Enter key support ─────────────────────────────────────
     document.addEventListener('keydown', e => {
       if (e.key === 'Enter') {
         const activePanel = document.querySelector('.panel.active').id;
@@ -339,16 +408,16 @@
       }
     });
 
-    // Check existing valid session
-    const sess = EMS_DB.getSession();
+    // ── Restore existing session ──────────────────────────────
+    const sess = getSession();
     if (sess && sess.role) {
-      window.location.href = sess.role === 'admin' ? 'admin-dashboard.html' : 'employee-dashboard.html';
+      window.location.href = sess.role === 'admin' ? '/EMS_login/admin-dashboard.html' : '/EMS_login/employee-dashboard.html';
     }
 
-    // Also check Firebase Auth state
+    // ── Firebase Auth state listener ──────────────────────────
     auth.onAuthStateChanged(user => {
       if (user) {
-        const s = EMS_DB.getSession();
+        const s = getSession();
         if (s && s.role) {
           window.location.href = s.role === 'admin' ? 'admin-dashboard.html' : 'employee-dashboard.html';
         }
