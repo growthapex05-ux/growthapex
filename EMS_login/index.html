@@ -337,7 +337,7 @@
       btn.classList.add('loading');
 
       try {
-        const email = user.includes('@') ? user : ADMIN_EMAIL;
+        const email = (user.includes('@') && user.includes('.')) ? user : ADMIN_EMAIL;
         const cred  = await auth.signInWithEmailAndPassword(email, pass);
 
         if (cred.user.email !== ADMIN_EMAIL) {
@@ -351,9 +351,12 @@
         window.location.href = '/EMS_login/admin-dashboard.html';
       } catch (e) {
         btn.classList.remove('loading');
-        const msg = e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found'
-          ? '❌ Wrong email or password.'
-          : '❌ Login failed: ' + e.message;
+        let msg = '❌ Login failed: ' + e.message;
+        if (e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential') {
+          msg = '❌ Wrong email or password.';
+        } else if (e.code === 'auth/invalid-email') {
+          msg = '❌ Invalid email format. Please enter a valid email address.';
+        }
         showError(msg);
       }
     }
@@ -369,6 +372,13 @@
       btn.classList.add('loading');
 
       try {
+        // Validate email format on client side before hitting Firebase
+        if (!emailInput.includes('@') || !emailInput.includes('.')) {
+          btn.classList.remove('loading');
+          showError('❌ Please enter a valid email address (e.g. yourname@gmail.com).');
+          return;
+        }
+
         // Step 1: Sign in with Firebase Auth (no Firestore needed yet)
         const cred = await auth.signInWithEmailAndPassword(emailInput, pass);
 
@@ -393,9 +403,12 @@
         window.location.href = '/EMS_login/employee-dashboard.html';
       } catch (e) {
         btn.classList.remove('loading');
-        const msg = e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential'
-          ? '❌ Wrong email or password.'
-          : '❌ Login failed: ' + e.message;
+        let msg = '❌ Login failed: ' + e.message;
+        if (e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential') {
+          msg = '❌ Wrong email or password.';
+        } else if (e.code === 'auth/invalid-email') {
+          msg = '❌ Invalid email format. Please enter a valid email address.';
+        }
         showError(msg);
       }
     }
