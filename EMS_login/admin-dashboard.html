@@ -146,9 +146,38 @@
     .progress{height:6px;background:rgba(0,0,0,.08);border-radius:3px;overflow:hidden;margin-top:6px}
     .progress-bar{height:100%;border-radius:3px;transition:width .5s ease}
 
+    /* Sidebar Overlay Backdrop on Mobile */
+    .sidebar-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+      z-index: 99; backdrop-filter: blur(2px); transition: all 0.3s ease;
+    }
+    .sidebar-overlay.open { display: block; }
+
+    /* Menu Toggle Hamburger on Mobile */
+    .menu-toggle {
+      display: none; background: none; border: none; font-size: 24px;
+      cursor: pointer; color: var(--text); padding: 4px 8px; margin-right: 12px;
+      align-items: center; justify-content: center;
+    }
+
     @media(max-width:900px){
-      .sidebar{width:60px}.sidebar .nav-item span,.sidebar .nav-label,.sidebar-logo span,.admin-chip-wrap{display:none}
-      .main{margin-left:60px;padding:16px}.charts-grid{grid-template-columns:1fr}.form-row2{grid-template-columns:1fr}
+      .menu-toggle { display: inline-flex; }
+      .sidebar {
+        position: fixed; left: -240px; top: 0; bottom: 0; z-index: 100;
+        width: 240px; transition: left 0.3s ease; box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+      }
+      .sidebar.open { left: 0; }
+      .main { margin-left: 0; padding: 16px; }
+      .topbar { display: flex; align-items: center; justify-content: flex-start; }
+      .topbar-left { display: flex; align-items: center; flex: 1; }
+      .topbar-left p { display: none; }
+      .charts-grid { grid-template-columns: 1fr; }
+      .form-row2 { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media(max-width:480px) {
+      .stats-grid { grid-template-columns: 1fr; }
+      .topbar-right .clock-badge { display: none; }
     }
   </style>
 </head>
@@ -156,6 +185,9 @@
 
 <!-- Toast Container -->
 <div class="toast-container" id="toasts"></div>
+
+<!-- Sidebar Overlay Backdrop -->
+<div class="sidebar-overlay" onclick="toggleSidebar()"></div>
 
 <!-- Sidebar -->
 <nav class="sidebar">
@@ -182,6 +214,7 @@
 <main class="main">
   <div class="topbar">
     <div class="topbar-left">
+      <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
       <h2 id="page-title">Overview</h2>
       <p id="page-sub">Live data from GrowthApex EMS</p>
     </div>
@@ -442,9 +475,23 @@ const sBadge = s => {
   return `<span class="badge badge-${m[s]||'blue'}">${s}</span>`;
 };
 
+// ─── Sidebar Mobile Toggle ────────────────────────────────────
+function toggleSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const overlay = document.querySelector('.sidebar-overlay');
+  if (sidebar) sidebar.classList.toggle('open');
+  if (overlay) overlay.classList.toggle('open');
+}
+
 // ─── Page Navigation ──────────────────────────────────────────
 const titles = { overview:'Overview', employees:'Employees', attendance:'Attendance', tasks:'Tasks', leaves:'Leave Requests', salary:'Payroll' };
 function showPage(id, el) {
+  // Close sidebar on mobile navigation
+  const sidebar = document.querySelector('.sidebar');
+  const overlay = document.querySelector('.sidebar-overlay');
+  if (sidebar) sidebar.classList.remove('open');
+  if (overlay) overlay.classList.remove('open');
+
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
