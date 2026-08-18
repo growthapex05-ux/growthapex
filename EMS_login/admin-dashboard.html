@@ -536,6 +536,70 @@ const sBadge = s => {
   return `<span class="badge badge-${m[s]||'blue'}">${s}</span>`;
 };
 
+const calcHours = (dateStr, checkIn, checkOut) => {
+  if (!checkIn) return '—';
+  
+  const today = new Date().toISOString().split('T')[0];
+  let endTime = checkOut;
+  let isCurrent = false;
+
+  if (!checkOut) {
+    if (dateStr === today) {
+      const now = new Date();
+      endTime = now.toLocaleTimeString('en-IN', { hour12: false });
+      isCurrent = true;
+    } else {
+      return '—';
+    }
+  }
+
+  try {
+    const [h1, m1, s1] = checkIn.split(':').map(Number);
+    const [h2, m2, s2] = endTime.split(':').map(Number);
+    const t1 = new Date(2000, 0, 1, h1, m1, s1 || 0);
+    const t2 = new Date(2000, 0, 1, h2, m2, s2 || 0);
+    let diffMs = t2 - t1;
+    if (diffMs < 0) return '—';
+    const hrs = Math.floor(diffMs / 3600000);
+    const mins = Math.floor((diffMs % 3600000) / 60000);
+    
+    const formatted = `${hrs}h ${mins}m`;
+    return isCurrent ? `<span style="color:var(--green);font-weight:600">⚡ Working (${formatted})</span>` : formatted;
+  } catch (e) {
+    return '—';
+  }
+};
+
+const calcTotalHours = (attList) => {
+  let totalMs = 0;
+  const today = new Date().toISOString().split('T')[0];
+  
+  attList.forEach(a => {
+    if (!a.checkIn) return;
+    let endTime = a.checkOut;
+    if (!a.checkOut) {
+      if (a.date === today) {
+        endTime = new Date().toLocaleTimeString('en-IN', { hour12: false });
+      } else {
+        return;
+      }
+    }
+    
+    try {
+      const [h1, m1, s1] = a.checkIn.split(':').map(Number);
+      const [h2, m2, s2] = endTime.split(':').map(Number);
+      const t1 = new Date(2000, 0, 1, h1, m1, s1 || 0);
+      const t2 = new Date(2000, 0, 1, h2, m2, s2 || 0);
+      let diffMs = t2 - t1;
+      if (diffMs > 0) {
+        totalMs += diffMs;
+      }
+    } catch (_) {}
+  });
+  
+  return totalMs / 3600000;
+};
+
 // ─── Sidebar Mobile Toggle ────────────────────────────────────
 function toggleSidebar() {
   const sidebar = document.querySelector('.sidebar');
@@ -754,22 +818,25 @@ async function renderAdminAtt() {
   const absent   = att.filter(a=>a.status==='absent').length;
   const halfDay  = att.filter(a=>a.status==='half-day').length;
   const onLeave  = att.filter(a=>a.status==='leave').length;
+  const totalHrs = calcTotalHours(att);
   document.getElementById('att-summary').innerHTML = `
     <div class="att-chip" style="border-color:rgba(16,185,129,.3)"><strong style="color:#34d399">${present}</strong>Present</div>
     <div class="att-chip" style="border-color:rgba(239,68,68,.3)"><strong style="color:#f87171">${absent}</strong>Absent</div>
     <div class="att-chip" style="border-color:rgba(245,158,11,.3)"><strong style="color:#fbbf24">${halfDay}</strong>Half Day</div>
     <div class="att-chip" style="border-color:rgba(6,182,212,.3)"><strong style="color:#67e8f9">${onLeave}</strong>On Leave</div>
+    <div class="att-chip" style="border-color:rgba(0,212,255,.3)"><strong style="color:var(--cyan)">${totalHrs.toFixed(1)}h</strong>Total Hours</div>
     <div class="att-chip"><strong>${att.length}</strong>Total</div>`;
 
   const emps2 = cache.employees;
   const empMap2 = Object.fromEntries(emps2.map(e => [e.id, e]));
 
   document.getElementById('admin-att-table').innerHTML = att.length ? `
-    <table><thead><tr><th>Employee</th><th>Date</th><th>Status</th><th>Check-In</th><th>Check-Out</th><th>Action</th></tr></thead>
+    <table><thead><tr><th>Employee</th><th>Date</th><th>Status</th><th>Check-In</th><th>Check-Out</th><th>Working Hours</th><th>Action</th></tr></thead>
     <tbody>${att.slice().reverse().map(a=>{ const emp=empMap2[a.empId]||{}; return `<tr>
       <td><div style="font-weight:600">${emp.name||a.empId}</div><div style="font-size:11px;color:var(--muted)">${a.empId}</div></td>
       <td>${fmt(a.date)}</td><td>${sBadge(a.status)}</td>
       <td>${a.checkIn||'—'}</td><td>${a.checkOut||'—'}</td>
+      <td>${calcHours(a.date, a.checkIn, a.checkOut)}</td>
       <td><button class="btn btn-sm btn-edit" onclick="editAtt('${a.empId}','${a.date}')">✏</button></td>
     </tr>`;}).join('')}</tbody></table>`
   : '<div class="empty-state"><div>📅</div>No attendance records for selected filters</div>';
