@@ -770,14 +770,16 @@ async function renderAdminTasks() {
   const empMap = Object.fromEntries(emps.map(e => [e.id, e]));
 
   document.getElementById('admin-tasks-table').innerHTML = tasks.length ? `
-    <table><thead><tr><th>Task</th><th>Assigned To</th><th>Deadline</th><th>Status</th><th>Actions</th></tr></thead>
+    <table><thead><tr><th>Task</th><th>Assigned To</th><th>Source</th><th>Deadline</th><th>Status</th><th>Actions</th></tr></thead>
     <tbody>${tasks.slice().reverse().map(t=>{
       const emp = empMap[t.empId] || {};
       const overdue = t.status!=='done' && t.deadline < new Date().toISOString().split('T')[0];
+      const isSelf = t.createdBy === 'employee';
       return `<tr>
         <td><div style="font-weight:600">${t.title}${overdue?'<span class="badge badge-red" style="margin-left:6px;font-size:10px">OVERDUE</span>':''}</div>
             <div style="font-size:11px;color:var(--muted)">${t.description||''}</div></td>
         <td><div style="font-weight:600">${emp.name||t.empId}</div><div style="font-size:11px;color:var(--muted)">${emp.department||''}</div></td>
+        <td>${isSelf ? '<span class="badge badge-cyan">Self-Submitted</span>' : '<span class="badge badge-purple">Admin Assigned</span>'}</td>
         <td style="color:${overdue?'#f87171':'inherit'}">${fmt(t.deadline)}</td>
         <td>
           <select onchange="updateTaskStatus('${t.id}',this.value)" style="padding:4px 8px;font-size:12px;width:auto">

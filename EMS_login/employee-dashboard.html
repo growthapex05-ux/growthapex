@@ -175,6 +175,26 @@
       align-items: center; justify-content: center;
     }
 
+    /* Modal */
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+    .modal-overlay.open{display:flex;animation:fadeIn .2s ease}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    .modal{background:var(--card);border:1px solid var(--border);border-radius:16px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;padding:28px;animation:slideUp .25s ease}
+    @keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+    .modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+    .modal-header h3{font-size:18px;font-weight:800;font-family:'Space Grotesk',sans-serif;color:var(--text)}
+    .modal-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .2s}
+    .modal-close:hover{background:rgba(0,0,0,.08);color:var(--text)}
+    .form-group{margin-bottom:14px}
+    .form-row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .modal-footer{display:flex;gap:10px;margin-top:20px}
+    .btn-save{background:var(--text);color:#fff;flex:1;font-size:14px;padding:11px;border-radius:8px;cursor:pointer;border:none;font-family:'Space Grotesk',sans-serif;font-weight:700;transition:all .2s}
+    .btn-save:hover{background:var(--purple);color:#fff}
+    .btn-sm{padding:5px 10px;font-size:11px;border-radius:6px;cursor:pointer;border:none;font-family:'Inter',sans-serif;font-weight:600}
+    .btn-edit{background:rgba(59,130,246,.15);color:#93c5fd;border:1px solid rgba(59,130,246,.3)}
+    .btn-del{background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.3)}
+    .btn-cancel{background:rgba(255,255,255,.06);color:var(--text);border:1px solid var(--border)}
+
     @media (max-width:768px) {
       .menu-toggle { display: inline-flex; }
       .sidebar {
@@ -188,7 +208,7 @@
       .topbar-left p { display: none; }
       .stats-grid { grid-template-columns: 1fr 1fr; }
       .charts-grid { grid-template-columns: 1fr; }
-      .profile-grid, .form-row { grid-template-columns: 1fr; }
+      .profile-grid, .form-row, .form-row2 { grid-template-columns: 1fr; }
     }
     @media (max-width:480px) {
       .stats-grid { grid-template-columns: 1fr; }
@@ -289,7 +309,12 @@
     </div>
 
     <div class="section-card">
-      <div class="section-head"><h3>📋 Recent Tasks</h3></div>
+      <div class="section-head">
+        <h3>📋 Recent Tasks</h3>
+        <div class="toolbar">
+          <button class="btn btn-primary" onclick="openTaskModal()">+ Submit Daily Task</button>
+        </div>
+      </div>
       <div class="table-wrap" id="dash-tasks-table"></div>
     </div>
 
@@ -361,6 +386,7 @@
             <option value="in-progress">In Progress</option>
             <option value="done">Done</option>
           </select>
+          <button class="btn btn-primary" onclick="openTaskModal()">+ Submit Daily Task</button>
         </div>
       </div>
       <div class="table-wrap" id="my-tasks-table"></div>
@@ -418,6 +444,43 @@
     <div class="section-card">
       <h3>💰 Salary Details</h3>
       <div id="salary-info"></div>
+    </div>
+  </div>
+
+  <!-- Task Modal -->
+  <div class="modal-overlay" id="task-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="task-modal-title">Submit Daily Task</h3>
+        <button class="modal-close" onclick="closeModal('task-modal')">✕</button>
+      </div>
+      <div class="form-group">
+        <label>Task Title *</label>
+        <input id="task-title" placeholder="What are you working on today?">
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea id="task-desc" rows="3" placeholder="Describe the task details…"></textarea>
+      </div>
+      <div class="form-row2">
+        <div class="form-group">
+          <label>Deadline</label>
+          <input type="date" id="task-deadline">
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="task-status">
+            <option value="todo">To Do</option>
+            <option value="in-progress">In Progress</option>
+            <option value="done">Done</option>
+          </select>
+        </div>
+      </div>
+      <input type="hidden" id="task-edit-id">
+      <div class="modal-footer">
+        <button class="btn btn-cancel" style="padding:11px 20px" onclick="closeModal('task-modal')">Cancel</button>
+        <button class="btn-save" onclick="saveTask()">💾 Save Task</button>
+      </div>
     </div>
   </div>
 
@@ -676,15 +739,25 @@
     if(q) tasks = tasks.filter(t => (t.title+t.description).toLowerCase().includes(q));
     if(s) tasks = tasks.filter(t => t.status === s);
     
-    const html = tasks.length ? `<table><thead><tr><th>Task</th><th>Deadline</th><th>Status</th><th>Update Progress</th></tr></thead><tbody>
-      ${tasks.slice().reverse().map(t=>`<tr>
-        <td><div style="font-weight:600">${t.title}</div><div style="font-size:11px;color:var(--muted)">${t.description||''}</div></td>
-        <td style="${t.status!=='done' && t.deadline < new Date().toISOString().split('T')[0] ? 'color:var(--red)' : ''}">${fmt(t.deadline)}</td>
-        <td>${sBadge(t.status)}</td>
-        <td><select class="filter-select" onchange="updateTaskStatus(${t.id},this.value)" style="width:auto">
-          ${['todo','in-progress','done'].map(st=>`<option value="${st}" ${t.status===st?'selected':''}>${st}</option>`).join('')}
-        </select></td>
-      </tr>`).join('')}
+    const html = tasks.length ? `<table><thead><tr><th>Task</th><th>Deadline</th><th>Status</th><th>Type</th><th>Update Progress</th><th>Actions</th></tr></thead><tbody>
+      ${tasks.slice().reverse().map(t=>{
+        const isSelf = t.createdBy === 'employee';
+        return `<tr>
+          <td><div style="font-weight:600">${t.title}</div><div style="font-size:11px;color:var(--muted)">${t.description||''}</div></td>
+          <td style="${t.status!=='done' && t.deadline < new Date().toISOString().split('T')[0] ? 'color:var(--red)' : ''}">${fmt(t.deadline)}</td>
+          <td>${sBadge(t.status)}</td>
+          <td>${isSelf ? '<span class="badge badge-cyan">Self-Submitted</span>' : '<span class="badge badge-purple">Admin Assigned</span>'}</td>
+          <td><select class="filter-select" onchange="updateTaskStatus('${t.id}',this.value)" style="width:auto">
+            ${['todo','in-progress','done'].map(st=>`<option value="${st}" ${t.status===st?'selected':''}>${st}</option>`).join('')}
+          </select></td>
+          <td style="white-space:nowrap">
+            ${isSelf ? `
+              <button class="btn btn-sm btn-edit" onclick="editEmployeeTask('${t.id}')">✏ Edit</button>
+              <button class="btn btn-sm btn-del" onclick="deleteEmployeeTask('${t.id}')" style="margin-left:4px">🗑</button>
+            ` : '—'}
+          </td>
+        </tr>`;
+      }).join('')}
     </tbody></table>` : '<div class="empty-state"><div>✅</div>No tasks found</div>';
     document.getElementById('my-tasks-table').innerHTML = html;
   }
@@ -693,6 +766,74 @@
     await EMS_DB.updateTask(id, { status });
     toast('Task status updated', 'success');
     renderTasks();
+  }
+
+  // Modal actions
+  function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+  document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
+
+  function openTaskModal(task = null) {
+    document.getElementById('task-modal-title').textContent = task ? 'Edit Daily Task' : 'Submit Daily Task';
+    document.getElementById('task-title').value = task ? task.title : '';
+    document.getElementById('task-desc').value = task ? (task.description || '') : '';
+    document.getElementById('task-deadline').value = task ? task.deadline : new Date().toISOString().split('T')[0];
+    document.getElementById('task-status').value = task ? task.status : 'todo';
+    document.getElementById('task-edit-id').value = task ? task.id : '';
+    document.getElementById('task-modal').classList.add('open');
+    setTimeout(() => document.getElementById('task-title').focus(), 100);
+  }
+
+  async function editEmployeeTask(id) {
+    const tasks = await EMS_DB.getTasks(empId);
+    const t = tasks.find(t => t.id === id);
+    if (!t) return;
+    openTaskModal(t);
+  }
+
+  async function saveTask() {
+    const editId = document.getElementById('task-edit-id').value;
+    const task = {
+      empId: empId,
+      title: document.getElementById('task-title').value.trim(),
+      description: document.getElementById('task-desc').value.trim(),
+      deadline: document.getElementById('task-deadline').value,
+      status: document.getElementById('task-status').value,
+    };
+    if (!task.title || !task.deadline) {
+      toast('Please fill title and deadline', 'error');
+      return;
+    }
+    
+    try {
+      if (editId) {
+        await EMS_DB.updateTask(editId, task);
+        toast('Task updated successfully!', 'success');
+      } else {
+        await EMS_DB.addTask({
+          ...task,
+          createdBy: 'employee',
+          createdAt: new Date().toISOString()
+        });
+        toast('Daily task submitted successfully!', 'success');
+      }
+      closeModal('task-modal');
+      const activePage = document.querySelector('.page.active').id.replace('page-', '');
+      renderPage(activePage);
+    } catch (err) {
+      toast('Error saving task: ' + err.message, 'error');
+    }
+  }
+
+  async function deleteEmployeeTask(id) {
+    if (!confirm('Are you sure you want to delete this task?')) return;
+    try {
+      await EMS_DB.deleteTask(id);
+      toast('Task deleted successfully', 'error');
+      const activePage = document.querySelector('.page.active').id.replace('page-', '');
+      renderPage(activePage);
+    } catch (err) {
+      toast('Error deleting task: ' + err.message, 'error');
+    }
   }
 
   // ── Leaves ──────────────────────────────────────────────────
