@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+# Exclude internal Employee Management System
+Disallow: /EMS_login/
+Disallow: /assets/js/
+
+Sitemap: https://growthapex.in/sitemap.xml
