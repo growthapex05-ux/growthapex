@@ -24,4 +24,56 @@
     <loc>https://growthapex.in/contact</loc>
     <priority>0.80</priority>
   </url>
+  <url>
+    <loc>https://growthapex.in/blog-standard</loc>
+    <priority>0.80</priority>
+  </url>
+  <url>
+    <loc>https://growthapex.in/blog-two-columns</loc>
+    <priority>0.70</priority>
+  </url>
+  <url>
+    <loc>https://growthapex.in/blog-three-columns</loc>
+    <priority>0.70</priority>
+  </url>
+  <url>
+    <loc>https://growthapex.in/blog-local-seo</loc>
+    <priority>0.64</priority>
+  </url>
+  <url>
+    <loc>https://growthapex.in/blog-keyword-research</loc>
+    <priority>0.64</priority>
+  </url>
+  <url>
+    <loc>https://growthapex.in/blog-core-web-vitals</loc>
+    <priority>0.64</priority>
+  </url>
+  <url>
+    <loc>https://growthapex.in/blog-double-marketing-roi</loc>
+    <priority>0.64</priority>
+  </url>
+  <url>
+    <loc>https://growthapex.in/blog-branding-strategies</loc>
+    <priority>0.64</priority>
+  </url>
+  <url>
+    <loc>https://growthapex.in/blog-social-media-leads</loc>
+    <priority>0.64</priority>
+  </url>
+  <url>
+    <loc>https://growthapex.in/blog-b2b-lead-generation</loc>
+    <priority>0.64</priority>
+  </url>
+  <url>
+    <loc>https://growthapex.in/blog-visual-graphic-design</loc>
+    <priority>0.64</priority>
+  </url>
+  <url>
+    <loc>https://growthapex.in/blog-cro-web-design</loc>
+    <priority>0.64</priority>
+  </url>
+  <url>
+    <loc>https://growthapex.in/blog-content-marketing</loc>
+    <priority>0.64</priority>
+  </url>
 </urlset>

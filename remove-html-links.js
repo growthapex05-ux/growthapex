@@ -17,7 +17,17 @@ const rootHtmls = [
   'service-details.html',
   'service.html',
   'work-details.html',
-  'work.html'
+  'work.html',
+  'blog-local-seo.html',
+  'blog-keyword-research.html',
+  'blog-core-web-vitals.html',
+  'blog-double-marketing-roi.html',
+  'blog-branding-strategies.html',
+  'blog-social-media-leads.html',
+  'blog-b2b-lead-generation.html',
+  'blog-visual-graphic-design.html',
+  'blog-cro-web-design.html',
+  'blog-content-marketing.html'
 ];
 
 const emsHtmls = [
