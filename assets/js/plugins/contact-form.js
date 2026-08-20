@@ -40,6 +40,22 @@
                 // Set the message text.
                 $(formMessages).text(response);
 
+                // Get values before clearing
+                var nameVal = $('#name').val() || '';
+                var emailVal = $('#email').val() || '';
+                var messageVal = $('#message').val() || '';
+
+                // Construct WhatsApp message
+                var waMessage = "Hello Surya, a new client has submitted the contact form on GrowthApex:\n\n" +
+                                "*Name:* " + nameVal + "\n" +
+                                "*Email:* " + emailVal + "\n" +
+                                "*Message:* " + messageVal;
+                
+                var waUrl = "https://wa.me/919217648531?text=" + encodeURIComponent(waMessage);
+                
+                // Open WhatsApp in a new tab
+                window.open(waUrl, '_blank');
+
                 // Clear the form.
                 $('#name, #email, #message').val('');
             })
