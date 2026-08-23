@@ -1,0 +1,20 @@
+{
+  "name": "ems-whatsapp-automation",
+  "version": "1.0.0",
+  "description": "GrowthApex EMS Whatsapp Automation Reports",
+  "main": "run.js",
+  "scripts": {
+    "start": "node run.js",
+    "test-daily": "node run.js --type=daily --dry-run",
+    "test-weekly": "node run.js --type=weekly --dry-run",
+    "test-monthly": "node run.js --type=monthly --dry-run"
+  },
+  "dependencies": {
+    "axios": "^1.6.8",
+    "dotenv": "^16.4.5",
+    "firebase-admin": "^12.1.0",
+    "minimist": "^1.2.8",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.26.0"
+  }
+}
