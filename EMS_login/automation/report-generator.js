@@ -26,6 +26,56 @@ function formatDateString(date) {
   return date.toISOString().split('T')[0];
 }
 
+// Helper: Get Indian public holidays & festivals for a given month (1-indexed) and year
+function getHolidaysForMonth(year, month) {
+  // month is 1-indexed (1 = January, 12 = December)
+  // Verified dates for 2026. Update year blocks below for future years.
+  const ALL_HOLIDAYS = [
+    // Fixed-date national holidays (every year)
+    { month: 1,  day: 1,  name: "New Year's Day 🎊" },
+    { month: 1,  day: 26, name: "Republic Day 🇮🇳" },
+    { month: 8,  day: 15, name: "Independence Day 🇮🇳" },
+    { month: 10, day: 2,  name: "Gandhi Jayanti 🕊️" },
+    { month: 12, day: 25, name: "Christmas 🎄" },
+
+    // 2026 verified festival dates
+    ...(year === 2026 ? [
+      { month: 1,  day: 14, name: "Makar Sankranti / Lohri 🪁" },
+      { month: 2,  day: 15, name: "Maha Shivratri 🔱" },
+      { month: 3,  day: 4,  name: "Holi 🎨" },
+      { month: 3,  day: 21, name: "Eid ul-Fitr 🌙" },
+      { month: 3,  day: 26, name: "Ram Navami 🙏" },
+      { month: 4,  day: 3,  name: "Good Friday ✝️" },
+      { month: 4,  day: 14, name: "Ambedkar Jayanti / Baisakhi 🌾" },
+      { month: 5,  day: 1,  name: "Buddha Purnima / Labour Day 🙏" },
+      { month: 5,  day: 28, name: "Eid ul-Adha (Bakrid) 🌙" },
+      { month: 6,  day: 26, name: "Muharram (Islamic New Year) 🕌" },
+      { month: 8,  day: 28, name: "Raksha Bandhan (Rakhi) 🪢" },
+      { month: 9,  day: 4,  name: "Janmashtami 🦚" },
+      { month: 9,  day: 5,  name: "Teachers' Day 🍎" },
+      { month: 10, day: 20, name: "Dussehra / Vijayadashami 🏹" },
+      { month: 11, day: 8,  name: "Diwali 🪔" },
+      { month: 11, day: 24, name: "Guru Nanak Jayanti 🙏" },
+    ] : []),
+
+    // 2027 festival dates (update when confirmed)
+    ...(year === 2027 ? [
+      { month: 1,  day: 14, name: "Makar Sankranti / Lohri 🪁" },
+      { month: 3,  day: 4,  name: "Holi 🎨" },
+      { month: 10, day: 25, name: "Diwali 🪔" },
+    ] : []),
+  ];
+
+  return ALL_HOLIDAYS
+    .filter(h => h.month === month)
+    .sort((a, b) => a.day - b.day)  // Sort by date ascending
+    .map(h => {
+      const dateLabel = new Date(year, h.month - 1, h.day)
+        .toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      return { date: dateLabel, name: h.name };
+    });
+}
+
 async function getActiveEmployees(db) {
   const snap = await db.collection('employees').get();
   return snap.docs
@@ -560,6 +610,15 @@ async function generateMonthlyReport(db) {
       const lateStr = stats.lateDays > 0 ? ` (⏰ ${stats.lateDays} Late)` : '';
       report += ` • *${stats.name}*: ${stats.tasksCompleted}/${stats.tasksAssigned} Tasks (Attendance: ${stats.presentDays}d Present | ${stats.absentDays}d Absent | ${stats.leaveDays}d Leave)${lateStr}\n`;
     });
+
+  // Notable holidays / festivals section
+  const holidays = getHolidaysForMonth(year, month + 1); // month is 0-indexed inside function
+  if (holidays.length > 0) {
+    report += `\n🗓️ *Notable Holidays & Festivals This Month:*\n`;
+    holidays.forEach(h => {
+      report += ` • *${h.date}* - ${h.name}\n`;
+    });
+  }
 
   report += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
   report += `🚀 Great job team! Let's hit new heights this month!`;

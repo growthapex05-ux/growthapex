@@ -440,6 +440,14 @@
       </div>
       <div class="table-wrap" id="leave-history-table"></div>
     </div>
+
+    <!-- Holidays Card -->
+    <div class="section-card" id="holidays-card">
+      <div class="section-head">
+        <h3>🗓️ Holidays &amp; Festivals This Month</h3>
+      </div>
+      <div id="holidays-list"></div>
+    </div>
   </div>
 
   <!-- Salary -->
@@ -588,7 +596,7 @@
     if (id==='profile')    renderProfile();
     if (id==='attendance') renderAttendance();
     if (id==='tasks')      renderTasks();
-    if (id==='leaves')     renderLeavesTable();
+    if (id==='leaves')     { renderLeavesTable(); renderHolidays(); }
     if (id==='salary')     renderSalary();
   }
   
@@ -902,6 +910,65 @@
             <tr style="background:rgba(38,207,75,.1);font-weight:700;color:var(--green)"><td style="padding:16px 12px;font-size:16px">Net Pay</td><td style="text-align:right;padding:16px 12px;font-size:16px">${money(net)}</td></tr>
           </tbody>
         </table>
+      </div>`;
+  }
+
+  // ── Holidays & Festivals ──
+  function getHolidaysForMonth(year, month) {
+    // month is 1-indexed. Verified 2026 Indian holiday dates.
+    const ALL = [
+      { month:1,  day:1,  name:"New Year's Day", emoji:"🎊" },
+      { month:1,  day:14, name:"Makar Sankranti / Lohri", emoji:"🪁" },
+      { month:1,  day:26, name:"Republic Day", emoji:"🇮🇳" },
+      { month:2,  day:15, name:"Maha Shivratri", emoji:"🔱" },
+      { month:3,  day:4,  name:"Holi", emoji:"🎨" },
+      { month:3,  day:21, name:"Eid ul-Fitr", emoji:"🌙" },
+      { month:3,  day:26, name:"Ram Navami", emoji:"🙏" },
+      { month:4,  day:3,  name:"Good Friday", emoji:"✝️" },
+      { month:4,  day:14, name:"Ambedkar Jayanti / Baisakhi", emoji:"🌾" },
+      { month:5,  day:1,  name:"Buddha Purnima / Labour Day", emoji:"🙏" },
+      { month:5,  day:28, name:"Eid ul-Adha (Bakrid)", emoji:"🌙" },
+      { month:6,  day:26, name:"Muharram (Islamic New Year)", emoji:"🕌" },
+      { month:8,  day:15, name:"Independence Day", emoji:"🇮🇳" },
+      { month:8,  day:28, name:"Raksha Bandhan (Rakhi)", emoji:"🪢" },
+      { month:9,  day:4,  name:"Janmashtami", emoji:"🦚" },
+      { month:9,  day:5,  name:"Teachers' Day", emoji:"🍎" },
+      { month:10, day:2,  name:"Gandhi Jayanti", emoji:"🕊️" },
+      { month:10, day:20, name:"Dussehra / Vijayadashami", emoji:"🏹" },
+      { month:11, day:8,  name:"Diwali", emoji:"🪔" },
+      { month:11, day:24, name:"Guru Nanak Jayanti", emoji:"🙏" },
+      { month:12, day:25, name:"Christmas", emoji:"🎄" },
+    ];
+    return ALL.filter(h => h.month === month).sort((a,b) => a.day - b.day);
+  }
+
+  function renderHolidays() {
+    const el = document.getElementById('holidays-list');
+    if (!el) return;
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1; // 1-indexed
+    const monthName = now.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+    const holidays = getHolidaysForMonth(year, month);
+    if (!holidays.length) {
+      el.innerHTML = '<p style="color:var(--muted);font-size:13px;padding:8px 0">No major holidays this month.</p>';
+      return;
+    }
+    el.innerHTML = `
+      <p style="font-size:12px;color:var(--muted);margin-bottom:14px">📅 Showing holidays for <strong>${monthName}</strong></p>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${holidays.map(h => {
+          const dateStr = new Date(year, h.month-1, h.day).toLocaleDateString('en-IN',{day:'numeric',month:'short',weekday:'short'});
+          const isPast = new Date(year, h.month-1, h.day) < now && new Date(year,h.month-1,h.day).toDateString() !== now.toDateString();
+          return `<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:8px;background:${isPast?'rgba(0,0,0,.03)':'rgba(0,212,255,.06)'};border:1px solid ${isPast?'var(--border)':'rgba(0,212,255,.2)'};opacity:${isPast?.6:1}">
+            <div style="font-size:22px;flex-shrink:0">${h.emoji}</div>
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:700;color:var(--text)">${h.name}</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:2px">${dateStr}</div>
+            </div>
+            ${isPast ? '<span style="font-size:11px;color:var(--muted);background:rgba(0,0,0,.06);padding:2px 8px;border-radius:4px">Past</span>' : '<span style="font-size:11px;color:var(--cyan);background:rgba(0,212,255,.1);padding:2px 8px;border-radius:4px;font-weight:600">Upcoming</span>'}
+          </div>`;
+        }).join('')}
       </div>`;
   }
 
