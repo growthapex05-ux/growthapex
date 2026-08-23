@@ -430,13 +430,15 @@ async function generateMonthlyReport(db) {
     .where('status', '==', 'approved')
     .get();
   
-  let monthlyLeavesDays = 0;
-  leavesSnap.forEach(doc => {
-    const data = doc.data();
-    if (data.to >= startStr && data.from <= endStr) {
-      monthlyLeavesDays++;
+  // Calculate actual working days in this monthly period (excluding Sundays)
+  let totalWorkingDays = 0;
+  let dateIter = new Date(startDate);
+  while (dateIter <= endDate) {
+    if (dateIter.getDay() !== 0) { // 0 is Sunday
+      totalWorkingDays++;
     }
-  });
+    dateIter.setDate(dateIter.getDate() + 1);
+  }
 
   // Calculate stats per employee
   const employeeStats = {};
@@ -446,9 +448,38 @@ async function generateMonthlyReport(db) {
       department: emp.department,
       presentDays: 0,
       lateDays: 0,
+      leaveDays: 0,
+      absentDays: 0,
       tasksAssigned: 0,
       tasksCompleted: 0
     };
+  });
+
+  let monthlyLeavesDays = 0;
+  leavesSnap.forEach(doc => {
+    const data = doc.data();
+    const lFrom = data.from;
+    const lTo = data.to;
+    if (lTo >= startStr && lFrom <= endStr) {
+      // Calculate overlap days (excluding Sundays) in current month
+      try {
+        let current = new Date(lFrom > startStr ? lFrom : startStr);
+        const limit = new Date(lTo < endStr ? lTo : endStr);
+        let overlapDays = 0;
+        while (current <= limit) {
+          if (current.getDay() !== 0) { // 0 is Sunday
+            overlapDays++;
+          }
+          current.setDate(current.getDate() + 1);
+        }
+        monthlyLeavesDays += overlapDays;
+        if (employeeStats[data.empId]) {
+          employeeStats[data.empId].leaveDays += overlapDays;
+        }
+      } catch (e) {
+        console.error("Error calculating overlap days for monthly leaves:", e.message);
+      }
+    }
   });
 
   attendanceRecords.forEach(rec => {
@@ -461,6 +492,13 @@ async function generateMonthlyReport(db) {
         }
       }
     }
+  });
+
+  // Calculate absent days per employee (working days - present - leave)
+  employees.forEach(emp => {
+    const stats = employeeStats[emp.id];
+    stats.absentDays = totalWorkingDays - stats.presentDays - stats.leaveDays;
+    if (stats.absentDays < 0) stats.absentDays = 0;
   });
 
   tasksRecords.forEach(task => {
@@ -507,7 +545,7 @@ async function generateMonthlyReport(db) {
   report += `• Total Tasks Completed: ${totalCompleted}\n`;
   report += `• Average Task Completion: ${monthlyCompletionRate}%\n`;
   report += `• Total Approved Leave Days: ${monthlyLeavesDays} days\n`;
-  report += `• Avg Attendance Check-ins: ${Math.round(attendanceRecords.length / employees.length)} per employee\n\n`;
+  report += `• Avg Attendance Check-ins: ${Math.round(attendanceRecords.length / employees.length)} days (out of ${totalWorkingDays} working days)\n\n`;
 
   if (employeeOfTheMonth && maxCompleted > 0) {
     report += `🎉 *EMPLOYEE OF THE MONTH* 🎉\n`;
@@ -520,7 +558,7 @@ async function generateMonthlyReport(db) {
     .sort((a, b) => b.tasksCompleted - a.tasksCompleted)
     .forEach(stats => {
       const lateStr = stats.lateDays > 0 ? ` (⏰ ${stats.lateDays} Late)` : '';
-      report += ` • *${stats.name}*: ${stats.tasksCompleted}/${stats.tasksAssigned} Tasks${lateStr}\n`;
+      report += ` • *${stats.name}*: ${stats.tasksCompleted}/${stats.tasksAssigned} Tasks (Attendance: ${stats.presentDays}d Present | ${stats.absentDays}d Absent | ${stats.leaveDays}d Leave)${lateStr}\n`;
     });
 
   report += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;

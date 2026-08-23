@@ -31,6 +31,12 @@ async function main() {
     process.exit(1);
   }
 
+  // Skip running the daily report on Sundays
+  if (reportType === 'daily' && new Date().getDay() === 0) {
+    console.log(`📅 Today is Sunday. Exclude Sunday from working days. Skipping daily report.`);
+    process.exit(0);
+  }
+
   console.log(`🤖 Starting EMS Report Automation`);
   console.log(`📊 Report Type: ${reportType.toUpperCase()}`);
   console.log(`⚙️  Dry Run: ${isDryRun ? 'ENABLED (Will only print to console)' : 'DISABLED (Will send to WhatsApp)'}`);
