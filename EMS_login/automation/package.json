@@ -5,6 +5,7 @@
   "main": "run.js",
   "scripts": {
     "start": "node run.js",
+    "listen-checkin": "node checkin-listener.js",
     "test-daily": "node run.js --type=daily --dry-run",
     "test-weekly": "node run.js --type=weekly --dry-run",
     "test-monthly": "node run.js --type=monthly --dry-run"

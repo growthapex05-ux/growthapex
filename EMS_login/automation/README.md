@@ -67,6 +67,28 @@ node run.js --type=monthly
 
 ---
 
+### 📍 Real-Time Employee Check-In Listener
+
+To send **instant WhatsApp group alerts** as soon as an employee checks in:
+```bash
+# Run real-time check-in listener
+npm run listen-checkin
+```
+Whenever any employee clicks **"Mark Check-In"** on their dashboard, an instant alert formatted like this will be broadcasted to your WhatsApp Group:
+
+```
+📍 *EMPLOYEE CHECK-IN ALERT* 📍
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 *Employee:* Rahul Sharma
+🆔 *ID:* EMP001
+⏰ *Check-In Time:* 09:42:15
+📅 *Date:* 2026-08-24
+🚦 *Status:* ✅ On Time
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+---
+
 ## ⏰ Scheduling Automation (Cron Jobs)
 
 To make these reports run fully automatically, you can schedule them:
