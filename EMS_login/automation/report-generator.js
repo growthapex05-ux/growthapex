@@ -228,6 +228,21 @@ async function generateWeeklyReport(db) {
   
   let totalLeavesApprovedDays = 0;
   const leaveLog = [];
+
+  // Calculate statistics per employee
+  const employeeStats = {};
+  employees.forEach(emp => {
+    employeeStats[emp.id] = {
+      name: emp.name,
+      presentDays: 0,
+      lateDays: 0,
+      leaveDays: 0,
+      absentDays: 0,
+      tasksAssigned: 0,
+      tasksCompleted: 0
+    };
+  });
+
   leavesSnap.forEach(doc => {
     const data = doc.data();
     // Check if overlap exists with the week range
@@ -237,20 +252,36 @@ async function generateWeeklyReport(db) {
       const empName = employeeMap[data.empId]?.name || data.empId;
       leaveLog.push(`${empName} (${data.type}: ${data.from} to ${data.to})`);
       totalLeavesApprovedDays++;
+
+      // Count overlap days for this employee (excluding Sundays)
+      try {
+        let current = new Date(lFrom > startStr ? lFrom : startStr);
+        const limit = new Date(lTo < endStr ? lTo : endStr);
+        let overlapDays = 0;
+        while (current <= limit) {
+          if (current.getDay() !== 0) { // 0 is Sunday
+            overlapDays++;
+          }
+          current.setDate(current.getDate() + 1);
+        }
+        if (employeeStats[data.empId]) {
+          employeeStats[data.empId].leaveDays += overlapDays;
+        }
+      } catch (e) {
+        console.error("Error calculating overlap days:", e.message);
+      }
     }
   });
 
-  // Calculate statistics per employee
-  const employeeStats = {};
-  employees.forEach(emp => {
-    employeeStats[emp.id] = {
-      name: emp.name,
-      presentDays: 0,
-      lateDays: 0,
-      tasksAssigned: 0,
-      tasksCompleted: 0
-    };
-  });
+  // Calculate actual working days in this weekly period (Monday to Saturday, excluding Sundays)
+  let totalWorkingDays = 0;
+  let dateIter = new Date(startDate);
+  while (dateIter <= endDate) {
+    if (dateIter.getDay() !== 0) { // 0 is Sunday
+      totalWorkingDays++;
+    }
+    dateIter.setDate(dateIter.getDate() + 1);
+  }
 
   attendanceRecords.forEach(rec => {
     const stats = employeeStats[rec.empId];
@@ -262,6 +293,13 @@ async function generateWeeklyReport(db) {
         }
       }
     }
+  });
+
+  // Calculate absent days per employee (working days - present - leave)
+  employees.forEach(emp => {
+    const stats = employeeStats[emp.id];
+    stats.absentDays = totalWorkingDays - stats.presentDays - stats.leaveDays;
+    if (stats.absentDays < 0) stats.absentDays = 0;
   });
 
   tasksRecords.forEach(task => {
@@ -306,6 +344,14 @@ async function generateWeeklyReport(db) {
   report += `• Total Present Check-ins: ${totalPresentCount}\n`;
   report += `• Late Check-ins: ${totalLateCount} ⏰\n`;
   report += `• Total Leaves Taken: ${totalLeavesApprovedDays} days\n\n`;
+
+  report += `👥 *Employee Attendance Summary:*\n`;
+  employees.forEach(emp => {
+    const stats = employeeStats[emp.id];
+    const lateText = stats.lateDays > 0 ? ` (⏰ ${stats.lateDays} Late)` : '';
+    report += ` • *${stats.name}*: Present: ${stats.presentDays}d | Absent: ${stats.absentDays}d | Leaves: ${stats.leaveDays}d${lateText}\n`;
+  });
+  report += `\n`;
 
   report += `📝 *Task Execution summary:*\n`;
   report += `• Total Tasks Logged: ${totalTasksAssigned}\n`;
