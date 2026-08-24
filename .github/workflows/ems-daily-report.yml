@@ -1,0 +1,34 @@
+name: Scheduled EMS Daily WhatsApp Report
+
+on:
+  schedule:
+    # Runs Mon-Sat at 13:30 UTC (7:00 PM IST / 19:00 IST)
+    - cron: '30 13 * * 1-6'
+  workflow_dispatch:
+
+jobs:
+  send-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: |
+          cd EMS_login/automation
+          npm ci
+
+      - name: Send Daily Report
+        env:
+          PROVIDER: green-api
+          GREEN_API_INSTANCE_ID: 710722717591
+          GREEN_API_TOKEN: 585dd13708e94c6f8f424252765f46f924dde228378049fe8b
+          WA_GROUP_JID: 120363412057920447@g.us
+        run: |
+          cd EMS_login/automation
+          node run.js --type=daily

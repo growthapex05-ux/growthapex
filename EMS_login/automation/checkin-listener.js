@@ -1,4 +1,4 @@
-const { initializeFirebase } = require('./report-generator');
+const { initializeFirebase, generateDailyReport } = require('./report-generator');
 const { sendReport } = require('./sender');
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 
@@ -18,9 +18,19 @@ const processedLogins = new Set();
 let isInitialLoad = true;
 let isInitialLoginLoad = true;
 
+// Track last date auto daily report was sent to avoid duplicate sends
+let lastDailyReportDate = '';
+
+// Target schedule time for daily report (default 19:00 / 7:00 PM)
+const timeStr = process.env.DAILY_REPORT_TIME || '19:00';
+const [targetHourStr, targetMinStr] = timeStr.split(':');
+const targetHour = parseInt(targetHourStr, 10) || 19;
+const targetMin = parseInt(targetMinStr, 10) || 0;
+
 async function startListener() {
   const todayStr = formatDateString(new Date());
-  console.log(`🤖 Starting Real-Time Employee Check-In & Login Listener for ${todayStr}...`);
+  console.log(`🤖 Starting Real-Time Employee Check-In, Login Listener & Auto Daily Scheduler for ${todayStr}...`);
+  console.log(`⏰ Daily Report Scheduled for ${timeStr} IST every day (except Sundays).`);
 
   // Cache employee details
   const empSnap = await db.collection('employees').get();
@@ -139,6 +149,27 @@ async function startListener() {
     }, (err) => {
       console.error("❌ Firestore Attendance Snapshot Error:", err);
     });
+
+  // 3. Auto Daily Report Scheduler (Runs automatically at EXACT target time HH:MM every day)
+  setInterval(async () => {
+    const now = new Date();
+    const currentTodayStr = formatDateString(now);
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+
+    // Trigger daily report at exact target HH:MM (e.g. 19:00 / 7:00 PM), skip Sundays (0)
+    if (hours === targetHour && minutes === targetMin && now.getDay() !== 0 && lastDailyReportDate !== currentTodayStr) {
+      lastDailyReportDate = currentTodayStr;
+      console.log(`\n⏰ [Auto Scheduler] Triggering Scheduled Daily Report at ${timeStr} for ${currentTodayStr}...`);
+      try {
+        const report = await generateDailyReport(db);
+        await sendReport(report);
+        console.log(`✅ [Auto Scheduler] Daily Report sent successfully via Green-API!`);
+      } catch (err) {
+        console.error(`❌ [Auto Scheduler] Failed to send Daily Report:`, err.message);
+      }
+    }
+  }, 20000); // Check every 20 seconds
 }
 
 startListener();
