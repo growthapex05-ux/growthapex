@@ -348,6 +348,17 @@
         }
 
         setSession({ role: 'admin', name: 'GrowthApex Admin', email: cred.user.email });
+        try {
+          await db.collection('logins').add({
+            empId: 'ADMIN',
+            name: 'GrowthApex Admin',
+            role: 'admin',
+            email: cred.user.email,
+            loginTime: new Date().toLocaleTimeString('en-IN', { hour12: true }),
+            date: new Date().toISOString().split('T')[0],
+            timestamp: new Date().toISOString()
+          });
+        } catch (_) {}
         window.location.href = '/EMS_login/admin-dashboard';
       } catch (e) {
         btn.classList.remove('loading');
@@ -423,6 +434,17 @@
           designation: emp.designation || '',
           department:  emp.department  || '',
         });
+        try {
+          await db.collection('logins').add({
+            empId: emp.id,
+            name: emp.name,
+            role: 'employee',
+            email: emp.email,
+            loginTime: new Date().toLocaleTimeString('en-IN', { hour12: true }),
+            date: new Date().toISOString().split('T')[0],
+            timestamp: new Date().toISOString()
+          });
+        } catch (_) {}
         window.location.href = '/EMS_login/employee-dashboard';
       } catch (e) {
         btn.classList.remove('loading');

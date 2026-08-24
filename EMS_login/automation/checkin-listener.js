@@ -14,11 +14,13 @@ function isCheckInLate(checkInTime) {
 }
 
 const processedCheckIns = new Set();
+const processedLogins = new Set();
 let isInitialLoad = true;
+let isInitialLoginLoad = true;
 
 async function startListener() {
   const todayStr = formatDateString(new Date());
-  console.log(`🤖 Starting Real-Time Employee Check-In Listener for ${todayStr}...`);
+  console.log(`🤖 Starting Real-Time Employee Check-In & Login Listener for ${todayStr}...`);
 
   // Cache employee details
   const empSnap = await db.collection('employees').get();
@@ -27,7 +29,50 @@ async function startListener() {
     employeeMap[doc.id] = doc.data();
   });
 
-  // Listen to today's attendance changes in Firestore real-time
+  // 1. Listen to today's logins in Firestore real-time
+  db.collection('logins')
+    .where('date', '==', todayStr)
+    .onSnapshot(async (snapshot) => {
+      for (const change of snapshot.docChanges()) {
+        if (change.type === 'added') {
+          const docId = change.doc.id;
+          const data = change.doc.data();
+
+          if (processedLogins.has(docId)) continue;
+          processedLogins.add(docId);
+
+          if (isInitialLoginLoad) {
+            console.log(`ℹ️ [Initial Load] Recorded existing login: ${data.name} (${data.role})`);
+            continue;
+          }
+
+          const message = `🔑 *EMS SYSTEM LOGIN ALERT* 🔑\n` +
+                          `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                          `👤 *User:* ${data.name}\n` +
+                          `🆔 *ID / Role:* ${data.empId} (${data.role.toUpperCase()})\n` +
+                          `⏰ *Login Time:* ${data.loginTime}\n` +
+                          `📅 *Date:* ${data.date}\n` +
+                          `━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+
+          console.log(`\n📲 New Login Detected! Sending WhatsApp Alert for ${data.name}...`);
+          try {
+            await sendReport(message);
+            console.log(`✅ WhatsApp Login Alert sent successfully for ${data.name}!`);
+          } catch (err) {
+            console.error(`❌ Failed to send Login Alert for ${data.name}:`, err.message);
+          }
+        }
+      }
+
+      if (isInitialLoginLoad) {
+        isInitialLoginLoad = false;
+        console.log(`⚡ Real-time login listener active.`);
+      }
+    }, (err) => {
+      console.error("❌ Firestore Logins Snapshot Error:", err);
+    });
+
+  // 2. Listen to today's attendance changes in Firestore real-time
   db.collection('attendance')
     .where('date', '==', todayStr)
     .onSnapshot(async (snapshot) => {
@@ -89,10 +134,10 @@ async function startListener() {
 
       if (isInitialLoad) {
         isInitialLoad = false;
-        console.log(`⚡ Real-time listener active. Waiting for new employee check-ins...`);
+        console.log(`⚡ Real-time check-in listener active. Waiting for new employee logins & check-ins...`);
       }
     }, (err) => {
-      console.error("❌ Firestore Snapshot Error:", err);
+      console.error("❌ Firestore Attendance Snapshot Error:", err);
     });
 }
 
