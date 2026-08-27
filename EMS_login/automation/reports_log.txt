@@ -1,0 +1,37 @@
+🤖 Starting EMS Report Automation
+📊 Report Type: DAILY
+⚙️  Dry Run: DISABLED (Will send to WhatsApp)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Connecting to Firebase...
+✅ Connected to Firebase successfully!
+Generating daily report data...
+✅ Report generated successfully!
+
+📄 Generated Message content:
+
+📢 *GROWTHAPEX EMS - DAILY REPORT* 📢
+📅 *Date:* 2026-08-25
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+👥 *Attendance Summary:*
+• Total Strength: 3
+• Present: 2
+• Absent: 1
+
+⏰ *Late Check-ins:* 
+ - Jayati Goyal (Late: 10:06:15)
+ - Dhiraj Kumar (Late: 10:10:30)
+
+❌ *Absent:* 
+ - Adarsh Singh
+
+📝 *Task Updates Today:*
+✅ *Completed Tasks (1):*
+ - Client Follow-up, Posting & Content Coordinatio (by Jayati Goyal)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Sending report to WhatsApp...
+Sending message to group 120363412057920447@g.us via Green-API...
+🎉 Report sent successfully via Green-API! Message ID: 3EB037465FBB9FE6C6A7CA
+🚀 Report automation run completed successfully!

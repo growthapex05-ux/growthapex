@@ -84,8 +84,8 @@ async function getActiveEmployees(db) {
 }
 
 // Generate DAILY Report
-async function generateDailyReport(db) {
-  const todayStr = formatDateString(new Date());
+async function generateDailyReport(db, targetDateStr = null) {
+  const todayStr = targetDateStr || formatDateString(new Date());
   
   // 1. Fetch active employees
   const employees = await getActiveEmployees(db);
@@ -125,10 +125,9 @@ async function generateDailyReport(db) {
 
   // 4. Fetch tasks created or completed today
   // Query tasks created today
-  const startOfDay = new Date();
-  startOfDay.setHours(0,0,0,0);
-  const endOfDay = new Date();
-  endOfDay.setHours(23,59,59,999);
+  const targetDateParts = todayStr.split('-').map(Number);
+  const startOfDay = new Date(targetDateParts[0], targetDateParts[1] - 1, targetDateParts[2], 0, 0, 0, 0);
+  const endOfDay = new Date(targetDateParts[0], targetDateParts[1] - 1, targetDateParts[2], 23, 59, 59, 999);
 
   const tasksSnap = await db.collection('tasks')
     .where('createdAt', '>=', startOfDay.toISOString())
@@ -626,9 +625,44 @@ async function generateMonthlyReport(db) {
   return report;
 }
 
+// Generate LOGIN Report
+async function generateLoginReport(db, targetDateStr = null) {
+  const dateStr = targetDateStr || formatDateString(new Date());
+
+  const loginsSnap = await db.collection('logins')
+    .where('date', '==', dateStr)
+    .get();
+
+  const logins = [];
+  loginsSnap.forEach(doc => {
+    logins.push({ id: doc.id, ...doc.data() });
+  });
+
+  // Sort by loginTime ascending
+  logins.sort((a, b) => (a.loginTime || '').localeCompare(b.loginTime || ''));
+
+  let report = `🔑 *GROWTHAPEX EMS - LOGIN REPORT* 🔑\n`;
+  report += `📅 *Date:* ${dateStr}\n`;
+  report += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+  if (logins.length === 0) {
+    report += `ℹ️ No system logins recorded for this date.`;
+  } else {
+    report += `👤 *Total Logins (${logins.length}):*\n`;
+    logins.forEach(l => {
+      const roleStr = l.role ? ` (${l.role.toUpperCase()})` : '';
+      report += ` • *${l.name}* [${l.empId}]${roleStr} at ${l.loginTime || 'N/A'}\n`;
+    });
+  }
+
+  return report;
+}
+
 module.exports = {
   initializeFirebase,
   generateDailyReport,
   generateWeeklyReport,
-  generateMonthlyReport
+  generateMonthlyReport,
+  generateLoginReport
 };
+

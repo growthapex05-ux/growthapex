@@ -8,37 +8,39 @@ const {
   initializeFirebase, 
   generateDailyReport, 
   generateWeeklyReport, 
-  generateMonthlyReport 
+  generateMonthlyReport,
+  generateLoginReport
 } = require('./report-generator');
 const { sendReport } = require('./sender');
 
 // Parse CLI arguments
-// Example: node run.js --type=daily [--dry-run]
+// Example: node run.js --type=daily [--date=2026-08-26] [--dry-run]
 const argv = parseArgs(process.argv.slice(2), {
-  string: ['type'],
+  string: ['type', 'date'],
   boolean: ['dry-run'],
   alias: { t: 'type', d: 'dry-run' }
 });
 
 async function main() {
   const reportType = (argv.type || '').toLowerCase();
+  const targetDate = argv.date || null;
   const isDryRun = !!argv['dry-run'];
 
-  if (!['daily', 'weekly', 'monthly'].includes(reportType)) {
+  if (!['daily', 'weekly', 'monthly', 'login'].includes(reportType)) {
     console.error("❌ Error: Invalid or missing report type.");
-    console.error("👉 Usage: node run.js --type=[daily|weekly|monthly] [--dry-run]");
+    console.error("👉 Usage: node run.js --type=[daily|weekly|monthly|login] [--date=YYYY-MM-DD] [--dry-run]");
     console.error("   Short aliases: node run.js -t daily -d");
     process.exit(1);
   }
 
-  // Skip running the daily report on Sundays
-  if (reportType === 'daily' && new Date().getDay() === 0) {
+  // Skip running the daily report on Sundays (unless explicit date specified)
+  if (reportType === 'daily' && !targetDate && new Date().getDay() === 0) {
     console.log(`📅 Today is Sunday. Exclude Sunday from working days. Skipping daily report.`);
     process.exit(0);
   }
 
   console.log(`🤖 Starting EMS Report Automation`);
-  console.log(`📊 Report Type: ${reportType.toUpperCase()}`);
+  console.log(`📊 Report Type: ${reportType.toUpperCase()}${targetDate ? ` (Date: ${targetDate})` : ''}`);
   console.log(`⚙️  Dry Run: ${isDryRun ? 'ENABLED (Will only print to console)' : 'DISABLED (Will send to WhatsApp)'}`);
   console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
 
@@ -56,7 +58,9 @@ async function main() {
   try {
     console.log(`Generating ${reportType} report data...`);
     if (reportType === 'daily') {
-      reportText = await generateDailyReport(db);
+      reportText = await generateDailyReport(db, targetDate);
+    } else if (reportType === 'login') {
+      reportText = await generateLoginReport(db, targetDate);
     } else if (reportType === 'weekly') {
       reportText = await generateWeeklyReport(db);
     } else if (reportType === 'monthly') {

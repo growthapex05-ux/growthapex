@@ -4,14 +4,18 @@ require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 
 const db = initializeFirebase();
 
-function formatDateString(date) {
-  return date.toISOString().split('T')[0];
+function getTodayDateStr() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 }
 
 function isCheckInLate(checkInTime) {
   if (!checkInTime) return false;
   return checkInTime > '10:00:00';
 }
+
+let activeDateStr = '';
+let unsubLogins = null;
+let unsubAttendance = null;
 
 const processedCheckIns = new Set();
 const processedLogins = new Set();
@@ -27,21 +31,43 @@ const [targetHourStr, targetMinStr] = timeStr.split(':');
 const targetHour = parseInt(targetHourStr, 10) || 19;
 const targetMin = parseInt(targetMinStr, 10) || 0;
 
-async function startListener() {
-  const todayStr = formatDateString(new Date());
-  console.log(`🤖 Starting Real-Time Employee Check-In, Login Listener & Auto Daily Scheduler for ${todayStr}...`);
-  console.log(`⏰ Daily Report Scheduled for ${timeStr} IST every day (except Sundays).`);
+let employeeMap = {};
 
-  // Cache employee details
-  const empSnap = await db.collection('employees').get();
-  const employeeMap = {};
-  empSnap.forEach(doc => {
-    employeeMap[doc.id] = doc.data();
-  });
+async function updateEmployeeMap() {
+  try {
+    const empSnap = await db.collection('employees').get();
+    empSnap.forEach(doc => {
+      employeeMap[doc.id] = doc.data();
+    });
+  } catch (err) {
+    console.error("⚠️ Error caching employee map:", err.message);
+  }
+}
 
-  // 1. Listen to today's logins in Firestore real-time
-  db.collection('logins')
-    .where('date', '==', todayStr)
+function setupListenersForDate(targetDateStr) {
+  if (activeDateStr === targetDateStr && unsubLogins && unsubAttendance) return;
+
+  // Cleanup existing listeners if changing date
+  if (unsubLogins) {
+    try { unsubLogins(); } catch (_) {}
+    unsubLogins = null;
+  }
+  if (unsubAttendance) {
+    try { unsubAttendance(); } catch (_) {}
+    unsubAttendance = null;
+  }
+
+  activeDateStr = targetDateStr;
+  processedCheckIns.clear();
+  processedLogins.clear();
+  isInitialLoad = true;
+  isInitialLoginLoad = true;
+
+  console.log(`\n📅 Subscribing Real-Time Firestore Listeners for Date: ${activeDateStr} (IST)`);
+
+  // 1. Listen to target date's logins in Firestore real-time
+  unsubLogins = db.collection('logins')
+    .where('date', '==', activeDateStr)
     .onSnapshot(async (snapshot) => {
       for (const change of snapshot.docChanges()) {
         if (change.type === 'added') {
@@ -59,7 +85,7 @@ async function startListener() {
           const message = `🔑 *EMS SYSTEM LOGIN ALERT* 🔑\n` +
                           `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
                           `👤 *User:* ${data.name}\n` +
-                          `🆔 *ID / Role:* ${data.empId} (${data.role.toUpperCase()})\n` +
+                          `🆔 *ID / Role:* ${data.empId} (${(data.role || 'user').toUpperCase()})\n` +
                           `⏰ *Login Time:* ${data.loginTime}\n` +
                           `📅 *Date:* ${data.date}\n` +
                           `━━━━━━━━━━━━━━━━━━━━━━━━━━`;
@@ -76,15 +102,15 @@ async function startListener() {
 
       if (isInitialLoginLoad) {
         isInitialLoginLoad = false;
-        console.log(`⚡ Real-time login listener active.`);
+        console.log(`⚡ Real-time login listener active for ${activeDateStr}.`);
       }
     }, (err) => {
       console.error("❌ Firestore Logins Snapshot Error:", err);
     });
 
-  // 2. Listen to today's attendance changes in Firestore real-time
-  db.collection('attendance')
-    .where('date', '==', todayStr)
+  // 2. Listen to target date's attendance changes in Firestore real-time
+  unsubAttendance = db.collection('attendance')
+    .where('date', '==', activeDateStr)
     .onSnapshot(async (snapshot) => {
       for (const change of snapshot.docChanges()) {
         if (change.type === 'added' || change.type === 'modified') {
@@ -144,16 +170,33 @@ async function startListener() {
 
       if (isInitialLoad) {
         isInitialLoad = false;
-        console.log(`⚡ Real-time check-in listener active. Waiting for new employee logins & check-ins...`);
+        console.log(`⚡ Real-time check-in listener active for ${activeDateStr}. Waiting for new employee logins & check-ins...`);
       }
     }, (err) => {
       console.error("❌ Firestore Attendance Snapshot Error:", err);
     });
+}
 
-  // 3. Auto Daily Report Scheduler (Runs automatically at EXACT target time HH:MM every day)
+async function startListener() {
+  const initialTodayStr = getTodayDateStr();
+  console.log(`🤖 Starting Real-Time Employee Check-In, Login Listener & Auto Daily Scheduler...`);
+  console.log(`⏰ Daily Report Scheduled for ${timeStr} IST every day (except Sundays).`);
+
+  await updateEmployeeMap();
+  setupListenersForDate(initialTodayStr);
+
+  // 3. Auto Daily Report Scheduler & Midnight Date Rollover Check
   setInterval(async () => {
     const now = new Date();
-    const currentTodayStr = formatDateString(now);
+    const currentTodayStr = getTodayDateStr();
+
+    // Check if date rolled over to next day
+    if (currentTodayStr !== activeDateStr) {
+      console.log(`🔄 Date changed from ${activeDateStr} to ${currentTodayStr}. Refreshing real-time listeners...`);
+      await updateEmployeeMap();
+      setupListenersForDate(currentTodayStr);
+    }
+
     const hours = now.getHours();
     const minutes = now.getMinutes();
 
@@ -164,7 +207,7 @@ async function startListener() {
       try {
         const report = await generateDailyReport(db);
         await sendReport(report);
-        console.log(`✅ [Auto Scheduler] Daily Report sent successfully via Green-API!`);
+        console.log(`✅ [Auto Scheduler] Daily Report sent successfully!`);
       } catch (err) {
         console.error(`❌ [Auto Scheduler] Failed to send Daily Report:`, err.message);
       }
