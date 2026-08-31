@@ -27,11 +27,22 @@ const EMS_DB = {
     return doc.exists ? { id: doc.id, ...doc.data() } : null;
   },
 
-  /** Add new employee — auto-assigns next EMP ID, creates Firebase Auth account */
+  /** Add new employee — auto-assigns next EMP ID (or uses customId if provided), creates Firebase Auth account */
   async addEmployee(data) {
-    const emps = await this.getEmployees();
-    const nextNum = emps.length + 1;
-    const empId   = 'EMP' + String(nextNum).padStart(3, '0');
+    let empId;
+    if (data.customId && data.customId.trim()) {
+      // Admin-specified ID (e.g. EMP003)
+      empId = data.customId.trim().toUpperCase();
+      // Check if already taken
+      const existing = await this._col('employees').doc(empId).get();
+      if (existing.exists) throw new Error(`Employee ID ${empId} is already taken.`);
+    } else {
+      // Auto-generate next EMP ID
+      const emps = await this.getEmployees();
+      const nextNum = emps.length + 1;
+      empId = 'EMP' + String(nextNum).padStart(3, '0');
+    }
+
     const email   = data.email.trim().toLowerCase();
     const password = data.password;
 
@@ -44,15 +55,16 @@ const EMS_DB = {
       console.warn('Auth createUser warning:', e.message);
     }
 
+    const { customId: _drop, ...restData } = data; // strip customId from stored fields
     const emp = {
-      name:        data.name,
+      name:        restData.name,
       email:       email,
-      phone:       data.phone || '',
-      department:  data.department || 'General',
-      designation: data.designation || '',
-      salary:      Number(data.salary) || 0,
-      joinDate:    data.joinDate || new Date().toISOString().split('T')[0],
-      status:      data.status || 'active',
+      phone:       restData.phone || '',
+      department:  restData.department || 'General',
+      designation: restData.designation || '',
+      salary:      Number(restData.salary) || 0,
+      joinDate:    restData.joinDate || new Date().toISOString().split('T')[0],
+      status:      restData.status || 'active',
       createdAt:   new Date().toISOString(),
     };
 

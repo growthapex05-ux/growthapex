@@ -552,6 +552,10 @@
       <div class="form-group"><label>Join Date</label><input type="date" id="f-join"></div>
       <div class="form-group"><label>Login Password *</label><input type="text" id="f-pass" placeholder="Set password"></div>
     </div>
+    <div class="form-group" id="f-id-group">
+      <label>Employee ID <span style="font-size:11px;font-weight:500;color:var(--muted)">(leave blank to auto-assign)</span></label>
+      <input id="f-custom-id" placeholder="e.g. EMP003" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+    </div>
     <div class="form-group"><label>Status</label>
       <select id="f-status"><option value="active">Active</option><option value="inactive">Inactive</option></select>
     </div>
@@ -933,6 +937,22 @@ function openEmpModal(emp) {
   document.getElementById('f-status').value = emp?.status||'active';
   document.getElementById('f-edit-id').value= emp?.id||'';
   document.getElementById('emp-modal-msg').textContent = '';
+
+  // Show Employee ID field only when adding a new employee
+  const idGroup = document.getElementById('f-id-group');
+  const customIdInput = document.getElementById('f-custom-id');
+  if (emp) {
+    // Editing — hide ID field (can't change document ID)
+    if (idGroup) idGroup.style.display = 'none';
+    customIdInput.value = '';
+  } else {
+    // Adding — show ID field with suggested next ID as placeholder
+    if (idGroup) idGroup.style.display = 'block';
+    customIdInput.value = '';
+    const nextNum = cache.employees.length + 1;
+    customIdInput.placeholder = 'EMP' + String(nextNum).padStart(3, '0') + ' (auto if blank)';
+  }
+
   document.getElementById('emp-modal').classList.add('open');
   setTimeout(()=>document.getElementById('f-name').focus(),100);
 }
@@ -946,7 +966,8 @@ async function deleteEmployee(id) {
   await EMS_DB.deleteEmployee(id); toast(`${emp?.name} removed`, 'error');
 }
 async function saveEmployee() {
-  const id   = document.getElementById('f-edit-id').value;
+  const id       = document.getElementById('f-edit-id').value;
+  const customId = document.getElementById('f-custom-id').value.trim().toUpperCase();
   const data = {
     name:        document.getElementById('f-name').value.trim(),
     email:       document.getElementById('f-email').value.trim(),
@@ -960,6 +981,10 @@ async function saveEmployee() {
   };
   const msg = document.getElementById('emp-modal-msg');
   if (!data.name||!data.email) { msg.innerHTML='<span style="color:#f87171">Name and Email are required.</span>'; return; }
+  // Validate custom ID format if provided
+  if (!id && customId && !/^EMP\d{3,}$/i.test(customId)) {
+    msg.innerHTML = '<span style="color:#f87171">Employee ID must be in format EMP001, EMP002 etc.</span>'; return;
+  }
   const btnSave = document.querySelector('#emp-modal .btn-save');
   if (btnSave) { btnSave.disabled = true; btnSave.textContent = 'Saving...'; }
   try {
@@ -967,6 +992,8 @@ async function saveEmployee() {
       await EMS_DB.updateEmployee(id, data);
       toast('Employee updated!','success');
     } else {
+      // Pass custom ID if provided
+      if (customId) data.customId = customId;
       const adminSession = JSON.parse(localStorage.getItem('ems_session'));
       const e = await EMS_DB.addEmployee(data);
       if (adminSession) localStorage.setItem('ems_session', JSON.stringify(adminSession));
@@ -976,7 +1003,7 @@ async function saveEmployee() {
   } catch(err) {
     msg.innerHTML = `<span style="color:#f87171">Error: ${err.message}</span>`;
   } finally {
-    if (btnSave) { btnSave.disabled = false; btnSave.textContent = '💾 Save Employee'; }
+    if (btnSave) { btnSave.disabled = false; btnSave.textContent = '\ud83d\udcbe Save Employee'; }
   }
 }
 
