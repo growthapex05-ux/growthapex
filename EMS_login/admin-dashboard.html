@@ -179,6 +179,62 @@
       .stats-grid { grid-template-columns: 1fr; }
       .topbar-right .clock-badge { display: none; }
     }
+
+    /* ── WhatsApp Reports ──────────────────────────────────────── */
+    .rpt-tabs { display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; }
+    .rpt-tab {
+      padding:10px 20px; border-radius:8px; font-size:13px; font-weight:700;
+      cursor:pointer; border:none; font-family:'Urbanist',sans-serif;
+      background:rgba(0,0,0,.05); color:var(--muted); transition:all .25s;
+    }
+    .rpt-tab.active { background:var(--purple); color:#fff; box-shadow:0 4px 14px rgba(0,212,255,.3); }
+    .rpt-tab:hover:not(.active) { background:rgba(0,0,0,.09); color:var(--text); }
+    .rpt-meta { display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+    .rpt-meta-chip {
+      background:rgba(0,212,255,.08); border:1px solid rgba(0,212,255,.2);
+      border-radius:8px; padding:5px 14px; font-size:12px; font-weight:700; color:var(--purple-lt);
+    }
+    .rpt-preview-box {
+      background:#f8f9fb; border:1px solid var(--border);
+      border-radius:10px; padding:20px 24px;
+      font-family:'Space Grotesk',monospace; font-size:13px; line-height:1.85;
+      white-space:pre-wrap; color:var(--text); min-height:220px;
+      max-height:420px; overflow-y:auto;
+      box-shadow:inset 0 2px 6px rgba(0,0,0,.04);
+    }
+    .rpt-preview-box.loading { color:var(--muted); font-style:italic; }
+    .rpt-actions { display:flex; align-items:center; gap:12px; margin-top:16px; flex-wrap:wrap; }
+    .btn-wa {
+      display:inline-flex; align-items:center; gap:8px;
+      background:linear-gradient(135deg,#25D366,#128C7E);
+      color:#fff; border:none; border-radius:8px; padding:11px 24px;
+      font-size:14px; font-weight:700; cursor:pointer; font-family:'Space Grotesk',sans-serif;
+      transition:all .25s; box-shadow:0 4px 14px rgba(37,211,102,.35);
+    }
+    .btn-wa:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(37,211,102,.5); }
+    .btn-wa:disabled { opacity:.55; cursor:not-allowed; transform:none; }
+    .btn-refresh-rpt {
+      display:inline-flex; align-items:center; gap:6px;
+      background:rgba(0,0,0,.05); color:var(--text); border:1px solid var(--border);
+      border-radius:8px; padding:10px 18px; font-size:13px; font-weight:600;
+      cursor:pointer; font-family:'Urbanist',sans-serif; transition:all .2s;
+    }
+    .btn-refresh-rpt:hover { background:rgba(0,0,0,.09); }
+    .rpt-status {
+      margin-top:12px; font-size:13px; font-weight:600;
+      padding:10px 16px; border-radius:8px; display:none;
+    }
+    .rpt-status.success { background:rgba(16,185,129,.1); color:#10b981; border:1px solid rgba(16,185,129,.25); display:block; }
+    .rpt-status.error   { background:rgba(239,68,68,.1);  color:#ef4444; border:1px solid rgba(239,68,68,.25);  display:block; }
+    .rpt-status.sending { background:rgba(0,212,255,.1);  color:var(--purple-lt); border:1px solid rgba(0,212,255,.25); display:block; }
+    .rpt-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:22px; }
+    @media(max-width:900px){ .rpt-grid{grid-template-columns:1fr 1fr;} }
+    @media(max-width:480px){ .rpt-grid{grid-template-columns:1fr;} }
+    .rpt-kpi { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:16px 18px; }
+    .rpt-kpi .k-label { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
+    .rpt-kpi .k-val { font-size:26px; font-weight:800; font-family:'Space Grotesk',sans-serif; margin-top:4px; }
+    .rpt-kpi .k-val.green { color:var(--green); } .rpt-kpi .k-val.cyan { color:var(--cyan); }
+    .rpt-kpi .k-val.amber { color:var(--amber); } .rpt-kpi .k-val.red { color:var(--red); }
   </style>
 </head>
 <body>
@@ -204,6 +260,7 @@
     <div class="nav-item" onclick="showPage('tasks',this)"><span class="nav-icon">✅</span><span>Tasks</span></div>
     <div class="nav-item" onclick="showPage('leaves',this)"><span class="nav-icon">🌴</span><span>Leave Requests</span></div>
     <div class="nav-item" onclick="showPage('salary',this)"><span class="nav-icon">💰</span><span>Payroll</span></div>
+    <div class="nav-item" onclick="showPage('reports',this)" id="nav-reports"><span class="nav-icon">📲</span><span>WhatsApp Reports</span></div>
 
   </div>
   <div class="sidebar-footer">
@@ -349,6 +406,70 @@
       </div>
       <div class="table-wrap" id="admin-salary-table"></div>
     </div>
+  </div>
+
+  <!-- ── WhatsApp Reports ── -->
+  <div class="page" id="page-reports">
+
+    <!-- KPI Summary Row -->
+    <div class="rpt-grid" id="rpt-kpi-row">
+      <div class="rpt-kpi">
+        <div class="k-label">👥 Total Employees</div>
+        <div class="k-val cyan" id="rk-total">—</div>
+      </div>
+      <div class="rpt-kpi">
+        <div class="k-label">✅ Present Today</div>
+        <div class="k-val green" id="rk-present">—</div>
+      </div>
+      <div class="rpt-kpi">
+        <div class="k-label">❌ Absent Today</div>
+        <div class="k-val red" id="rk-absent">—</div>
+      </div>
+    </div>
+
+    <!-- Report Card -->
+    <div class="section-card">
+      <div class="section-head">
+        <h3>📲 Send WhatsApp Report</h3>
+        <div class="rpt-meta">
+          <span class="rpt-meta-chip" id="rpt-group-chip">📱 Group: 120363412057920447@g.us</span>
+          <span class="rpt-meta-chip" id="rpt-time-chip">🕐 —</span>
+        </div>
+      </div>
+
+      <!-- Report Type Tabs -->
+      <div class="rpt-tabs">
+        <button class="rpt-tab active" onclick="selectRptType('daily',this)">📢 Daily</button>
+        <button class="rpt-tab" onclick="selectRptType('weekly',this)">📊 Weekly</button>
+        <button class="rpt-tab" onclick="selectRptType('monthly',this)">🏆 Monthly</button>
+        <button class="rpt-tab" onclick="selectRptType('login',this)">🔑 Login</button>
+      </div>
+
+      <!-- Report Preview -->
+      <div class="rpt-preview-box loading" id="rpt-preview">Generating report preview…</div>
+
+      <!-- Action Buttons -->
+      <div class="rpt-actions">
+        <button class="btn-wa" id="btn-send-wa" onclick="sendWhatsAppReport()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.125.557 4.126 1.532 5.863L.073 23.386l5.671-1.487A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.838 0-3.568-.5-5.054-1.37l-.363-.215-3.366.883.898-3.282-.234-.377A9.938 9.938 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+          Send to WhatsApp
+        </button>
+        <button class="btn-refresh-rpt" onclick="refreshRptPreview()">
+          🔄 Regenerate Preview
+        </button>
+      </div>
+
+      <div class="rpt-status" id="rpt-status"></div>
+    </div>
+
+    <!-- Recent Send History -->
+    <div class="section-card">
+      <div class="section-head"><h3>📜 Send History (This Session)</h3></div>
+      <div id="rpt-history-table">
+        <div class="empty-state"><div>📭</div>No reports sent yet this session.</div>
+      </div>
+    </div>
+
   </div>
 </main>
 
@@ -617,7 +738,7 @@ function toggleSidebar() {
 }
 
 // ─── Page Navigation ──────────────────────────────────────────
-const titles = { overview:'Overview', employees:'Employees', attendance:'Attendance', tasks:'Tasks', leaves:'Leave Requests', salary:'Payroll' };
+const titles = { overview:'Overview', employees:'Employees', attendance:'Attendance', tasks:'Tasks', leaves:'Leave Requests', salary:'Payroll', reports:'WhatsApp Reports' };
 function showPage(id, el) {
   // Close sidebar on mobile navigation
   const sidebar = document.querySelector('.sidebar');
@@ -634,6 +755,7 @@ function showPage(id, el) {
   { id==='attendance' && initAtt(); id==='tasks' && initTasks(); }
   { id==='leaves' && initLeaves(); id==='salary' && renderSalary(); }
   if (id==='leaves') renderAdminHolidays();
+  if (id==='reports') initReportsPage();
 }
 
 // ─── OVERVIEW ─────────────────────────────────────────────────
@@ -1140,6 +1262,344 @@ function renderAdminHolidays() {
 }
 
 function logout() { EMS_DB.clearSession(); window.location.href = '/EMS_login/'; }
+
+// ══════════════════════════════════════════════════════════════
+// ─── WhatsApp Reports Module ──────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+
+const WA_CONFIG = {
+  GREEN_API_INSTANCE_ID: '710722717591',
+  GREEN_API_TOKEN: '585dd13708e94c6f8f424252765f46f924dde228378049fe8b',
+  GROUP_JID: '120363412057920447@g.us',
+};
+
+let currentRptType = 'daily';
+let currentRptText = '';
+const rptHistory = [];
+
+// ── Clock ticker for Reports meta chip ─────────────────────────
+function updateRptClock() {
+  const el = document.getElementById('rpt-time-chip');
+  if (el) el.textContent = '🕐 ' + new Date().toLocaleTimeString('en-IN');
+}
+
+function initReportsPage() {
+  updateRptClock();
+  if (!window._rptClockInterval) {
+    window._rptClockInterval = setInterval(updateRptClock, 1000);
+  }
+  refreshRptKPIs();
+  refreshRptPreview();
+}
+
+// ── KPI chips ──────────────────────────────────────────────────
+function refreshRptKPIs() {
+  const emps = cache.employees || [];
+  const today = new Date().toISOString().split('T')[0];
+  const att   = cache.attendance || [];
+  const active = emps.filter(e => e.status === 'active');
+  const presentToday = att.filter(a => a.date === today && a.status === 'present').map(a => a.empId);
+  const presentCount = presentToday.length;
+  const absentCount  = active.filter(e => !presentToday.includes(e.id)).length;
+
+  const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  setEl('rk-total',   active.length);
+  setEl('rk-present', presentCount);
+  setEl('rk-absent',  absentCount);
+}
+
+// ── Select report type ─────────────────────────────────────────
+function selectRptType(type, btn) {
+  currentRptType = type;
+  document.querySelectorAll('.rpt-tab').forEach(t => t.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  setRptStatus('');
+  refreshRptPreview();
+}
+
+// ── Generate report text from Firestore cache ──────────────────
+async function generateReportText(type) {
+  const emps    = cache.employees || [];
+  const att     = cache.attendance || [];
+  const tasks   = cache.tasks || [];
+  const leaves  = cache.leaves || [];
+  const today   = new Date().toISOString().split('T')[0];
+  const active  = emps.filter(e => e.status === 'active');
+
+  const getDateStr = (offsetDays) => {
+    const d = new Date(); d.setDate(d.getDate() + offsetDays);
+    return d.toISOString().split('T')[0];
+  };
+
+  // ── DAILY ──────────────────────────────────────────────────
+  if (type === 'daily') {
+    const presentRecs = att.filter(a => a.date === today && a.status === 'present');
+    const presentIds  = presentRecs.map(a => a.empId);
+    const absentList  = active.filter(e => !presentIds.includes(e.id)).map(e => e.name);
+    const todayTasks  = tasks.filter(t => t.createdAt && t.createdAt.startsWith(today));
+
+    let msg = `📢 *GROWTHAPEX EMS - DAILY REPORT* 📢\n`;
+    msg += `📅 *Date:* ${today}\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    msg += `👥 *Attendance Summary:*\n`;
+    msg += `• Total Strength: ${active.length}\n`;
+    msg += `• Present: ${presentIds.length}\n`;
+    msg += `• Absent: ${absentList.length}\n`;
+    if (absentList.length) msg += `\n❌ *Absent:* \n${absentList.map(n => ` - ${n}`).join('\n')}\n`;
+    msg += `\n📝 *Task Updates Today:*\n`;
+    if (todayTasks.length === 0) {
+      msg += `• No new tasks assigned or submitted today.\n`;
+    } else {
+      todayTasks.forEach(t => { msg += `• [${t.status}] ${t.title} — ${t.empId}\n`; });
+    }
+    msg += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+    return msg;
+  }
+
+  // ── LOGIN ──────────────────────────────────────────────────
+  if (type === 'login') {
+    let logins = [];
+    try {
+      const snap = await db.collection('logins').where('date', '==', today).get();
+      logins = snap.docs.map(d => d.data());
+    } catch (_) {}
+    let msg = `🔑 *GROWTHAPEX EMS - LOGIN REPORT* 🔑\n📅 *Date:* ${today}\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    if (!logins.length) {
+      msg += `ℹ️ No system logins recorded for this date.\n`;
+    } else {
+      logins.forEach(l => {
+        msg += `👤 *${l.name}* (${(l.role||'user').toUpperCase()}) — ⏰ ${l.loginTime}\n`;
+      });
+    }
+    msg += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+    return msg;
+  }
+
+  // ── WEEKLY ─────────────────────────────────────────────────
+  if (type === 'weekly') {
+    const days = [...Array(7)].map((_, i) => getDateStr(-6 + i));
+    const periodStart = days[0], periodEnd = days[6];
+    const weekAtt   = att.filter(a => days.includes(a.date));
+    const weekTasks = tasks.filter(t => t.createdAt && days.some(d => t.createdAt.startsWith(d)));
+    const weekLeaves= leaves.filter(l => l.status === 'approved' && days.some(d => d >= (l.startDate||'') && d <= (l.endDate||'')));
+
+    const totalCheckins = weekAtt.filter(a => a.status === 'present').length;
+    const lateCheckins  = weekAtt.filter(a => a.checkIn && a.checkIn > '10:00:00').length;
+    const doneTasks     = weekTasks.filter(t => t.status === 'done');
+
+    // Achiever: employee with most completed tasks
+    const taskByEmp = {};
+    doneTasks.forEach(t => { taskByEmp[t.empId] = (taskByEmp[t.empId]||0) + 1; });
+    const achieverId = Object.entries(taskByEmp).sort((a,b) => b[1]-a[1])[0]?.[0];
+    const achiever   = emps.find(e => e.id === achieverId);
+
+    let msg = `📊 *GROWTHAPEX EMS - WEEKLY REPORT* 📊\n`;
+    msg += `📅 *Period:* ${periodStart} to ${periodEnd}\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    msg += `👥 *Team Engagement:*\n`;
+    msg += `• Active Employees: ${active.length}\n`;
+    msg += `• Total Present Check-ins: ${totalCheckins}\n`;
+    msg += `• Late Check-ins: ${lateCheckins} ⏰\n`;
+    msg += `• Total Leaves Taken: ${weekLeaves.length} days\n\n`;
+    msg += `👥 *Employee Attendance Summary:*\n`;
+    active.forEach(e => {
+      const empAtt   = weekAtt.filter(a => a.empId === e.id);
+      const present  = empAtt.filter(a => a.status === 'present').length;
+      const absent   = days.length - present;
+      const late     = empAtt.filter(a => a.checkIn && a.checkIn > '10:00:00').length;
+      const lv       = weekLeaves.filter(l => l.empId === e.id).length;
+      msg += ` • *${e.name}*: Present: ${present}d | Absent: ${absent}d | Leaves: ${lv}d (⏰ ${late} Late)\n`;
+    });
+    msg += `\n📝 *Task Execution summary:*\n`;
+    msg += `• Total Tasks Logged: ${weekTasks.length}\n`;
+    msg += `• Total Tasks Completed: ${doneTasks.length}\n`;
+    const rate = weekTasks.length ? Math.round(doneTasks.length / weekTasks.length * 100) : 0;
+    msg += `• Completion Success Rate: ${rate}%\n`;
+    if (achiever) {
+      msg += `\n🥇 *Weekly Task Achievers:*\n`;
+      msg += ` 🥇 *${achiever.name}* - Completed ${taskByEmp[achieverId]} tasks\n`;
+    }
+    msg += `\n📌 *System Note:* Keep logging daily tasks and checking in before 10:00 AM.\n\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+    return msg;
+  }
+
+  // ── MONTHLY ────────────────────────────────────────────────
+  if (type === 'monthly') {
+    const now      = new Date();
+    const year     = now.getFullYear();
+    const month    = now.getMonth();
+    const monthName = now.toLocaleString('en-IN', { month: 'long' });
+
+    // Days in month
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const monthDays = [...Array(daysInMonth)].map((_, i) => {
+      const d = new Date(year, month, i + 1);
+      return d.toISOString().split('T')[0];
+    });
+    const workingDays = monthDays.filter(d => { const wd = new Date(d).getDay(); return wd !== 0; }).length;
+
+    const monAtt   = att.filter(a => monthDays.includes(a.date));
+    const monTasks = tasks.filter(t => t.createdAt && monthDays.some(d => t.createdAt.startsWith(d)));
+    const monLeaves= leaves.filter(l => l.status === 'approved' && monthDays.some(d => d >= (l.startDate||'') && d <= (l.endDate||'')));
+    const doneTasks= monTasks.filter(t => t.status === 'done');
+    const rate     = monTasks.length ? Math.round(doneTasks.length / monTasks.length * 100) : 100;
+
+    // Avg attendance
+    const avgAtt = active.length ? Math.round(monAtt.filter(a => a.status === 'present').length / active.length) : 0;
+
+    // Employee of month: most completed tasks, least late
+    const empScores = active.map(e => {
+      const eDone = doneTasks.filter(t => t.empId === e.id).length;
+      const eLate = monAtt.filter(a => a.empId === e.id && a.checkIn && a.checkIn > '10:00:00').length;
+      return { emp: e, done: eDone, late: eLate };
+    }).sort((a, b) => b.done - a.done || a.late - b.late);
+    const eotm = empScores[0];
+
+    // Indian holidays this month
+    const HOLIDAYS_ALL = [
+      { month:1,day:1,name:"New Year's Day",emoji:"🎊"},{month:1,day:26,name:"Republic Day",emoji:"🇮🇳"},
+      {month:8,day:15,name:"Independence Day",emoji:"🇮🇳"},{month:8,day:28,name:"Raksha Bandhan (Rakhi)",emoji:"🪢"},
+      {month:10,day:2,name:"Gandhi Jayanti",emoji:"🕊️"},{month:10,day:20,name:"Dussehra",emoji:"🏹"},
+      {month:11,day:8,name:"Diwali",emoji:"🪔"},{month:12,day:25,name:"Christmas",emoji:"🎄"},
+    ];
+    const thisMonthHols = HOLIDAYS_ALL.filter(h => h.month === month + 1);
+
+    let msg = `🏆 *GROWTHAPEX EMS - MONTHLY PERFORMANCE* 🏆\n`;
+    msg += `📅 *Month:* ${monthName} ${year}\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    msg += `🌟 *Key performance indicators (KPIs):*\n`;
+    msg += `• Total Tasks Assigned: ${monTasks.length}\n`;
+    msg += `• Total Tasks Completed: ${doneTasks.length}\n`;
+    msg += `• Average Task Completion: ${rate}%\n`;
+    msg += `• Total Approved Leave Days: ${monLeaves.length} days\n`;
+    msg += `• Avg Attendance Check-ins: ${avgAtt} days (out of ${workingDays} working days)\n\n`;
+    if (eotm && eotm.done >= 0) {
+      msg += `🎉 *EMPLOYEE OF THE MONTH* 🎉\n`;
+      msg += `⭐ *${eotm.emp.name}* (${eotm.emp.department})\n`;
+      msg += `💪 Completed *${eotm.done} tasks* with only *${eotm.late} late check-ins*!\n\n`;
+    }
+    msg += `👥 *Employee Breakdown (Completed/Assigned):*\n`;
+    empScores.forEach(({ emp, done, late }) => {
+      const empAtt    = monAtt.filter(a => a.empId === emp.id);
+      const present   = empAtt.filter(a => a.status === 'present').length;
+      const absent    = workingDays - present;
+      const lv        = monLeaves.filter(l => l.empId === emp.id).length;
+      const assigned  = monTasks.filter(t => t.empId === emp.id).length;
+      msg += ` • *${emp.name}*: ${done}/${assigned} Tasks (Attendance: ${present}d Present | ${absent}d Absent | ${lv}d Leave) (⏰ ${late} Late)\n`;
+    });
+    if (thisMonthHols.length) {
+      msg += `\n🗓️ *Notable Holidays & Festivals This Month:*\n`;
+      thisMonthHols.forEach(h => { msg += ` • *${h.day} ${monthName.slice(0,3)}* - ${h.name} ${h.emoji}\n`; });
+    }
+    msg += `\n━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `🚀 Great job team! Let's hit new heights next month!\n\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+    return msg;
+  }
+
+  return 'Unknown report type.';
+}
+
+// ── Refresh preview box ────────────────────────────────────────
+async function refreshRptPreview() {
+  refreshRptKPIs();
+  const box = document.getElementById('rpt-preview');
+  const btn = document.getElementById('btn-send-wa');
+  if (!box) return;
+  box.textContent = '⏳ Generating report preview…';
+  box.classList.add('loading');
+  if (btn) btn.disabled = true;
+  setRptStatus('');
+  try {
+    currentRptText = await generateReportText(currentRptType);
+    box.textContent = currentRptText;
+    box.classList.remove('loading');
+    if (btn) btn.disabled = false;
+  } catch (err) {
+    box.textContent = '❌ Error generating report: ' + err.message;
+    box.classList.remove('loading');
+  }
+}
+
+// ── Send via Green API ────────────────────────────────────────
+async function sendWhatsAppReport() {
+  if (!currentRptText) { toast('Generate a report first.','warning'); return; }
+  const btn = document.getElementById('btn-send-wa');
+  if (btn) btn.disabled = true;
+  setRptStatus('sending', '⏳ Sending report to WhatsApp group…');
+
+  const { GREEN_API_INSTANCE_ID, GREEN_API_TOKEN, GROUP_JID } = WA_CONFIG;
+  const url = `https://api.green-api.com/waInstance${GREEN_API_INSTANCE_ID}/sendMessage/${GREEN_API_TOKEN}`;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chatId: GROUP_JID, message: currentRptText })
+    });
+    const data = await res.json();
+    if (data && data.idMessage) {
+      setRptStatus('success', `✅ Report sent! Message ID: ${data.idMessage}`);
+      toast('WhatsApp report sent successfully! 🚀', 'success');
+      addRptHistory(currentRptType, data.idMessage);
+    } else {
+      throw new Error(JSON.stringify(data));
+    }
+  } catch (err) {
+    setRptStatus('error', '❌ Failed to send: ' + err.message);
+    toast('Failed to send report: ' + err.message, 'error');
+  }
+  if (btn) btn.disabled = false;
+}
+
+// ── Status helper ──────────────────────────────────────────────
+function setRptStatus(type, msg = '') {
+  const el = document.getElementById('rpt-status');
+  if (!el) return;
+  el.className = 'rpt-status' + (type ? ' ' + type : '');
+  el.textContent = msg;
+}
+
+// ── History table ─────────────────────────────────────────────
+function addRptHistory(type, msgId) {
+  const typeLabels = { daily:'📢 Daily', weekly:'📊 Weekly', monthly:'🏆 Monthly', login:'🔑 Login' };
+  rptHistory.unshift({
+    type: typeLabels[type] || type,
+    msgId,
+    time: new Date().toLocaleTimeString('en-IN'),
+    date: new Date().toLocaleDateString('en-IN'),
+  });
+  renderRptHistory();
+}
+
+function renderRptHistory() {
+  const el = document.getElementById('rpt-history-table');
+  if (!el) return;
+  if (!rptHistory.length) {
+    el.innerHTML = '<div class="empty-state"><div>📭</div>No reports sent yet this session.</div>';
+    return;
+  }
+  el.innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Type</th><th>Date</th><th>Time</th><th>Message ID</th><th>Status</th>
+        </tr></thead>
+        <tbody>
+          ${rptHistory.map(r => `
+            <tr>
+              <td><strong>${r.type}</strong></td>
+              <td>${r.date}</td>
+              <td>${r.time}</td>
+              <td><code style="font-size:11px;background:rgba(0,0,0,.05);padding:2px 6px;border-radius:4px">${r.msgId}</code></td>
+              <td><span class="badge badge-green">✅ Sent</span></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
 
 // ─── Init ─────────────────────────────────────────────────────
 // The page will render automatically when the Firestore listeners fire their initial snapshot

@@ -35,3 +35,92 @@ Sending report to WhatsApp...
 Sending message to group 120363412057920447@g.us via Green-API...
 🎉 Report sent successfully via Green-API! Message ID: 3EB037465FBB9FE6C6A7CA
 🚀 Report automation run completed successfully!
+🤖 Starting EMS Report Automation
+📊 Report Type: DAILY
+⚙️  Dry Run: DISABLED (Will send to WhatsApp)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Connecting to Firebase...
+✅ Connected to Firebase successfully!
+Generating daily report data...
+❌ Error generating report content: Error: 14 UNAVAILABLE: Name resolution failed for target dns:firestore.googleapis.com:443
+    at callErrorFromStatus (d:\new website growthapex\growthapex\EMS_login\automation\node_modules\@grpc\grpc-js\build\src\call.js:32:19)
+    at Object.onReceiveStatus (d:\new website growthapex\growthapex\EMS_login\automation\node_modules\@grpc\grpc-js\build\src\client.js:359:73)
+    at Object.onReceiveStatus (d:\new website growthapex\growthapex\EMS_login\automation\node_modules\@grpc\grpc-js\build\src\client-interceptors.js:327:181)
+    at d:\new website growthapex\growthapex\EMS_login\automation\node_modules\@grpc\grpc-js\build\src\resolving-call.js:135:78
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+for call at
+    at ServiceClientImpl.makeServerStreamRequest (d:\new website growthapex\growthapex\EMS_login\automation\node_modules\@grpc\grpc-js\build\src\client.js:342:32)
+    at ServiceClientImpl.<anonymous> (d:\new website growthapex\growthapex\EMS_login\automation\node_modules\@grpc\grpc-js\build\src\make-client.js:105:19)
+    at d:\new website growthapex\growthapex\EMS_login\automation\node_modules\@google-cloud\firestore\build\src\v1\firestore_client.js:242:33
+    at d:\new website growthapex\growthapex\EMS_login\automation\node_modules\google-gax\build\src\streamingCalls\streamingApiCaller.js:38:28
+    at d:\new website growthapex\growthapex\EMS_login\automation\node_modules\google-gax\build\src\normalCalls\timeout.js:44:16
+    at Object.request (d:\new website growthapex\growthapex\EMS_login\automation\node_modules\google-gax\build\src\streamingCalls\streaming.js:234:40)
+    at Timeout.makeRequest [as _onTimeout] (d:\new website growthapex\growthapex\EMS_login\automation\node_modules\retry-request\index.js:159:28)
+    at listOnTimeout (node:internal/timers:588:17)
+    at process.processTimers (node:internal/timers:523:7)
+Caused by: Error
+    at QueryUtil._getResponse (d:\new website growthapex\growthapex\EMS_login\automation\node_modules\@google-cloud\firestore\build\src\reference\query-util.js:44:23)
+    at CollectionReference._getResponse (d:\new website growthapex\growthapex\EMS_login\automation\node_modules\@google-cloud\firestore\build\src\reference\query.js:784:32)
+    at CollectionReference._get (d:\new website growthapex\growthapex\EMS_login\automation\node_modules\@google-cloud\firestore\build\src\reference\query.js:777:35)
+    at d:\new website growthapex\growthapex\EMS_login\automation\node_modules\@google-cloud\firestore\build\src\reference\query.js:745:43
+    at d:\new website growthapex\growthapex\EMS_login\automation\node_modules\@google-cloud\firestore\build\src\telemetry\enabled-trace-util.js:110:30
+    at NoopContextManager.with (d:\new website growthapex\growthapex\EMS_login\automation\node_modules\@opentelemetry\api\build\src\context\NoopContextManager.js:14:19)
+    at ContextAPI.with (d:\new website growthapex\growthapex\EMS_login\automation\node_modules\@opentelemetry\api\build\src\api\context.js:51:46)
+    at NoopTracer.startActiveSpan (d:\new website growthapex\growthapex\EMS_login\automation\node_modules\@opentelemetry\api\build\src\trace\NoopTracer.js:54:31)
+    at ProxyTracer.startActiveSpan (d:\new website growthapex\growthapex\EMS_login\automation\node_modules\@opentelemetry\api\build\src\trace\ProxyTracer.js:27:24)
+    at EnabledTraceUtil.startActiveSpan (d:\new website growthapex\growthapex\EMS_login\automation\node_modules\@google-cloud\firestore\build\src\telemetry\enabled-trace-util.js:102:28)
+    at CollectionReference.get (d:\new website growthapex\growthapex\EMS_login\automation\node_modules\@google-cloud\firestore\build\src\reference\query.js:744:43)
+    at getActiveEmployees (d:\new website growthapex\growthapex\EMS_login\automation\report-generator.js:80:49)
+    at generateDailyReport (d:\new website growthapex\growthapex\EMS_login\automation\report-generator.js:91:27)
+    at main (d:\new website growthapex\growthapex\EMS_login\automation\run.js:61:26)
+    at Object.<anonymous> (d:\new website growthapex\growthapex\EMS_login\automation\run.js:95:1)
+    at Module._compile (node:internal/modules/cjs/loader:1706:14) {
+  code: 14,
+  details: 'Name resolution failed for target dns:firestore.googleapis.com:443',
+  metadata: Metadata {
+    internalRepr: Map(0) {},
+    opaqueData: Map(0) {},
+    options: {}
+  }
+}
+🤖 Starting EMS Report Automation
+📊 Report Type: WEEKLY
+⚙️  Dry Run: DISABLED (Will send to WhatsApp)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Connecting to Firebase...
+✅ Connected to Firebase successfully!
+Generating weekly report data...
+✅ Report generated successfully!
+
+📄 Generated Message content:
+
+📊 *GROWTHAPEX EMS - WEEKLY REPORT* 📊
+📅 *Period:* 2026-08-23 to 2026-08-30
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+👥 *Team Engagement:*
+• Active Employees: 3
+• Total Present Check-ins: 11
+• Late Check-ins: 11 ⏰
+• Total Leaves Taken: 0 days
+
+👥 *Employee Attendance Summary:*
+ • *Jayati Goyal*: Present: 4d | Absent: 2d | Leaves: 0d (⏰ 4 Late)
+ • *Adarsh Singh*: Present: 1d | Absent: 5d | Leaves: 0d (⏰ 1 Late)
+ • *Dhiraj Kumar*: Present: 6d | Absent: 0d | Leaves: 0d (⏰ 6 Late)
+
+📝 *Task Execution summary:*
+• Total Tasks Logged: 1
+• Total Tasks Completed: 1
+• Completion Success Rate: 100%
+
+🥇 *Weekly Task Achievers:*
+ 🥇 *Jayati Goyal* - Completed 1 tasks
+
+📌 *System Note:* Keep logging daily tasks and checking in before 10:00 AM.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Sending report to WhatsApp...
+Sending message to group 120363412057920447@g.us via Green-API...
+🎉 Report sent successfully via Green-API! Message ID: 3EB000228A74E385BCCCE3
+🚀 Report automation run completed successfully!
