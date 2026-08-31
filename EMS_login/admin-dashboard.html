@@ -235,6 +235,55 @@
     .rpt-kpi .k-val { font-size:26px; font-weight:800; font-family:'Space Grotesk',sans-serif; margin-top:4px; }
     .rpt-kpi .k-val.green { color:var(--green); } .rpt-kpi .k-val.cyan { color:var(--cyan); }
     .rpt-kpi .k-val.amber { color:var(--amber); } .rpt-kpi .k-val.red { color:var(--red); }
+    /* ── Task Checklist ────────────────────────────────── */
+    .task-checklist-row {
+      display:flex; align-items:flex-start; gap:14px;
+      padding:12px 14px; border-radius:8px;
+      border:1px solid var(--border); background:var(--card);
+      margin-bottom:8px; transition:all .2s;
+    }
+    .task-checklist-row:hover { border-color:rgba(0,212,255,.3); background:rgba(0,212,255,.02); }
+    .task-checklist-row.done-row { opacity:.65; background:#f9f9fb; }
+    .task-cb {
+      width:20px; height:20px; border-radius:5px;
+      border:2px solid var(--border); cursor:pointer;
+      flex-shrink:0; margin-top:2px; accent-color:var(--green);
+      transition:all .2s;
+    }
+    .task-cb:checked { accent-color:#10b981; }
+    .task-info { flex:1; min-width:0; }
+    .task-title-text {
+      font-size:14px; font-weight:700; color:var(--text);
+      display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+    }
+    .task-title-text.strikethrough { text-decoration:line-through; color:var(--muted); }
+    .task-meta-row { display:flex; align-items:center; gap:8px; margin-top:5px; flex-wrap:wrap; }
+    .task-emp-chip {
+      display:inline-flex; align-items:center; gap:5px;
+      background:rgba(0,0,0,.05); border-radius:6px;
+      padding:3px 9px; font-size:11px; font-weight:700; color:var(--text);
+    }
+    .task-actions { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+    /* Employee completion summary */
+    .emp-completion-grid {
+      display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
+      gap:12px; margin-top:6px;
+    }
+    .emp-completion-card {
+      background:var(--card); border:1px solid var(--border);
+      border-radius:10px; padding:14px 16px;
+    }
+    .ecc-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+    .ecc-name { font-size:13px; font-weight:700; color:var(--text); }
+    .ecc-pct {
+      font-size:18px; font-weight:800; font-family:'Space Grotesk',sans-serif;
+    }
+    .ecc-pct.full  { color:var(--green); }
+    .ecc-pct.mid   { color:var(--amber); }
+    .ecc-pct.low   { color:var(--red); }
+    .ecc-bar-wrap { height:7px; background:rgba(0,0,0,.07); border-radius:4px; overflow:hidden; }
+    .ecc-bar { height:100%; border-radius:4px; transition:width .5s ease; }
+    .ecc-label { font-size:11px; color:var(--muted); margin-top:5px; }
   </style>
 </head>
 <body>
@@ -363,7 +412,12 @@
           <button class="btn btn-primary" onclick="openTaskModal()">+ Assign Task</button>
         </div>
       </div>
-      <div class="table-wrap" id="admin-tasks-table"></div>
+      <div id="admin-tasks-checklist"></div>
+    </div>
+    <!-- Employee Completion Summary -->
+    <div class="section-card" id="task-completion-section">
+      <div class="section-head"><h3>📊 Task Completion by Employee</h3></div>
+      <div class="emp-completion-grid" id="emp-completion-grid"></div>
     </div>
   </div>
 
@@ -1018,40 +1072,117 @@ async function renderAdminTasks() {
   const empId  = document.getElementById('task-emp-filter')?.value||'';
   const status = document.getElementById('task-status-filter')?.value||'';
   let tasks = cache.tasks;
-  if (q)      tasks = tasks.filter(t=>(t.title+t.description).toLowerCase().includes(q));
+  if (q)      tasks = tasks.filter(t=>(t.title+(t.description||'')).toLowerCase().includes(q));
   if (empId)  tasks = tasks.filter(t=>t.empId===empId);
   if (status) tasks = tasks.filter(t=>t.status===status);
 
-  const emps = cache.employees;
+  const emps   = cache.employees;
   const empMap = Object.fromEntries(emps.map(e => [e.id, e]));
 
-  document.getElementById('admin-tasks-table').innerHTML = tasks.length ? `
-    <table><thead><tr><th>Task</th><th>Assigned To</th><th>Source</th><th>Deadline</th><th>Status</th><th>Actions</th></tr></thead>
-    <tbody>${tasks.slice().reverse().map(t=>{
-      const emp = empMap[t.empId] || {};
-      const overdue = t.status!=='done' && t.deadline < new Date().toISOString().split('T')[0];
-      const isSelf = t.createdBy === 'employee';
-      return `<tr>
-        <td><div style="font-weight:600">${t.title}${overdue?'<span class="badge badge-red" style="margin-left:6px;font-size:10px">OVERDUE</span>':''}</div>
-            <div style="font-size:11px;color:var(--muted)">${t.description||''}</div></td>
-        <td><div style="font-weight:600">${emp.name||t.empId}</div><div style="font-size:11px;color:var(--muted)">${emp.department||''}</div></td>
-        <td>${isSelf ? '<span class="badge badge-cyan">Self-Submitted</span>' : '<span class="badge badge-purple">Admin Assigned</span>'}</td>
-        <td style="color:${overdue?'#f87171':'inherit'}">${fmt(t.deadline)}</td>
-        <td>
-          <select onchange="updateTaskStatus('${t.id}',this.value)" style="padding:4px 8px;font-size:12px;width:auto">
-            ${['todo','in-progress','done'].map(s=>`<option value="${s}" ${t.status===s?'selected':''}>${s}</option>`).join('')}
-          </select>
-        </td>
-        <td style="white-space:nowrap">
-          <button class="btn btn-sm btn-edit" onclick="editTask('${t.id}')">✏</button>
-          <button class="btn btn-sm btn-del" onclick="deleteTask('${t.id}')" style="margin-left:4px">🗑</button>
-        </td>
-      </tr>`;
-    }).join('')}</tbody></table>`
-  : '<div class="empty-state"><div>✅</div>No tasks — assign one!</div>';
+  const container = document.getElementById('admin-tasks-checklist');
+  if (!container) return;
+
+  if (!tasks.length) {
+    container.innerHTML = '<div class="empty-state"><div>\u2705</div>No tasks — assign one!</div>';
+  } else {
+    // Sort: undone first, then done
+    const sorted = [...tasks].sort((a, b) => {
+      const da = a.status === 'done' ? 1 : 0;
+      const db = b.status === 'done' ? 1 : 0;
+      return da - db;
+    });
+
+    container.innerHTML = sorted.map(t => {
+      const emp     = empMap[t.empId] || {};
+      const isDone  = t.status === 'done';
+      const overdue = !isDone && t.deadline && t.deadline < new Date().toISOString().split('T')[0];
+      const isSelf  = t.createdBy === 'employee';
+      const pctCls  = isDone ? 'badge-green' : overdue ? 'badge-red' : 'badge-amber';
+
+      return `
+        <div class="task-checklist-row ${isDone ? 'done-row' : ''}" id="tcr-${t.id}">
+          <input type="checkbox" class="task-cb"
+            ${isDone ? 'checked' : ''}
+            onchange="toggleTaskDone('${t.id}', this.checked)"
+            title="Mark as ${isDone ? 'incomplete' : 'complete'}">
+          <div class="task-info">
+            <div class="task-title-text ${isDone ? 'strikethrough' : ''}">
+              ${t.title}
+              ${overdue ? '<span class="badge badge-red" style="font-size:10px">OVERDUE</span>' : ''}
+              ${isDone  ? '<span class="badge badge-green" style="font-size:10px">✔ Done</span>' : ''}
+            </div>
+            ${t.description ? `<div style="font-size:12px;color:var(--muted);margin-top:3px">${t.description}</div>` : ''}
+            <div class="task-meta-row">
+              <span class="task-emp-chip">👤 ${emp.name || t.empId} <span style="opacity:.6">(${t.empId})</span></span>
+              <span class="badge badge-${emp.department ? 'purple' : 'blue'}" style="font-size:10px">${emp.department || 'Unknown'}</span>
+              <span class="badge ${pctCls}" style="font-size:10px">${t.status}</span>
+              ${isSelf ? '<span class="badge badge-cyan" style="font-size:10px">Self-Submitted</span>' : '<span class="badge badge-purple" style="font-size:10px">Admin Assigned</span>'}
+              ${t.deadline ? `<span style="font-size:11px;color:${overdue?'#f87171':'var(--muted)'}">\ud83d\udcc5 ${fmt(t.deadline)}</span>` : ''}
+            </div>
+          </div>
+          <div class="task-actions">
+            <button class="btn btn-sm btn-edit" onclick="editTask('${t.id}')" title="Edit">\u270f</button>
+            <button class="btn btn-sm btn-del" onclick="deleteTask('${t.id}')" title="Delete">🗑</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  renderTaskCompletionSummary();
 }
-async function updateTaskStatus(id, status) {
-  await EMS_DB.updateTask(id, { status }); toast('Task updated!','success');
+
+// ── Toggle done via checkbox ────────────────────────────────────
+async function toggleTaskDone(id, checked) {
+  const newStatus = checked ? 'done' : 'todo';
+  // Optimistic UI update
+  const row = document.getElementById('tcr-' + id);
+  if (row) {
+    if (checked) {
+      row.classList.add('done-row');
+      const titleEl = row.querySelector('.task-title-text');
+      if (titleEl) titleEl.classList.add('strikethrough');
+    } else {
+      row.classList.remove('done-row');
+      const titleEl = row.querySelector('.task-title-text');
+      if (titleEl) titleEl.classList.remove('strikethrough');
+    }
+  }
+  await EMS_DB.updateTask(id, { status: newStatus });
+  toast(checked ? '\u2705 Task marked as done!' : 'Task marked as to-do', checked ? 'success' : 'info');
+}
+
+// ── Employee completion % summary ──────────────────────────────
+function renderTaskCompletionSummary() {
+  const emps  = cache.employees.filter(e => e.status === 'active');
+  const tasks = cache.tasks;
+  const grid  = document.getElementById('emp-completion-grid');
+  if (!grid) return;
+
+  if (!emps.length) {
+    grid.innerHTML = '<div class="empty-state"><div>\ud83d\udc65</div>No employees found.</div>';
+    return;
+  }
+
+  grid.innerHTML = emps.map(e => {
+    const empTasks  = tasks.filter(t => t.empId === e.id);
+    const doneTasks = empTasks.filter(t => t.status === 'done').length;
+    const total     = empTasks.length;
+    const pct       = total ? Math.round(doneTasks / total * 100) : 0;
+    const pctCls    = pct === 100 ? 'full' : pct >= 50 ? 'mid' : 'low';
+    const barColor  = pct === 100 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444';
+
+    return `
+      <div class="emp-completion-card">
+        <div class="ecc-header">
+          <div class="ecc-name">\ud83d\udc64 ${e.name}<br><span style="font-size:11px;font-weight:500;color:var(--muted)">${e.department || ''}</span></div>
+          <div class="ecc-pct ${pctCls}">${pct}%</div>
+        </div>
+        <div class="ecc-bar-wrap">
+          <div class="ecc-bar" style="width:${pct}%;background:${barColor}"></div>
+        </div>
+        <div class="ecc-label">${doneTasks} of ${total} task${total !== 1 ? 's' : ''} completed</div>
+      </div>`;
+  }).join('');
 }
 async function deleteTask(id) {
   await EMS_DB.deleteTask(id); toast('Task deleted','error');
@@ -1351,6 +1482,22 @@ async function generateReportText(type) {
     } else {
       todayTasks.forEach(t => { msg += `• [${t.status}] ${t.title} — ${t.empId}\n`; });
     }
+    msg += `\n📊 *Task Completion % by Employee:*\n`;
+    const hasTasks = active.some(e => tasks.filter(t => t.empId === e.id).length > 0);
+    if (!hasTasks) {
+      msg += `• No tasks assigned yet.\n`;
+    } else {
+      active.forEach(e => {
+        const empTasks = tasks.filter(t => t.empId === e.id);
+        const done     = empTasks.filter(t => t.status === 'done').length;
+        const total    = empTasks.length;
+        const pct      = total ? Math.round(done / total * 100) : 0;
+        const filled   = Math.round(pct / 10);
+        const bar      = '█'.repeat(filled) + '░'.repeat(10 - filled);
+        const star     = pct === 100 ? ' ⭐' : '';
+        msg += ` • *${e.name}*: ${bar} ${pct}% (${done}/${total})${star}\n`;
+      });
+    }
     msg += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
     return msg;
   }
@@ -1419,6 +1566,23 @@ async function generateReportText(type) {
       msg += `\n🥇 *Weekly Task Achievers:*\n`;
       msg += ` 🥇 *${achiever.name}* - Completed ${taskByEmp[achieverId]} tasks\n`;
     }
+    // Per-employee weekly task completion %
+    msg += `\n📊 *Task Completion % (This Week):*\n`;
+    const anyWeekTasks = active.some(e => weekTasks.filter(t => t.empId === e.id).length > 0);
+    if (!anyWeekTasks) {
+      msg += `• No tasks logged this week.\n`;
+    } else {
+      active.forEach(e => {
+        const empT  = weekTasks.filter(t => t.empId === e.id);
+        const done  = empT.filter(t => t.status === 'done').length;
+        const total = empT.length;
+        const pct   = total ? Math.round(done / total * 100) : 0;
+        const filled = Math.round(pct / 10);
+        const bar   = '█'.repeat(filled) + '░'.repeat(10 - filled);
+        const star  = pct === 100 ? ' ⭐' : '';
+        msg += ` • *${e.name}*: ${bar} ${pct}% (${done}/${total})${star}\n`;
+      });
+    }
     msg += `\n📌 *System Note:* Keep logging daily tasks and checking in before 10:00 AM.\n\n`;
     msg += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
     return msg;
@@ -1479,14 +1643,20 @@ async function generateReportText(type) {
       msg += `⭐ *${eotm.emp.name}* (${eotm.emp.department})\n`;
       msg += `💪 Completed *${eotm.done} tasks* with only *${eotm.late} late check-ins*!\n\n`;
     }
-    msg += `👥 *Employee Breakdown (Completed/Assigned):*\n`;
+    msg += `👥 *Employee Breakdown:*\n`;
     empScores.forEach(({ emp, done, late }) => {
-      const empAtt    = monAtt.filter(a => a.empId === emp.id);
-      const present   = empAtt.filter(a => a.status === 'present').length;
-      const absent    = workingDays - present;
-      const lv        = monLeaves.filter(l => l.empId === emp.id).length;
-      const assigned  = monTasks.filter(t => t.empId === emp.id).length;
-      msg += ` • *${emp.name}*: ${done}/${assigned} Tasks (Attendance: ${present}d Present | ${absent}d Absent | ${lv}d Leave) (⏰ ${late} Late)\n`;
+      const empAtt   = monAtt.filter(a => a.empId === emp.id);
+      const present  = empAtt.filter(a => a.status === 'present').length;
+      const absent   = workingDays - present;
+      const lv       = monLeaves.filter(l => l.empId === emp.id).length;
+      const assigned = monTasks.filter(t => t.empId === emp.id).length;
+      const pct      = assigned ? Math.round(done / assigned * 100) : 0;
+      const filled   = Math.round(pct / 10);
+      const bar      = '█'.repeat(filled) + '░'.repeat(10 - filled);
+      const star     = pct === 100 ? ' ⭐' : '';
+      msg += ` • *${emp.name}* (${emp.department || 'N/A'})\n`;
+      msg += `   Tasks: ${bar} ${pct}% — ${done}/${assigned} done${star}\n`;
+      msg += `   Att: ${present}d Present | ${absent}d Absent | ${lv}d Leave | ⏰ ${late} Late\n`;
     });
     if (thisMonthHols.length) {
       msg += `\n🗓️ *Notable Holidays & Festivals This Month:*\n`;

@@ -214,6 +214,32 @@
       .stats-grid { grid-template-columns: 1fr; }
       .topbar-right .clock-badge { display: none; }
     }
+    /* ── Task Checklist (Employee) ──────────────────── */
+    .task-checklist-row {
+      display:flex; align-items:flex-start; gap:14px;
+      padding:13px 16px; border-radius:10px;
+      border:1px solid var(--border); background:var(--card);
+      margin-bottom:10px; transition:all .2s;
+    }
+    .task-checklist-row:hover { border-color:rgba(0,212,255,.3); box-shadow:0 2px 10px rgba(0,212,255,.08); }
+    .task-checklist-row.done-row { opacity:.6; background:#f9f9fb; }
+    .task-cb {
+      width:22px; height:22px; border-radius:6px; border:2px solid var(--border);
+      cursor:pointer; flex-shrink:0; margin-top:2px; accent-color:#10b981; transition:all .2s;
+    }
+    .task-info { flex:1; min-width:0; }
+    .task-title-text { font-size:14px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    .task-title-text.strikethrough { text-decoration:line-through; color:var(--muted); }
+    .task-meta-row { display:flex; align-items:center; gap:8px; margin-top:6px; flex-wrap:wrap; }
+    .task-actions { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+    /* Completion bar */
+    .emp-task-bar-wrap { background:rgba(0,0,0,.06); border-radius:6px; height:10px; overflow:hidden; flex:1; }
+    .emp-task-bar { height:100%; border-radius:6px; transition:width .6s ease; }
+    .completion-header { display:flex; align-items:center; gap:14px; margin-bottom:18px; flex-wrap:wrap; }
+    .completion-pct { font-size:28px; font-weight:800; font-family:'Space Grotesk',sans-serif; }
+    .completion-pct.full  { color:#10b981; }
+    .completion-pct.mid   { color:#f59e0b; }
+    .completion-pct.low   { color:#ef4444; }
   </style>
 </head>
 <body>
@@ -377,6 +403,19 @@
 
   <!-- Tasks -->
   <div class="page" id="page-tasks">
+    <!-- Personal Completion Header -->
+    <div class="section-card" id="my-task-completion-card">
+      <div class="section-head"><h3>📊 My Task Completion</h3></div>
+      <div class="completion-header">
+        <div class="completion-pct" id="my-task-pct">—</div>
+        <div style="flex:1">
+          <div class="emp-task-bar-wrap">
+            <div class="emp-task-bar" id="my-task-bar" style="width:0%"></div>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:6px" id="my-task-label">Loading…</div>
+        </div>
+      </div>
+    </div>
     <div class="section-card">
       <div class="section-head"><h3>✅ My Tasks</h3>
         <div class="toolbar">
@@ -390,7 +429,7 @@
           <button class="btn btn-primary" onclick="openTaskModal()">+ Submit Daily Task</button>
         </div>
       </div>
-      <div class="table-wrap" id="my-tasks-table"></div>
+      <div id="my-tasks-checklist"></div>
     </div>
   </div>
 
@@ -742,33 +781,93 @@
 
   // ── Tasks ────────────────────────────────────────────────────
   async function renderTasks() {
-    const q = document.getElementById('my-task-search').value.toLowerCase();
-    const s = document.getElementById('my-task-status').value;
-    let tasks = await EMS_DB.getTasks(empId);
-    if(q) tasks = tasks.filter(t => (t.title+t.description).toLowerCase().includes(q));
-    if(s) tasks = tasks.filter(t => t.status === s);
-    
-    const html = tasks.length ? `<table><thead><tr><th>Task</th><th>Deadline</th><th>Status</th><th>Type</th><th>Update Progress</th><th>Actions</th></tr></thead><tbody>
-      ${tasks.slice().reverse().map(t=>{
-        const isSelf = t.createdBy === 'employee';
-        return `<tr>
-          <td><div style="font-weight:600">${t.title}</div><div style="font-size:11px;color:var(--muted)">${t.description||''}</div></td>
-          <td style="${t.status!=='done' && t.deadline < new Date().toISOString().split('T')[0] ? 'color:var(--red)' : ''}">${fmt(t.deadline)}</td>
-          <td>${sBadge(t.status)}</td>
-          <td>${isSelf ? '<span class="badge badge-cyan">Self-Submitted</span>' : '<span class="badge badge-purple">Admin Assigned</span>'}</td>
-          <td><select class="filter-select" onchange="updateTaskStatus('${t.id}',this.value)" style="width:auto">
-            ${['todo','in-progress','done'].map(st=>`<option value="${st}" ${t.status===st?'selected':''}>${st}</option>`).join('')}
-          </select></td>
-          <td style="white-space:nowrap">
+    const q = (document.getElementById('my-task-search')?.value || '').toLowerCase();
+    const s = document.getElementById('my-task-status')?.value || '';
+    let allTasks = await EMS_DB.getTasks(empId);
+    let tasks = [...allTasks];
+    if (q) tasks = tasks.filter(t => (t.title + (t.description || '')).toLowerCase().includes(q));
+    if (s) tasks = tasks.filter(t => t.status === s);
+
+    // Update completion bar (always from all tasks, not filtered)
+    const done  = allTasks.filter(t => t.status === 'done').length;
+    const total = allTasks.length;
+    const pct   = total ? Math.round(done / total * 100) : 0;
+    const pctEl = document.getElementById('my-task-pct');
+    const barEl = document.getElementById('my-task-bar');
+    const lblEl = document.getElementById('my-task-label');
+    if (pctEl) {
+      pctEl.textContent = pct + '%';
+      pctEl.className = 'completion-pct ' + (pct === 100 ? 'full' : pct >= 50 ? 'mid' : 'low');
+    }
+    if (barEl) {
+      const barColor = pct === 100 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444';
+      barEl.style.width = pct + '%';
+      barEl.style.background = barColor;
+    }
+    if (lblEl) lblEl.textContent = `${done} of ${total} task${total !== 1 ? 's' : ''} completed${pct === 100 && total > 0 ? ' ⭐ Great work!' : ''}`;
+
+    const container = document.getElementById('my-tasks-checklist');
+    if (!container) return;
+
+    if (!tasks.length) {
+      container.innerHTML = '<div class="empty-state"><div>✅</div>No tasks found</div>';
+      return;
+    }
+
+    // Sort: undone first, then done
+    const sorted = [...tasks].sort((a, b) => (a.status === 'done' ? 1 : 0) - (b.status === 'done' ? 1 : 0));
+    const today  = new Date().toISOString().split('T')[0];
+
+    container.innerHTML = sorted.map(t => {
+      const isDone   = t.status === 'done';
+      const overdue  = !isDone && t.deadline && t.deadline < today;
+      const isSelf   = t.createdBy === 'employee';
+      const stateCls = isDone ? 'badge-green' : overdue ? 'badge-red' : 'badge-amber';
+
+      return `
+        <div class="task-checklist-row ${isDone ? 'done-row' : ''}" id="emp-tcr-${t.id}">
+          <input type="checkbox" class="task-cb"
+            ${isDone ? 'checked' : ''}
+            onchange="toggleEmpTaskDone('${t.id}', this.checked)"
+            title="Mark as ${isDone ? 'incomplete' : 'complete'}">
+          <div class="task-info">
+            <div class="task-title-text ${isDone ? 'strikethrough' : ''}">
+              ${t.title}
+              ${isDone  ? '<span class="badge badge-green" style="font-size:10px">✔ Done</span>' : ''}
+              ${overdue ? '<span class="badge badge-red" style="font-size:10px">OVERDUE</span>' : ''}
+            </div>
+            ${t.description ? `<div style="font-size:12px;color:var(--muted);margin-top:3px">${t.description}</div>` : ''}
+            <div class="task-meta-row">
+              <span class="badge ${stateCls}" style="font-size:10px">${t.status}</span>
+              ${isSelf ? '<span class="badge badge-cyan" style="font-size:10px">Self-Submitted</span>' : '<span class="badge badge-purple" style="font-size:10px">Admin Assigned</span>'}
+              ${t.deadline ? `<span style="font-size:11px;color:${overdue ? '#f87171' : 'var(--muted)'}">📅 ${fmt(t.deadline)}</span>` : ''}
+            </div>
+          </div>
+          <div class="task-actions">
             ${isSelf ? `
-              <button class="btn btn-sm btn-edit" onclick="editEmployeeTask('${t.id}')">✏ Edit</button>
-              <button class="btn btn-sm btn-del" onclick="deleteEmployeeTask('${t.id}')" style="margin-left:4px">🗑</button>
-            ` : '—'}
-          </td>
-        </tr>`;
-      }).join('')}
-    </tbody></table>` : '<div class="empty-state"><div>✅</div>No tasks found</div>';
-    document.getElementById('my-tasks-table').innerHTML = html;
+              <button class="btn btn-sm btn-edit" onclick="editEmployeeTask('${t.id}')" title="Edit">✏</button>
+              <button class="btn btn-sm btn-del" onclick="deleteEmployeeTask('${t.id}')" title="Delete">🗑</button>
+            ` : ''}
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  async function toggleEmpTaskDone(id, checked) {
+    const newStatus = checked ? 'done' : 'todo';
+    const row = document.getElementById('emp-tcr-' + id);
+    if (row) {
+      if (checked) {
+        row.classList.add('done-row');
+        const t = row.querySelector('.task-title-text'); if (t) t.classList.add('strikethrough');
+      } else {
+        row.classList.remove('done-row');
+        const t = row.querySelector('.task-title-text'); if (t) t.classList.remove('strikethrough');
+      }
+    }
+    await EMS_DB.updateTask(id, { status: newStatus });
+    toast(checked ? '✅ Task marked as done!' : 'Task reverted to to-do', checked ? 'success' : 'info');
+    renderTasks();
   }
 
   async function updateTaskStatus(id, status) {
