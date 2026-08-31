@@ -568,6 +568,37 @@
   </div>
 </div>
 
+<!-- Change Employee ID Modal -->
+<div class="modal-overlay" id="change-id-modal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h3>🔄 Change Employee ID</h3>
+      <button class="modal-close" onclick="closeModal('change-id-modal')">✕</button>
+    </div>
+    <div style="margin-bottom:16px;padding:12px 14px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:8px;font-size:13px">
+      ⚠️ Changing the ID will <strong>move all employee data</strong> to the new ID and remove the old one. This cannot be undone.
+    </div>
+    <div class="form-group">
+      <label>Current Employee ID</label>
+      <input id="cid-old" disabled style="opacity:.6;cursor:not-allowed">
+    </div>
+    <div class="form-group">
+      <label>Employee Name</label>
+      <input id="cid-name" disabled style="opacity:.6;cursor:not-allowed">
+    </div>
+    <div class="form-group">
+      <label>New Employee ID *</label>
+      <input id="cid-new" placeholder="e.g. EMP003" style="text-transform:uppercase;font-weight:700"
+        oninput="this.value=this.value.toUpperCase()">
+    </div>
+    <div id="cid-msg" style="font-size:13px;min-height:18px"></div>
+    <div class="modal-footer">
+      <button class="btn btn-cancel" style="padding:11px 20px" onclick="closeModal('change-id-modal')">Cancel</button>
+      <button class="btn-save" id="cid-save-btn" onclick="confirmChangeEmpId()">🔄 Change ID</button>
+    </div>
+  </div>
+</div>
+
 <!-- Attendance Modal -->
 <div class="modal-overlay" id="att-modal">
   <div class="modal">
@@ -912,6 +943,9 @@ async function renderEmpTable() {
       <td>${sBadge(e.status)}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-sm btn-edit" onclick="editEmployee('${e.id}')">✏ Edit</button>
+        <button class="btn btn-sm" onclick="openChangeIdModal('${e.id}','${e.name.replace(/'/g,"\\'")}')"
+          style="margin-left:4px;background:rgba(245,158,11,.15);color:#fbbf24;border:1px solid rgba(245,158,11,.3)"
+          title="Change Employee ID">🔄 ID</button>
         <button class="btn btn-sm btn-del" onclick="deleteEmployee('${e.id}')" style="margin-left:4px">🗑</button>
       </td>
     </tr>`).join('')}</tbody></table>`
@@ -964,6 +998,73 @@ async function deleteEmployee(id) {
   const emp = cache.employees.find(e => e.id === id);
   if (!confirm(`Delete ${emp?.name||id}? This cannot be undone.`)) return;
   await EMS_DB.deleteEmployee(id); toast(`${emp?.name} removed`, 'error');
+}
+
+// ─── Change Employee ID ────────────────────────────────────────
+function openChangeIdModal(oldId, name) {
+  document.getElementById('cid-old').value  = oldId;
+  document.getElementById('cid-name').value = name;
+  document.getElementById('cid-new').value  = '';
+  document.getElementById('cid-msg').textContent = '';
+  const btn = document.getElementById('cid-save-btn');
+  if (btn) { btn.disabled = false; btn.textContent = '🔄 Change ID'; }
+  document.getElementById('change-id-modal').classList.add('open');
+  setTimeout(() => document.getElementById('cid-new').focus(), 100);
+}
+
+async function confirmChangeEmpId() {
+  const oldId = document.getElementById('cid-old').value.trim();
+  const newId = document.getElementById('cid-new').value.trim().toUpperCase();
+  const msgEl = document.getElementById('cid-msg');
+  const btn   = document.getElementById('cid-save-btn');
+
+  msgEl.textContent = '';
+  if (!newId) { msgEl.innerHTML = '<span style="color:#f87171">Please enter a new Employee ID.</span>'; return; }
+  if (!/^EMP\d{3,}$/i.test(newId)) { msgEl.innerHTML = '<span style="color:#f87171">ID must be in format EMP001, EMP002 etc.</span>'; return; }
+  if (newId === oldId) { msgEl.innerHTML = '<span style="color:#f87171">New ID is the same as the current ID.</span>'; return; }
+
+  // Check if new ID is already taken
+  const existing = await db.collection('employees').doc(newId).get();
+  if (existing.exists) { msgEl.innerHTML = `<span style="color:#f87171">ID ${newId} is already taken by another employee.</span>`; return; }
+
+  btn.disabled = true; btn.textContent = 'Moving…';
+  msgEl.innerHTML = '<span style="color:var(--muted)">⏳ Transferring data…</span>';
+
+  try {
+    const batch = db.batch();
+
+    // 1. Copy employee doc
+    const empDoc = await db.collection('employees').doc(oldId).get();
+    if (!empDoc.exists) throw new Error('Employee not found');
+    batch.set(db.collection('employees').doc(newId), empDoc.data());
+    batch.delete(db.collection('employees').doc(oldId));
+
+    // 2. Move attendance records
+    const attSnap = await db.collection('attendance').where('empId', '==', oldId).get();
+    attSnap.forEach(d => {
+      batch.set(db.collection('attendance').doc(d.id), { ...d.data(), empId: newId });
+    });
+
+    // 3. Move tasks
+    const taskSnap = await db.collection('tasks').where('empId', '==', oldId).get();
+    taskSnap.forEach(d => {
+      batch.set(db.collection('tasks').doc(d.id), { ...d.data(), empId: newId });
+    });
+
+    // 4. Move leaves
+    const leaveSnap = await db.collection('leaves').where('empId', '==', oldId).get();
+    leaveSnap.forEach(d => {
+      batch.set(db.collection('leaves').doc(d.id), { ...d.data(), empId: newId });
+    });
+
+    await batch.commit();
+
+    closeModal('change-id-modal');
+    toast(`✅ Employee ID changed: ${oldId} → ${newId}`, 'success');
+  } catch(err) {
+    msgEl.innerHTML = `<span style="color:#f87171">Error: ${err.message}</span>`;
+    btn.disabled = false; btn.textContent = '🔄 Change ID';
+  }
 }
 async function saveEmployee() {
   const id       = document.getElementById('f-edit-id').value;
