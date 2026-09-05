@@ -974,40 +974,146 @@
   }
 
   // ── Salary ─────────────────────────────────────────────────
+  function numberToWords(num) {
+    if (!num || isNaN(num)) return 'Zero Rupees Only';
+    const a = ['','One ','Two ','Three ','Four ','Five ','Six ','Seven ','Eight ','Nine ','Ten ','Eleven ','Twelve ','Thirteen ','Fourteen ','Fifteen ','Sixteen ','Seventeen ','Eighteen ','Nineteen '];
+    const b = ['', '', 'Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+    function inWords(n) {
+      if ((n = n.toString()).length > 9) return 'Overflow';
+      let n_arr = ('000000000' + n).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+      if (!n_arr) return '';
+      let str = '';
+      str += (n_arr[1] != 0) ? (a[Number(n_arr[1])] || b[n_arr[1][0]] + ' ' + a[n_arr[1][1]]) + 'Crore ' : '';
+      str += (n_arr[2] != 0) ? (a[Number(n_arr[2])] || b[n_arr[2][0]] + ' ' + a[n_arr[2][1]]) + 'Lakh ' : '';
+      str += (n_arr[3] != 0) ? (a[Number(n_arr[3])] || b[n_arr[3][0]] + ' ' + a[n_arr[3][1]]) + 'Thousand ' : '';
+      str += (n_arr[4] != 0) ? (a[Number(n_arr[4])] || b[n_arr[4][0]] + ' ' + a[n_arr[4][1]]) + 'Hundred ' : '';
+      str += (n_arr[5] != 0) ? ((str != '') ? 'and ' : '') + (a[Number(n_arr[5])] || b[n_arr[5][0]] + ' ' + a[n_arr[5][1]]) : '';
+      return str;
+    }
+    return inWords(Math.round(num)).trim() + ' Rupees Only';
+  }
+
   function renderSalary() {
-    const net     = Number(emp.salary || 0);
-    const basic   = Math.round(net / 1.38);
-    const hra     = Math.round(basic * 0.4);
-    const ta      = Math.round(basic * 0.1);
-    const gross   = basic + hra + ta;
-    const pf      = Math.round(basic * 0.12);
+    const net = Number(emp.salary || 0);
+    const basic = Math.round(net * 0.60);
+    const hra = Math.round(net * 0.30);
+    const special = net - (basic + hra);
+    const currentMonthStr = new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
 
     document.getElementById('salary-info').innerHTML = `
-      <div style="max-width:500px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;background:#f9f9f9;padding:16px;border-radius:12px;border:1px solid var(--border)">
-          <div>
-            <div style="font-size:12px;color:var(--text);text-transform:uppercase;letter-spacing:.05em;font-weight:700">Pay Period</div>
-            <div style="font-weight:700;font-size:16px;margin-top:4px">${new Date().toLocaleDateString('en-IN',{month:'long',year:'numeric'})}</div>
+      <div style="max-width:750px;background:#fff;color:#111827;padding:24px;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.05)">
+        <!-- Top Bar -->
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #00D4FF;padding-bottom:12px;margin-bottom:16px">
+          <img src="../assets/images/logo/growthapex-logo.png" alt="GrowthApex Logo" style="height:48px;object-fit:contain" onerror="this.src='../assets/images/logo/favicon.svg'">
+          <div style="text-align:right">
+            <h2 style="font-family:'Space Grotesk',sans-serif;font-size:18px;margin:0;color:#111827">GROWTHAPEX DIGITAL MEDIA</h2>
+            <p style="font-size:11px;color:#6b7280;margin:2px 0 0 0">Email: contact@growthapex.in | Website: www.growthapex.in</p>
           </div>
-          <span class="badge badge-green" style="font-size:14px;padding:6px 12px">Paid</span>
         </div>
-        <table style="margin-bottom:16px">
-          <thead><tr><th>Earnings</th><th style="text-align:right">Amount</th></tr></thead>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;background:#f3f4f6;padding:10px 16px;border-radius:8px;margin-bottom:16px;border:1px solid #e5e7eb">
+          <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;color:#111827">PAYSLIP FOR: ${currentMonthStr.toUpperCase()}</div>
+          <button class="btn btn-primary" onclick="printEmpSalarySlip()" style="padding:6px 14px;font-size:12px">🖨️ Print / Save PDF</button>
+        </div>
+
+        <!-- Meta Table -->
+        <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px;color:#111827">
+          <tr>
+            <td style="padding:6px;font-weight:700;color:#4b5563">Employee Name:</td>
+            <td style="padding:6px;font-weight:700">${emp.name}</td>
+            <td style="padding:6px;font-weight:700;color:#4b5563">Employee ID:</td>
+            <td style="padding:6px;font-weight:700;color:#0284c7">${emp.id}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px;font-weight:700;color:#4b5563">Designation:</td>
+            <td style="padding:6px">${emp.designation || 'N/A'}</td>
+            <td style="padding:6px;font-weight:700;color:#4b5563">Department:</td>
+            <td style="padding:6px">${emp.department || 'N/A'}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px;font-weight:700;color:#4b5563">Joining Date:</td>
+            <td style="padding:6px">${emp.joinDate || 'N/A'}</td>
+            <td style="padding:6px;font-weight:700;color:#4b5563">Status:</td>
+            <td style="padding:6px"><span style="background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:12px;font-weight:700;font-size:11px">PAID ✅</span></td>
+          </tr>
+        </table>
+
+        <!-- Earnings Breakdown Table -->
+        <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px;color:#111827">
+          <thead>
+            <tr style="background:#f9fafb">
+              <th style="border:1px solid #e5e7eb;padding:8px;text-align:left;color:#374151">Earnings Breakdown</th>
+              <th style="border:1px solid #e5e7eb;padding:8px;text-align:right;color:#374151">Amount (₹)</th>
+              <th style="border:1px solid #e5e7eb;padding:8px;text-align:left;color:#374151">Deductions</th>
+              <th style="border:1px solid #e5e7eb;padding:8px;text-align:right;color:#374151">Amount (₹)</th>
+            </tr>
+          </thead>
           <tbody>
-            <tr><td>Basic Salary</td><td style="text-align:right">${money(basic)}</td></tr>
-            <tr><td>HRA (40%)</td><td style="text-align:right">${money(hra)}</td></tr>
-            <tr><td>Travel Allowance (10%)</td><td style="text-align:right">${money(ta)}</td></tr>
-            <tr style="background:#f9f9f9;font-weight:700"><td style="padding:16px 12px;color:var(--text)">Gross Pay</td><td style="text-align:right;padding:16px 12px;color:var(--text)">${money(gross)}</td></tr>
+            <tr>
+              <td style="border:1px solid #e5e7eb;padding:8px">Basic Pay (60%)</td>
+              <td style="border:1px solid #e5e7eb;padding:8px;text-align:right">${money(basic)}</td>
+              <td style="border:1px solid #e5e7eb;padding:8px">PF / ESI Deduction</td>
+              <td style="border:1px solid #e5e7eb;padding:8px;text-align:right;color:#16a34a">₹0 (Nil)</td>
+            </tr>
+            <tr>
+              <td style="border:1px solid #e5e7eb;padding:8px">House Rent Allowance (HRA 30%)</td>
+              <td style="border:1px solid #e5e7eb;padding:8px;text-align:right">${money(hra)}</td>
+              <td style="border:1px solid #e5e7eb;padding:8px">Other Deductions</td>
+              <td style="border:1px solid #e5e7eb;padding:8px;text-align:right;color:#16a34a">₹0 (Nil)</td>
+            </tr>
+            <tr>
+              <td style="border:1px solid #e5e7eb;padding:8px">Special Allowance</td>
+              <td style="border:1px solid #e5e7eb;padding:8px;text-align:right">${money(special)}</td>
+              <td style="border:1px solid #e5e7eb;padding:8px;font-weight:700">Total Deductions</td>
+              <td style="border:1px solid #e5e7eb;padding:8px;text-align:right;font-weight:700">₹0</td>
+            </tr>
+            <tr style="background:#f0fdf4;font-weight:700">
+              <td style="border:1px solid #e5e7eb;padding:10px;color:#166534">Gross Earnings</td>
+              <td style="border:1px solid #e5e7eb;padding:10px;text-align:right;color:#166534">${money(net)}</td>
+              <td style="border:1px solid #e5e7eb;padding:10px;color:#166534">Net Salary Payable</td>
+              <td style="border:1px solid #e5e7eb;padding:10px;text-align:right;color:#166534;font-size:15px">${money(net)}</td>
+            </tr>
           </tbody>
         </table>
-        <table>
-          <thead><tr><th>Deductions</th><th style="text-align:right">Amount</th></tr></thead>
-          <tbody>
-            <tr><td>PF (12%)</td><td style="text-align:right;color:var(--red)">-${money(pf)}</td></tr>
-            <tr style="background:rgba(38,207,75,.1);font-weight:700;color:var(--green)"><td style="padding:16px 12px;font-size:16px">Net Pay</td><td style="text-align:right;padding:16px 12px;font-size:16px">${money(net)}</td></tr>
-          </tbody>
-        </table>
+
+        <!-- Amount In Words -->
+        <div style="background:#f9fafb;padding:10px;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:20px;font-size:13px">
+          <b>Amount in Words:</b> <span style="color:#0284c7;font-weight:600">${numberToWords(net)}</span>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:24px;padding-top:16px">
+          <div style="text-align:center;width:180px;border-top:1px solid #9ca3af;padding-top:6px;font-size:12px;color:#4b5563">Employee Signature</div>
+          <div style="text-align:center;width:220px;border-top:1px solid #9ca3af;padding-top:6px;font-size:12px;color:#4b5563">
+            <b>Authorized Signatory</b><br><span style="font-size:10px;color:#6b7280">GrowthApex HR &amp; Finance</span>
+          </div>
+        </div>
       </div>`;
+  }
+
+  function printEmpSalarySlip() {
+    const content = document.getElementById('salary-info').innerHTML;
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>GrowthApex - Salary Slip</title>
+        <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Urbanist:wght@400;600;700&display=swap" rel="stylesheet">
+        <style>
+          body { font-family: 'Urbanist', sans-serif; margin: 20px; color: #111827; background: #fff; }
+          .btn { display: none !important; }
+          @media print { body { margin: 0; } }
+        </style>
+      </head>
+      <body>
+        ${content}
+        <script>
+          setTimeout(() => { window.print(); window.close(); }, 500);
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
   }
 
   // ── Holidays & Festivals ──

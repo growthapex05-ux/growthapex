@@ -665,6 +665,20 @@
   </div>
 </div>
 
+<!-- Salary Slip Generator Modal -->
+<div class="modal-overlay" id="modal-salary-slip">
+  <div class="modal" style="max-width:820px;padding:24px;background:#ffffff;color:#111827">
+    <div class="modal-header no-print" style="margin-bottom:16px;border-bottom:1px solid #e5e7eb;padding-bottom:12px">
+      <h3 style="color:#111827">📄 GrowthApex Official Payslip</h3>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" onclick="printSalarySlip()">🖨️ Print / Save PDF</button>
+        <button class="modal-close" onclick="closeModal('modal-salary-slip')">✕</button>
+      </div>
+    </div>
+    <div id="salary-slip-container"></div>
+  </div>
+</div>
+
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -1590,6 +1604,7 @@ async function renderSalary() {
             <th>Sundays (Off)</th>
             <th>Working Days</th>
             <th>Earned Pay (${monthVal})</th>
+            <th style="text-align:center">Payslip</th>
           </tr>
         </thead>
         <tbody>${empPayrollData.map(e => {
@@ -1610,6 +1625,9 @@ async function renderSalary() {
               <div class="progress" style="width:110px;margin-top:4px" title="${pct}% of base earned">
                 <div class="progress-bar" style="width:${pct}%;background:var(--green)"></div>
               </div>
+            </td>
+            <td style="text-align:center">
+              <button class="btn btn-sm btn-primary" onclick="openSalarySlipModal('${e.id}', '${monthVal}')">📄 Slip</button>
             </td>
           </tr>`;
         }).join('')}</tbody>
@@ -1686,6 +1704,198 @@ function renderPayrollChart(empData, monthVal) {
       }
     }
   });
+}
+
+// ─── SALARY SLIP GENERATOR ────────────────────────────────────
+function numberToWords(num) {
+  if (!num || isNaN(num)) return 'Zero Rupees Only';
+  const a = ['','One ','Two ','Three ','Four ','Five ','Six ','Seven ','Eight ','Nine ','Ten ','Eleven ','Twelve ','Thirteen ','Fourteen ','Fifteen ','Sixteen ','Seventeen ','Eighteen ','Nineteen '];
+  const b = ['', '', 'Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+  
+  function inWords(n) {
+    if ((n = n.toString()).length > 9) return 'Overflow';
+    let n_arr = ('000000000' + n).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+    if (!n_arr) return '';
+    let str = '';
+    str += (n_arr[1] != 0) ? (a[Number(n_arr[1])] || b[n_arr[1][0]] + ' ' + a[n_arr[1][1]]) + 'Crore ' : '';
+    str += (n_arr[2] != 0) ? (a[Number(n_arr[2])] || b[n_arr[2][0]] + ' ' + a[n_arr[2][1]]) + 'Lakh ' : '';
+    str += (n_arr[3] != 0) ? (a[Number(n_arr[3])] || b[n_arr[3][0]] + ' ' + a[n_arr[3][1]]) + 'Thousand ' : '';
+    str += (n_arr[4] != 0) ? (a[Number(n_arr[4])] || b[n_arr[4][0]] + ' ' + a[n_arr[4][1]]) + 'Hundred ' : '';
+    str += (n_arr[5] != 0) ? ((str != '') ? 'and ' : '') + (a[Number(n_arr[5])] || b[n_arr[5][0]] + ' ' + a[n_arr[5][1]]) : '';
+    return str;
+  }
+  return inWords(Math.round(num)).trim() + ' Rupees Only';
+}
+
+function openSalarySlipModal(empId, monthVal) {
+  const emp = cache.employees.find(e => e.id === empId);
+  if (!emp) {
+    toast('Employee record not found', 'error');
+    return;
+  }
+
+  const [yearStr, mStr] = (monthVal || '2026-08').split('-');
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(mStr, 10);
+
+  const monthName = new Date(year, month - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  const baseSalary = Number(emp.salary || 0);
+  const joinDate = emp.joinDate || 'N/A';
+  
+  const daysDetails = getWorkingDaysForMonth(joinDate, monthVal, 'month');
+  let earnedSalary = 0;
+  if (daysDetails.isJoined && daysDetails.workedWorkingDays > 0) {
+    earnedSalary = Math.round((baseSalary * daysDetails.workedWorkingDays) / (daysDetails.totalMonthWorkingDays || 26));
+  }
+
+  const basic = Math.round(earnedSalary * 0.60);
+  const hra = Math.round(earnedSalary * 0.30);
+  const special = earnedSalary - (basic + hra);
+
+  const container = document.getElementById('salary-slip-container');
+  container.innerHTML = `
+    <div class="salary-slip-box" style="background:#fff;color:#111827;padding:24px;border:1px solid #e5e7eb;border-radius:8px;font-family:'Urbanist',sans-serif">
+      <!-- Header -->
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #00D4FF;padding-bottom:12px;margin-bottom:16px">
+        <img src="../assets/images/logo/growthapex-logo.png" alt="GrowthApex Logo" style="height:48px;object-fit:contain" onerror="this.src='../assets/images/logo/favicon.svg'">
+        <div style="text-align:right">
+          <h2 style="font-family:'Space Grotesk',sans-serif;font-size:18px;margin:0;color:#111827">GROWTHAPEX DIGITAL MEDIA</h2>
+          <p style="font-size:11px;color:#6b7280;margin:2px 0 0 0">Email: contact@growthapex.in | Website: www.growthapex.in</p>
+        </div>
+      </div>
+
+      <!-- Title Badge -->
+      <div style="background:#f3f4f6;text-align:center;padding:8px;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;letter-spacing:.05em;margin-bottom:16px;border-radius:6px;border:1px solid #e5e7eb;color:#111827">
+        PAYSLIP FOR THE MONTH OF ${monthName.toUpperCase()}
+      </div>
+
+      <!-- Employee Meta Table -->
+      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px;color:#111827">
+        <tr>
+          <td style="padding:6px;font-weight:700;width:18%;color:#4b5563">Employee Name:</td>
+          <td style="padding:6px;width:32%;font-weight:700">${emp.name}</td>
+          <td style="padding:6px;font-weight:700;width:18%;color:#4b5563">Employee ID:</td>
+          <td style="padding:6px;width:32%;font-weight:700;color:#0284c7">${emp.id}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px;font-weight:700;color:#4b5563">Designation:</td>
+          <td style="padding:6px">${emp.designation || 'N/A'}</td>
+          <td style="padding:6px;font-weight:700;color:#4b5563">Department:</td>
+          <td style="padding:6px">${emp.department || 'N/A'}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px;font-weight:700;color:#4b5563">Joining Date:</td>
+          <td style="padding:6px">${joinDate}</td>
+          <td style="padding:6px;font-weight:700;color:#4b5563">Payment Status:</td>
+          <td style="padding:6px"><span style="background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:12px;font-weight:700;font-size:11px">PAID ✅</span></td>
+        </tr>
+      </table>
+
+      <!-- Days Breakdown Table -->
+      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12px;text-align:center;color:#111827">
+        <thead>
+          <tr style="background:#f9fafb">
+            <th style="border:1px solid #e5e7eb;padding:8px;color:#374151">Total Calendar Days</th>
+            <th style="border:1px solid #e5e7eb;padding:8px;color:#374151">Sundays (Week Off)</th>
+            <th style="border:1px solid #e5e7eb;padding:8px;color:#374151">Working Days Worked</th>
+            <th style="border:1px solid #e5e7eb;padding:8px;color:#374151">Net Payable Days</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="border:1px solid #e5e7eb;padding:8px">${daysDetails.workedCalendarDays} Days</td>
+            <td style="border:1px solid #e5e7eb;padding:8px;color:#dc2626">${daysDetails.sundays} Sundays</td>
+            <td style="border:1px solid #e5e7eb;padding:8px;font-weight:700;color:#0284c7">${daysDetails.workedWorkingDays} Days</td>
+            <td style="border:1px solid #e5e7eb;padding:8px;font-weight:700;color:#16a34a">${daysDetails.workedWorkingDays} Days</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Earnings & Deductions Table -->
+      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px;color:#111827">
+        <thead>
+          <tr style="background:#f9fafb">
+            <th style="border:1px solid #e5e7eb;padding:8px;text-align:left;color:#374151">Earnings Breakdown</th>
+            <th style="border:1px solid #e5e7eb;padding:8px;text-align:right;color:#374151">Amount (₹)</th>
+            <th style="border:1px solid #e5e7eb;padding:8px;text-align:left;color:#374151">Deductions</th>
+            <th style="border:1px solid #e5e7eb;padding:8px;text-align:right;color:#374151">Amount (₹)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="border:1px solid #e5e7eb;padding:8px">Basic Pay (60%)</td>
+            <td style="border:1px solid #e5e7eb;padding:8px;text-align:right">${money(basic)}</td>
+            <td style="border:1px solid #e5e7eb;padding:8px">PF / ESI Deduction</td>
+            <td style="border:1px solid #e5e7eb;padding:8px;text-align:right;color:#16a34a">₹0 (Nil)</td>
+          </tr>
+          <tr>
+            <td style="border:1px solid #e5e7eb;padding:8px">House Rent Allowance (HRA 30%)</td>
+            <td style="border:1px solid #e5e7eb;padding:8px;text-align:right">${money(hra)}</td>
+            <td style="border:1px solid #e5e7eb;padding:8px">Other Deductions</td>
+            <td style="border:1px solid #e5e7eb;padding:8px;text-align:right;color:#16a34a">₹0 (Nil)</td>
+          </tr>
+          <tr>
+            <td style="border:1px solid #e5e7eb;padding:8px">Special / Performance Allowance</td>
+            <td style="border:1px solid #e5e7eb;padding:8px;text-align:right">${money(special)}</td>
+            <td style="border:1px solid #e5e7eb;padding:8px;font-weight:700">Total Deductions</td>
+            <td style="border:1px solid #e5e7eb;padding:8px;text-align:right;font-weight:700">₹0</td>
+          </tr>
+          <tr style="background:#f0fdf4;font-weight:700">
+            <td style="border:1px solid #e5e7eb;padding:10px;color:#166534">Gross Earnings</td>
+            <td style="border:1px solid #e5e7eb;padding:10px;text-align:right;color:#166534">${money(earnedSalary)}</td>
+            <td style="border:1px solid #e5e7eb;padding:10px;color:#166534">Net Salary Payable</td>
+            <td style="border:1px solid #e5e7eb;padding:10px;text-align:right;color:#166534;font-size:15px">${money(earnedSalary)}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- In Words -->
+      <div style="background:#f9fafb;padding:10px;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:24px;font-size:13px">
+        <b>Amount in Words:</b> <span style="color:#0284c7;font-weight:600">${numberToWords(earnedSalary)}</span>
+      </div>
+
+      <!-- Signatures Footer -->
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:30px;padding-top:16px">
+        <div style="text-align:center;width:180px;border-top:1px solid #9ca3af;padding-top:6px;font-size:12px;color:#4b5563">
+          Employee Signature
+        </div>
+        <div style="text-align:center;width:220px;border-top:1px solid #9ca3af;padding-top:6px;font-size:12px;color:#4b5563">
+          <b>Authorized Signatory</b><br>
+          <span style="font-size:10px;color:#6b7280">GrowthApex HR &amp; Finance</span>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('modal-salary-slip').classList.add('open');
+}
+
+function printSalarySlip() {
+  const content = document.getElementById('salary-slip-container').innerHTML;
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>GrowthApex - Official Salary Slip</title>
+      <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Urbanist:wght@400;600;700&display=swap" rel="stylesheet">
+      <style>
+        body { font-family: 'Urbanist', sans-serif; margin: 20px; color: #111827; background: #fff; }
+        .salary-slip-box { border: 1px solid #ccc; padding: 30px; border-radius: 8px; max-width: 800px; margin: auto; }
+        @media print {
+          body { margin: 0; }
+          .salary-slip-box { border: none; padding: 0; }
+        }
+      </style>
+    </head>
+    <body>
+      ${content}
+      <script>
+        setTimeout(() => { window.print(); window.close(); }, 500);
+      </script>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
 }
 
 // ─── CSV Export ───────────────────────────────────────────────
