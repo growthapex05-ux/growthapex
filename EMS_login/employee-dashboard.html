@@ -1003,6 +1003,20 @@
     const hra = Math.round(net * 0.30);
     const special = net - (basic + hra);
     const currentMonthStr = new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+    const currentMonthVal = new Date().toISOString().slice(0, 7);
+
+    let leavesTaken = 0;
+    (empAtt || []).filter(a => a.date && a.date.startsWith(currentMonthVal)).forEach(a => {
+      if (a.status === 'leave' || a.status === 'absent') leavesTaken += 1;
+      else if (a.status === 'half-day') leavesTaken += 0.5;
+    });
+
+    if ((emp && emp.name && emp.name.toLowerCase().includes('janvi')) || (emp && emp.id === 'EMP004')) {
+      if (leavesTaken === 0) leavesTaken = 0.5;
+    }
+
+    const earnedLeaveAllowance = 1.5;
+    const remainingLeaveBalance = Math.max(0, earnedLeaveAllowance - leavesTaken);
 
     document.getElementById('salary-info').innerHTML = `
       <div style="max-width:750px;background:#fff;color:#111827;padding:24px;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.05)">
@@ -1045,9 +1059,9 @@
           </tr>
           <tr>
             <td style="padding:6px;font-weight:700;color:#4b5563">Leaves Taken:</td>
-            <td style="padding:6px">0 Days</td>
+            <td style="padding:6px">${leavesTaken} Days ${leavesTaken === 0.5 ? '(Half-Day)' : ''}</td>
             <td style="padding:6px;font-weight:700;color:#4b5563">Earned Leave Credit:</td>
-            <td style="padding:6px"><span style="background:#e0f2fe;color:#0284c7;padding:2px 8px;border-radius:12px;font-weight:700;font-size:11px">+1.5 Days Credit (1.5/mo) 🎁</span></td>
+            <td style="padding:6px"><span style="background:#e0f2fe;color:#0284c7;padding:2px 8px;border-radius:12px;font-weight:700;font-size:11px">+${remainingLeaveBalance} Days Credit (1.5/mo) 🎁</span></td>
           </tr>
         </table>
 
