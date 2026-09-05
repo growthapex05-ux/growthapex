@@ -1154,12 +1154,13 @@
       const btns = clone.querySelectorAll('.btn, button');
       btns.forEach(b => b.remove());
 
-      clone.style.position = 'absolute';
-      clone.style.top = '-9999px';
+      clone.style.position = 'fixed';
+      clone.style.top = '0px';
       clone.style.left = '0px';
       clone.style.width = '750px';
       clone.style.maxWidth = '750px';
       clone.style.background = '#ffffff';
+      clone.style.zIndex = '999999';
       clone.style.margin = '0';
       clone.style.padding = '0';
       clone.style.boxSizing = 'border-box';

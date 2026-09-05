@@ -2045,14 +2045,14 @@ function downloadSalarySlipPDF() {
     ? currentSalarySlipData.emp.name.replace(/\s+/g, '_') : 'Employee';
 
   if (typeof html2pdf !== 'undefined') {
-    // Clone container to body to avoid modal CSS offsets & viewport clipping
     const clone = container.cloneNode(true);
-    clone.style.position = 'absolute';
-    clone.style.top = '-9999px';
+    clone.style.position = 'fixed';
+    clone.style.top = '0px';
     clone.style.left = '0px';
     clone.style.width = '750px';
     clone.style.maxWidth = '750px';
     clone.style.background = '#ffffff';
+    clone.style.zIndex = '999999';
     clone.style.margin = '0';
     clone.style.padding = '0';
     clone.style.boxSizing = 'border-box';
@@ -2530,12 +2530,13 @@ function downloadLetterPadPDF() {
 
   if (typeof html2pdf !== 'undefined') {
     const clone = container.cloneNode(true);
-    clone.style.position = 'absolute';
-    clone.style.top = '-9999px';
+    clone.style.position = 'fixed';
+    clone.style.top = '0px';
     clone.style.left = '0px';
     clone.style.width = '750px';
     clone.style.maxWidth = '750px';
     clone.style.background = '#ffffff';
+    clone.style.zIndex = '999999';
     clone.style.margin = '0';
     clone.style.padding = '0';
     clone.style.boxSizing = 'border-box';
