@@ -635,7 +635,39 @@
         <button class="btn-save" onclick="saveTask()">💾 Save Task</button>
       </div>
     </div>
+  <!-- Floating Live Work Timer Widget (Persistent Screen Popup) -->
+  <div id="floating-work-timer" style="display:none;position:fixed;bottom:24px;right:24px;z-index:9999;background:rgba(15,23,42,0.92);backdrop-filter:blur(12px);border:1px solid rgba(56,189,248,0.4);box-shadow:0 12px 35px rgba(0,0,0,0.4),0 0 15px rgba(2,132,199,0.2);padding:14px 20px;border-radius:16px;color:#fff;font-family:'Space Grotesk',sans-serif;width:280px;box-sizing:border-box;transition:all 0.3s ease;animation:slideUpTimer 0.4s ease-out">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:6px">
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;letter-spacing:.03em;color:#38bdf8">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e;animation:pulseGreen 1.5s infinite"></span>
+        LIVE WORK TIMER
+      </div>
+      <span id="timer-live-badge" style="font-size:10px;background:rgba(34,197,94,0.15);color:#4ade80;padding:2px 7px;border-radius:10px;border:1px solid rgba(74,222,128,0.3);font-weight:600">🟢 Active</span>
+    </div>
+
+    <div style="text-align:center;margin:10px 0">
+      <div id="timer-clock-val" style="font-size:26px;font-weight:800;letter-spacing:1px;color:#f8fafc;font-family:monospace">00 : 00 : 00</div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:2px">Check-In Time: <span id="timer-checkin-val" style="color:#cbd5e1;font-weight:600">--:--</span></div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button onclick="markAtt('absent')" style="flex:1;background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;border:none;padding:8px 12px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:4px;box-shadow:0 4px 12px rgba(239,68,68,0.3);transition:all .2s">
+        ⏹️ Mark Check-Out
+      </button>
+    </div>
   </div>
+
+  <style>
+  @keyframes slideUpTimer {
+    from { transform: translateY(50px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  @keyframes pulseGreen {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.3); opacity: 0.6; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  </style>
 
 </main>
 
@@ -867,7 +899,86 @@
       clearInterval(heartbeatInterval);
       heartbeatInterval = null;
     }
+    stopLiveTimerWidget();
     updateLiveStatusBadgeUI('disconnected');
+  }
+
+  let liveTimerInterval = null;
+
+  function getCheckInDateObj(checkInStr, dateStr) {
+    if (!checkInStr) return new Date();
+    
+    if (checkInStr.includes('AM') || checkInStr.includes('PM')) {
+      const today = new Date();
+      const parts = checkInStr.trim().split(' ');
+      const time = parts[0];
+      const modifier = parts[1];
+      let [hours, minutes, seconds] = time.split(':');
+      if (!seconds) seconds = '00';
+      if (hours === '12') hours = '00';
+      if (modifier === 'PM') hours = parseInt(hours, 10) + 12;
+      today.setHours(parseInt(hours, 10), parseInt(minutes, 10), parseInt(seconds, 10), 0);
+      return today;
+    } else {
+      const [h, m, s] = checkInStr.split(':');
+      const d = new Date();
+      if (h !== undefined) d.setHours(parseInt(h, 10));
+      if (m !== undefined) d.setMinutes(parseInt(m, 10));
+      if (s !== undefined) d.setSeconds(parseInt(s, 10));
+      return d;
+    }
+  }
+
+  function startLiveTimerWidget(checkInStr, dateStr) {
+    stopLiveTimerWidget();
+    const widget = document.getElementById('floating-work-timer');
+    if (widget) widget.style.display = 'block';
+
+    const checkInDate = getCheckInDateObj(checkInStr, dateStr);
+
+    let displayCheckIn = checkInStr || '--:--';
+    const checkinEl = document.getElementById('timer-checkin-val');
+    if (checkinEl) checkinEl.textContent = displayCheckIn;
+
+    const updateTimer = () => {
+      const now = new Date();
+      let diffSecs = Math.floor((now - checkInDate) / 1000);
+      if (diffSecs < 0) diffSecs = 0;
+
+      const hrs = String(Math.floor(diffSecs / 3600)).padStart(2, '0');
+      const mins = String(Math.floor((diffSecs % 3600) / 60)).padStart(2, '0');
+      const secs = String(diffSecs % 60).padStart(2, '0');
+
+      const clockEl = document.getElementById('timer-clock-val');
+      if (clockEl) clockEl.textContent = `${hrs} : ${mins} : ${secs}`;
+
+      const badgeEl = document.getElementById('timer-live-badge');
+      if (badgeEl) {
+        if (currentActivityState === 'idle') {
+          badgeEl.style.background = 'rgba(245,158,11,0.15)';
+          badgeEl.style.color = '#fbbf24';
+          badgeEl.style.borderColor = 'rgba(251,191,36,0.3)';
+          badgeEl.innerHTML = '🟡 Idle (Away)';
+        } else {
+          badgeEl.style.background = 'rgba(34,197,94,0.15)';
+          badgeEl.style.color = '#4ade80';
+          badgeEl.style.borderColor = 'rgba(74,222,128,0.3)';
+          badgeEl.innerHTML = '🟢 Active';
+        }
+      }
+    };
+
+    updateTimer();
+    liveTimerInterval = setInterval(updateTimer, 1000);
+  }
+
+  function stopLiveTimerWidget() {
+    if (liveTimerInterval) {
+      clearInterval(liveTimerInterval);
+      liveTimerInterval = null;
+    }
+    const widget = document.getElementById('floating-work-timer');
+    if (widget) widget.style.display = 'none';
   }
 
   function registerActivityTrackers() {
@@ -921,8 +1032,10 @@
     
     if (todayRec && todayRec.checkIn && (!todayRec.checkOut || todayRec.checkOut === '—')) {
       startHeartbeatEngine();
+      startLiveTimerWidget(todayRec.checkIn, todayRec.date);
     } else {
       stopHeartbeatEngine();
+      stopLiveTimerWidget();
     }
 
     renderAttendanceTable();
@@ -950,14 +1063,16 @@
     if (type === 'present') {
         if(rec && rec.checkIn) { toast('Check-in already marked for today', 'info'); return; }
         await EMS_DB.markAttendance({ empId, date:today, status:'present', checkIn:time, lastHeartbeat: new Date().toISOString() });
-        toast('Checked in successfully. Active tracking started! 🟢', 'success');
+        toast('Checked in successfully. Active live timer & tracking started! 🟢', 'success');
         startHeartbeatEngine();
+        startLiveTimerWidget(time, today);
     } else {
         if(!rec || !rec.checkIn) { toast('You must check in first', 'error'); return; }
         if(rec.checkOut) { toast('Check-out already marked for today', 'info'); return; }
         await EMS_DB.markAttendance({ empId, date:today, status:rec.status, checkIn:rec.checkIn, checkOut:time });
-        toast('Checked out successfully', 'success');
+        toast('Checked out successfully. Live timer stopped.', 'success');
         stopHeartbeatEngine();
+        stopLiveTimerWidget();
     }
     renderAttendance();
   }
