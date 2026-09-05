@@ -2041,44 +2041,44 @@ function downloadSalarySlipPDF() {
   const container = document.getElementById('salary-slip-container');
   if (!container || !container.children.length) return;
 
+  const targetEl = container.querySelector('.salary-slip-box') || container;
   const empName = (currentSalarySlipData && currentSalarySlipData.emp && currentSalarySlipData.emp.name) 
     ? currentSalarySlipData.emp.name.replace(/\s+/g, '_') : 'Employee';
 
   if (typeof html2pdf !== 'undefined') {
-    const clone = container.cloneNode(true);
-    clone.style.position = 'fixed';
-    clone.style.top = '0px';
-    clone.style.left = '0px';
-    clone.style.width = '750px';
-    clone.style.maxWidth = '750px';
-    clone.style.background = '#ffffff';
-    clone.style.zIndex = '999999';
-    clone.style.margin = '0';
-    clone.style.padding = '0';
-    clone.style.boxSizing = 'border-box';
-    document.body.appendChild(clone);
-
-    const innerBox = clone.querySelector('.salary-slip-box') || clone.firstElementChild;
-    if (innerBox) {
-      innerBox.style.maxWidth = '100%';
-      innerBox.style.width = '100%';
-      innerBox.style.boxSizing = 'border-box';
-      innerBox.style.margin = '0';
-    }
-
     const opt = {
-      margin:       [4, 4, 4, 4],
+      margin:       [5, 5, 5, 5],
       filename:     `GrowthApex_Salary_Slip_${empName}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true, logging: false, scrollY: 0 },
+      html2canvas:  { 
+        scale: 2, 
+        useCORS: true, 
+        logging: false,
+        onclone: (clonedDoc) => {
+          const mOverlay = clonedDoc.getElementById('modal-salary-slip');
+          if (mOverlay) {
+            mOverlay.style.position = 'static';
+            mOverlay.style.display = 'block';
+            mOverlay.style.background = '#ffffff';
+            mOverlay.style.padding = '0';
+            mOverlay.style.margin = '0';
+          }
+          const mBox = mOverlay ? mOverlay.querySelector('.modal') : null;
+          if (mBox) {
+            mBox.style.position = 'static';
+            mBox.style.maxWidth = '100%';
+            mBox.style.width = '100%';
+            mBox.style.padding = '0';
+            mBox.style.margin = '0';
+            mBox.style.boxShadow = 'none';
+          }
+        }
+      },
       jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 
-    html2pdf().set(opt).from(clone).save().then(() => {
-      if (document.body.contains(clone)) document.body.removeChild(clone);
-    }).catch(err => {
+    html2pdf().set(opt).from(targetEl).save().catch(err => {
       console.error('PDF export error:', err);
-      if (document.body.contains(clone)) document.body.removeChild(clone);
       printSalarySlip();
     });
   } else {
@@ -2525,44 +2525,33 @@ function downloadLetterPadPDF() {
   const container = document.getElementById('letterpad-container');
   if (!container || !container.children.length) return;
 
+  const targetEl = container.querySelector('.letterpad-box') || container;
   const empId = document.getElementById('lp-emp-select')?.value || 'Employee';
   const docType = document.getElementById('lp-doc-type')?.value || 'Document';
 
   if (typeof html2pdf !== 'undefined') {
-    const clone = container.cloneNode(true);
-    clone.style.position = 'fixed';
-    clone.style.top = '0px';
-    clone.style.left = '0px';
-    clone.style.width = '750px';
-    clone.style.maxWidth = '750px';
-    clone.style.background = '#ffffff';
-    clone.style.zIndex = '999999';
-    clone.style.margin = '0';
-    clone.style.padding = '0';
-    clone.style.boxSizing = 'border-box';
-    document.body.appendChild(clone);
-
-    const innerBox = clone.querySelector('.letterpad-box') || clone.firstElementChild;
-    if (innerBox) {
-      innerBox.style.maxWidth = '100%';
-      innerBox.style.width = '100%';
-      innerBox.style.boxSizing = 'border-box';
-      innerBox.style.margin = '0';
-    }
-
     const opt = {
-      margin:       [4, 4, 4, 4],
+      margin:       [5, 5, 5, 5],
       filename:     `GrowthApex_${docType}_${empId}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true, logging: false, scrollY: 0 },
+      html2canvas:  { 
+        scale: 2, 
+        useCORS: true, 
+        logging: false,
+        onclone: (clonedDoc) => {
+          const lpPage = clonedDoc.getElementById('page-letterpad');
+          if (lpPage) {
+            lpPage.style.display = 'block';
+            lpPage.style.padding = '0';
+            lpPage.style.margin = '0';
+          }
+        }
+      },
       jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 
-    html2pdf().set(opt).from(clone).save().then(() => {
-      if (document.body.contains(clone)) document.body.removeChild(clone);
-    }).catch(err => {
+    html2pdf().set(opt).from(targetEl).save().catch(err => {
       console.error('Letter Pad PDF error:', err);
-      if (document.body.contains(clone)) document.body.removeChild(clone);
       printLetterPad();
     });
   } else {

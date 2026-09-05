@@ -1143,56 +1143,38 @@
       </div>`;
   }
 
-  function downloadEmpSalarySlipPDF() {
-    const container = document.getElementById('salary-info');
-    if (!container || !container.children.length) return;
+function downloadEmpSalarySlipPDF() {
+  const container = document.getElementById('salary-info');
+  if (!container || !container.children.length) return;
 
-    if (typeof html2pdf !== 'undefined') {
-      const empName = (emp && emp.name) ? emp.name.replace(/\s+/g, '_') : 'Employee';
+  const targetEl = container.firstElementChild || container;
+  const empName = (emp && emp.name) ? emp.name.replace(/\s+/g, '_') : 'Employee';
 
-      const clone = container.cloneNode(true);
-      const btns = clone.querySelectorAll('.btn, button');
-      btns.forEach(b => b.remove());
+  if (typeof html2pdf !== 'undefined') {
+    const opt = {
+      margin:       [5, 5, 5, 5],
+      filename:     `GrowthApex_Salary_Slip_${empName}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { 
+        scale: 2, 
+        useCORS: true, 
+        logging: false,
+        onclone: (clonedDoc) => {
+          const btns = clonedDoc.querySelectorAll('.btn, button');
+          btns.forEach(b => b.remove());
+        }
+      },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
 
-      clone.style.position = 'fixed';
-      clone.style.top = '0px';
-      clone.style.left = '0px';
-      clone.style.width = '750px';
-      clone.style.maxWidth = '750px';
-      clone.style.background = '#ffffff';
-      clone.style.zIndex = '999999';
-      clone.style.margin = '0';
-      clone.style.padding = '0';
-      clone.style.boxSizing = 'border-box';
-      document.body.appendChild(clone);
-
-      const innerBox = clone.firstElementChild;
-      if (innerBox) {
-        innerBox.style.maxWidth = '100%';
-        innerBox.style.width = '100%';
-        innerBox.style.boxSizing = 'border-box';
-        innerBox.style.margin = '0';
-      }
-
-      const opt = {
-        margin:       [4, 4, 4, 4],
-        filename:     `GrowthApex_Salary_Slip_${empName}.pdf`,
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, logging: false, scrollY: 0 },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      };
-
-      html2pdf().set(opt).from(clone).save().then(() => {
-        if (document.body.contains(clone)) document.body.removeChild(clone);
-      }).catch(err => {
-        console.error('PDF export error:', err);
-        if (document.body.contains(clone)) document.body.removeChild(clone);
-        printEmpSalarySlip();
-      });
-    } else {
+    html2pdf().set(opt).from(targetEl).save().catch(err => {
+      console.error('PDF export error:', err);
       printEmpSalarySlip();
-    }
+    });
+  } else {
+    printEmpSalarySlip();
   }
+}
 
   function printEmpSalarySlip() {
     const content = document.getElementById('salary-info').innerHTML;
