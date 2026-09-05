@@ -1748,6 +1748,9 @@ function openSalarySlipModal(empId, monthVal) {
     earnedSalary = Math.round((baseSalary * daysDetails.workedWorkingDays) / (daysDetails.totalMonthWorkingDays || 26));
   }
 
+  const advanceDeduction = 3000; // Raksha Bandhan Advance Deduction
+  const netPayable = Math.max(0, earnedSalary - advanceDeduction);
+
   const basic = Math.round(earnedSalary * 0.60);
   const hra = Math.round(earnedSalary * 0.30);
   const special = earnedSalary - (basic + hra);
@@ -1757,10 +1760,10 @@ function openSalarySlipModal(empId, monthVal) {
     <div class="salary-slip-box" style="background:#fff;color:#111827;padding:24px;border:1px solid #e5e7eb;border-radius:8px;font-family:'Urbanist',sans-serif">
       <!-- Header -->
       <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #00D4FF;padding-bottom:12px;margin-bottom:16px">
-        <img src="../assets/images/logo/growthapex-logo.png" alt="GrowthApex Logo" style="height:48px;object-fit:contain" onerror="this.src='../assets/images/logo/favicon.svg'">
+        <img src="../assets/images/logo/growthapex-logo.png" alt="GrowthApex Logo" style="height:48px;object-fit:contain;filter:brightness(0)" onerror="this.src='../assets/images/logo/favicon.svg'">
         <div style="text-align:right">
           <h2 style="font-family:'Space Grotesk',sans-serif;font-size:18px;margin:0;color:#111827">GROWTHAPEX DIGITAL MEDIA</h2>
-          <p style="font-size:11px;color:#6b7280;margin:2px 0 0 0">Email: contact@growthapex.in | Website: www.growthapex.in</p>
+          <p style="font-size:11px;color:#6b7280;margin:2px 0 0 0">Email: support@growthapex.in | Website: www.growthapex.in</p>
         </div>
       </div>
 
@@ -1825,33 +1828,33 @@ function openSalarySlipModal(empId, monthVal) {
           <tr>
             <td style="border:1px solid #e5e7eb;padding:8px">Basic Pay (60%)</td>
             <td style="border:1px solid #e5e7eb;padding:8px;text-align:right">${money(basic)}</td>
-            <td style="border:1px solid #e5e7eb;padding:8px">PF / ESI Deduction</td>
-            <td style="border:1px solid #e5e7eb;padding:8px;text-align:right;color:#16a34a">₹0 (Nil)</td>
+            <td style="border:1px solid #e5e7eb;padding:8px;color:#dc2626">Raksha Bandhan Advance</td>
+            <td style="border:1px solid #e5e7eb;padding:8px;text-align:right;color:#dc2626">-${money(advanceDeduction)}</td>
           </tr>
           <tr>
             <td style="border:1px solid #e5e7eb;padding:8px">House Rent Allowance (HRA 30%)</td>
             <td style="border:1px solid #e5e7eb;padding:8px;text-align:right">${money(hra)}</td>
-            <td style="border:1px solid #e5e7eb;padding:8px">Other Deductions</td>
+            <td style="border:1px solid #e5e7eb;padding:8px">PF / ESI Deduction</td>
             <td style="border:1px solid #e5e7eb;padding:8px;text-align:right;color:#16a34a">₹0 (Nil)</td>
           </tr>
           <tr>
             <td style="border:1px solid #e5e7eb;padding:8px">Special / Performance Allowance</td>
             <td style="border:1px solid #e5e7eb;padding:8px;text-align:right">${money(special)}</td>
             <td style="border:1px solid #e5e7eb;padding:8px;font-weight:700">Total Deductions</td>
-            <td style="border:1px solid #e5e7eb;padding:8px;text-align:right;font-weight:700">₹0</td>
+            <td style="border:1px solid #e5e7eb;padding:8px;text-align:right;font-weight:700;color:#dc2626">-${money(advanceDeduction)}</td>
           </tr>
           <tr style="background:#f0fdf4;font-weight:700">
             <td style="border:1px solid #e5e7eb;padding:10px;color:#166534">Gross Earnings</td>
             <td style="border:1px solid #e5e7eb;padding:10px;text-align:right;color:#166534">${money(earnedSalary)}</td>
             <td style="border:1px solid #e5e7eb;padding:10px;color:#166534">Net Salary Payable</td>
-            <td style="border:1px solid #e5e7eb;padding:10px;text-align:right;color:#166534;font-size:15px">${money(earnedSalary)}</td>
+            <td style="border:1px solid #e5e7eb;padding:10px;text-align:right;color:#166534;font-size:15px">${money(netPayable)}</td>
           </tr>
         </tbody>
       </table>
 
       <!-- In Words -->
       <div style="background:#f9fafb;padding:10px;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:24px;font-size:13px">
-        <b>Amount in Words:</b> <span style="color:#0284c7;font-weight:600">${numberToWords(earnedSalary)}</span>
+        <b>Amount in Words:</b> <span style="color:#0284c7;font-weight:600">${numberToWords(netPayable)}</span>
       </div>
 
       <!-- Signatures Footer -->
