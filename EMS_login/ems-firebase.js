@@ -138,6 +138,82 @@ const EMS_DB = {
     return { id: d.id, ...d.data() };
   },
 
+  async updateHeartbeat(empId, statusState = 'active') {
+    const today = new Date().toISOString().split('T')[0];
+    const snap = await this._col('attendance')
+      .where('empId', '==', empId)
+      .where('date',  '==', today)
+      .get();
+
+    if (!snap.empty) {
+      const doc = snap.docs[0];
+      const data = doc.data();
+      // Only heartbeat if employee is checked in and not checked out
+      if (data.checkIn && (!data.checkOut || data.checkOut === '—')) {
+        await doc.ref.update({
+          lastHeartbeat: new Date().toISOString(),
+          activityStatus: statusState,
+          pcConnected: true
+        });
+      }
+    }
+  },
+
+  async autoCheckoutDisconnected(empId, dateStr) {
+    const today = dateStr || new Date().toISOString().split('T')[0];
+    const snap = await this._col('attendance')
+      .where('empId', '==', empId)
+      .where('date',  '==', today)
+      .get();
+
+    if (!snap.empty) {
+      const doc = snap.docs[0];
+      const data = doc.data();
+      if (data.checkIn && (!data.checkOut || data.checkOut === '—')) {
+        let outTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+        if (data.lastHeartbeat) {
+          try {
+            outTime = new Date(data.lastHeartbeat).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+          } catch(e) {}
+        }
+        await doc.ref.update({
+          checkOut: outTime,
+          checkoutReason: 'Auto-Checkout (PC Closed / Disconnected)',
+          pcConnected: false,
+          activityStatus: 'disconnected'
+        });
+        return { success: true, checkOut: outTime };
+      }
+    }
+    return { success: false };
+  },
+
+  async processAutoCheckouts() {
+    const today = new Date().toISOString().split('T')[0];
+    const snap = await this._col('attendance')
+      .where('date', '==', today)
+      .get();
+
+    const now = Date.now();
+    const TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes timeout
+
+    for (const doc of snap.docs) {
+      const data = doc.data();
+      if (data.checkIn && (!data.checkOut || data.checkOut === '—') && data.lastHeartbeat) {
+        const lastHbTime = new Date(data.lastHeartbeat).getTime();
+        if (!isNaN(lastHbTime) && (now - lastHbTime > TIMEOUT_MS)) {
+          let outTime = new Date(lastHbTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+          await doc.ref.update({
+            checkOut: outTime,
+            checkoutReason: 'Auto-Checkout (PC Closed / Disconnected)',
+            pcConnected: false,
+            activityStatus: 'disconnected'
+          });
+        }
+      }
+    }
+  },
+
   // ── Tasks ─────────────────────────────────────────────────
 
   async getTasks(empId) {

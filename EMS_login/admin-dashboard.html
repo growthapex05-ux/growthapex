@@ -1358,7 +1358,40 @@ async function initAtt() {
     emps.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
   renderAdminAtt();
 }
+function getLivePulseBadge(a) {
+  if (!a) return '<span class="badge badge-gray">Not Marked</span>';
+  if (a.checkOut && a.checkOut !== '—') {
+    if (a.checkoutReason) {
+      return `<span class="badge badge-red" style="font-size:11px" title="${a.checkoutReason}">🔴 ${a.checkoutReason}</span>`;
+    }
+    return '<span class="badge badge-gray" style="font-size:11px">⚪ Checked Out</span>';
+  }
+  if (!a.checkIn || a.checkIn === '—') {
+    return '<span class="badge badge-gray" style="font-size:11px">Not Checked In</span>';
+  }
+
+  if (!a.lastHeartbeat) {
+    return '<span class="badge badge-green" style="font-size:11px">🟢 Checked In</span>';
+  }
+
+  const lastHbTime = new Date(a.lastHeartbeat).getTime();
+  const diffMs = Date.now() - lastHbTime;
+
+  if (diffMs <= 60000) {
+    if (a.activityStatus === 'idle') {
+      return '<span class="badge badge-amber" style="font-size:11px">🟡 Idle (Away)</span>';
+    }
+    return '<span class="badge badge-green" style="font-size:11px">🟢 Active Working</span>';
+  } else if (diffMs <= 180000) {
+    return '<span class="badge badge-amber" style="font-size:11px">🟡 Away / Reconnecting</span>';
+  } else {
+    return '<span class="badge badge-red" style="font-size:11px">🔴 Auto-Checked Out (PC Closed)</span>';
+  }
+}
+
 async function renderAdminAtt() {
+  await EMS_DB.processAutoCheckouts().catch(() => {});
+
   const date   = document.getElementById('att-date-filter')?.value||'';
   const empId  = document.getElementById('att-emp-filter')?.value||'';
   const status = document.getElementById('att-status-filter')?.value||'';
@@ -1385,11 +1418,14 @@ async function renderAdminAtt() {
   const empMap2 = Object.fromEntries(emps2.map(e => [e.id, e]));
 
   document.getElementById('admin-att-table').innerHTML = att.length ? `
-    <table><thead><tr><th>Employee</th><th>Date</th><th>Status</th><th>Check-In</th><th>Check-Out</th><th>Working Hours</th><th>Action</th></tr></thead>
+    <table><thead><tr><th>Employee</th><th>Date</th><th>Status</th><th>Live Working Pulse</th><th>Check-In</th><th>Check-Out</th><th>Working Hours</th><th>Action</th></tr></thead>
     <tbody>${att.slice().reverse().map(a=>{ const emp=empMap2[a.empId]||{}; return `<tr>
       <td><div style="font-weight:600">${emp.name||a.empId}</div><div style="font-size:11px;color:var(--muted)">${a.empId}</div></td>
-      <td>${fmt(a.date)}</td><td>${sBadge(a.status)}</td>
-      <td>${a.checkIn||'—'}</td><td>${a.checkOut||'—'}</td>
+      <td>${fmt(a.date)}</td>
+      <td>${sBadge(a.status)}</td>
+      <td>${getLivePulseBadge(a)}</td>
+      <td>${a.checkIn||'—'}</td>
+      <td>${a.checkOut||'—'}</td>
       <td>${calcHours(a.date, a.checkIn, a.checkOut)}</td>
       <td><button class="btn btn-sm btn-edit" onclick="editAtt('${a.empId}','${a.date}')">✏</button></td>
     </tr>`;}).join('')}</tbody></table>`

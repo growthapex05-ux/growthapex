@@ -395,6 +395,7 @@
         <button class="btn btn-green" onclick="markAtt('present')">✅ Mark Check-In</button>
         <button class="btn btn-red"   onclick="markAtt('absent')">❌ Mark Check-Out</button>
         <div id="today-att-status"></div>
+        <div id="live-pulse-badge"></div>
       </div>
       <div id="today-att-info" style="font-size:13px;color:var(--muted)"></div>
     </div>
@@ -842,6 +843,72 @@
     ['cur-pass','new-pass','confirm-pass'].forEach(id => document.getElementById(id).value='');
   }
 
+  // ── Heartbeat & Idle Activity Tracking Engine ─────────────
+  let heartbeatInterval = null;
+  let lastUserActivityTime = Date.now();
+  let currentActivityState = 'active'; // 'active' | 'idle'
+  const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes of no input = Idle
+
+  function startHeartbeatEngine() {
+    stopHeartbeatEngine();
+    EMS_DB.updateHeartbeat(empId, currentActivityState).catch(() => {});
+    updateLiveStatusBadgeUI(currentActivityState);
+
+    heartbeatInterval = setInterval(async () => {
+      const isIdle = (Date.now() - lastUserActivityTime) > IDLE_TIMEOUT_MS;
+      currentActivityState = isIdle ? 'idle' : 'active';
+      updateLiveStatusBadgeUI(currentActivityState);
+      await EMS_DB.updateHeartbeat(empId, currentActivityState).catch(() => {});
+    }, 30000);
+  }
+
+  function stopHeartbeatEngine() {
+    if (heartbeatInterval) {
+      clearInterval(heartbeatInterval);
+      heartbeatInterval = null;
+    }
+    updateLiveStatusBadgeUI('disconnected');
+  }
+
+  function registerActivityTrackers() {
+    const resetActivity = () => {
+      lastUserActivityTime = Date.now();
+      if (currentActivityState === 'idle') {
+        currentActivityState = 'active';
+        updateLiveStatusBadgeUI('active');
+        EMS_DB.updateHeartbeat(empId, 'active').catch(() => {});
+      }
+    };
+
+    ['mousemove', 'keydown', 'scroll', 'click', 'touchstart'].forEach(evt => {
+      window.addEventListener(evt, resetActivity, { passive: true });
+    });
+  }
+  registerActivityTrackers();
+
+  function updateLiveStatusBadgeUI(state) {
+    const badgeEl = document.getElementById('live-pulse-badge');
+    if (!badgeEl) return;
+    if (state === 'idle') {
+      badgeEl.className = 'badge badge-amber';
+      badgeEl.innerHTML = '🟡 Idle / Away';
+    } else if (state === 'active') {
+      badgeEl.className = 'badge badge-green';
+      badgeEl.innerHTML = '🟢 Active Working';
+    } else {
+      badgeEl.className = 'badge badge-gray';
+      badgeEl.innerHTML = '🔴 PC Offline / Checked Out';
+    }
+  }
+
+  // Window disconnect hooks
+  window.addEventListener('beforeunload', () => {
+    if (empId) EMS_DB.autoCheckoutDisconnected(empId).catch(() => {});
+  });
+  window.addEventListener('pagehide', () => {
+    if (empId) EMS_DB.autoCheckoutDisconnected(empId).catch(() => {});
+  });
+
   // ── Attendance ─────────────────────────────────────────────
   async function renderAttendance() {
     const todayRec = await EMS_DB.getTodayAttendance(empId);
@@ -851,6 +918,13 @@
     document.getElementById('today-att-info').innerHTML = todayRec
       ? `<strong>Check-In:</strong> ${todayRec.checkIn||'—'} &nbsp;|&nbsp; <strong>Check-Out:</strong> ${todayRec.checkOut||'—'}`
       : '';
+    
+    if (todayRec && todayRec.checkIn && (!todayRec.checkOut || todayRec.checkOut === '—')) {
+      startHeartbeatEngine();
+    } else {
+      stopHeartbeatEngine();
+    }
+
     renderAttendanceTable();
   }
 
@@ -863,7 +937,7 @@
     }
     
     const html = att.length ? `<table><thead><tr><th>Date</th><th>Status</th><th>Check-In</th><th>Check-Out</th></tr></thead><tbody>
-      ${att.slice().reverse().map(a=>`<tr><td>${fmt(a.date)}</td><td>${sBadge(a.status)}</td><td>${a.checkIn||'—'}</td><td>${a.checkOut||'—'}</td></tr>`).join('')}
+      ${att.slice().reverse().map(a=>`<tr><td>${fmt(a.date)}</td><td>${sBadge(a.status)}</td><td>${a.checkIn||'—'}</td><td>${a.checkOut||'—'}${a.checkoutReason ? ' (' + a.checkoutReason + ')' : ''}</td></tr>`).join('')}
     </tbody></table>` : '<div class="empty-state"><div>📅</div>No attendance records found</div>';
     document.getElementById('att-history-table').innerHTML = html;
   }
@@ -875,13 +949,15 @@
     
     if (type === 'present') {
         if(rec && rec.checkIn) { toast('Check-in already marked for today', 'info'); return; }
-        await EMS_DB.markAttendance({ empId, date:today, status:'present', checkIn:time });
-        toast('Checked in successfully', 'success');
+        await EMS_DB.markAttendance({ empId, date:today, status:'present', checkIn:time, lastHeartbeat: new Date().toISOString() });
+        toast('Checked in successfully. Active tracking started! 🟢', 'success');
+        startHeartbeatEngine();
     } else {
         if(!rec || !rec.checkIn) { toast('You must check in first', 'error'); return; }
         if(rec.checkOut) { toast('Check-out already marked for today', 'info'); return; }
         await EMS_DB.markAttendance({ empId, date:today, status:rec.status, checkIn:rec.checkIn, checkOut:time });
         toast('Checked out successfully', 'success');
+        stopHeartbeatEngine();
     }
     renderAttendance();
   }
