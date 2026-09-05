@@ -277,6 +277,15 @@
     <a class="nav-item" onclick="showPage('salary',this)">
       <span class="nav-icon">💰</span><span>Salary Slip</span>
     </a>
+    <a class="nav-item" onclick="showPage('worklog',this)">
+      <span class="nav-icon">📝</span><span>Daily EOD Work Log</span>
+    </a>
+    <a class="nav-item" onclick="showPage('expense',this)">
+      <span class="nav-icon">💸</span><span>Expense Claim</span>
+    </a>
+    <a class="nav-item" onclick="showPage('noticeboard',this)">
+      <span class="nav-icon">📢</span><span>Notice Board</span>
+    </a>
 
   </div>
   <div class="sidebar-footer">
@@ -496,6 +505,88 @@
     </div>
   </div>
 
+  <!-- Daily EOD Work Log -->
+  <div class="page" id="page-worklog">
+    <div class="section-card" style="margin-bottom:20px">
+      <div class="section-head">
+        <h3>📝 Submit Daily End of Day (EOD) Work Log</h3>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div class="form-group">
+          <label>Work Date *</label>
+          <input type="date" id="wl-date" class="search-input" style="width:100%">
+        </div>
+        <div class="form-group">
+          <label>Hours Worked *</label>
+          <input type="number" id="wl-hours" class="search-input" value="8" min="1" max="16" style="width:100%">
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:14px">
+        <label>Tasks Completed &amp; EOD Summary *</label>
+        <textarea id="wl-summary" class="search-input" rows="4" placeholder="Detail your tasks completed today, project updates, and blockers if any..." style="width:100%;font-family:inherit"></textarea>
+      </div>
+      <button class="btn btn-primary" onclick="submitEmpWorkLog()" style="background:#0284c7;color:#fff;border:none">💾 Submit EOD Work Log</button>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>📜 My Submitted Work Logs</h3>
+      </div>
+      <div class="table-wrap" id="emp-worklogs-history"></div>
+    </div>
+  </div>
+
+  <!-- Expense Claim -->
+  <div class="page" id="page-expense">
+    <div class="section-card" style="margin-bottom:20px">
+      <div class="section-head">
+        <h3>💸 Submit Expense Reimbursement Claim</h3>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
+        <div class="form-group">
+          <label>Expense Date *</label>
+          <input type="date" id="exp-date" class="search-input" style="width:100%">
+        </div>
+        <div class="form-group">
+          <label>Category *</label>
+          <select id="exp-category" class="search-input" style="width:100%">
+            <option value="Travel">✈️ Travel / Transport</option>
+            <option value="Food &amp; Client">🍔 Food &amp; Client Meeting</option>
+            <option value="Office Supplies">📦 Office Supplies</option>
+            <option value="Internet &amp; Phone">📶 Internet / Communication</option>
+            <option value="Other">📌 Other Expense</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Amount (₹) *</label>
+          <input type="number" id="exp-amount" class="search-input" placeholder="e.g. 1500" style="width:100%">
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:14px">
+        <label>Expense Description / Purpose *</label>
+        <input id="exp-desc" class="search-input" placeholder="e.g. Taxi fare for client meeting at Cyber City" style="width:100%">
+      </div>
+      <button class="btn btn-primary" onclick="submitEmpExpenseClaim()" style="background:#0284c7;color:#fff;border:none">📤 Submit Claim for Approval</button>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>📜 My Expense Claim History</h3>
+      </div>
+      <div class="table-wrap" id="emp-expenses-history"></div>
+    </div>
+  </div>
+
+  <!-- Notice Board -->
+  <div class="page" id="page-noticeboard">
+    <div class="section-card">
+      <div class="section-head">
+        <h3>📢 Company Notice Board &amp; Announcements</h3>
+      </div>
+      <div id="emp-noticeboard-list"></div>
+    </div>
+  </div>
+
   <!-- Task Modal -->
   <div class="modal-overlay" id="task-modal">
     <div class="modal">
@@ -610,8 +701,8 @@
   }
 
   // Page switch
-  const pageTitles = { dashboard:'Dashboard', profile:'My Profile', attendance:'Attendance', tasks:'My Tasks', leaves:'Leave Requests', salary:'Salary Slip' };
-  const pageSubs = { dashboard:'Live data from GrowthApex EMS', profile:'Manage your personal information', attendance:'Track your daily check-ins', tasks:'View and update your assignments', leaves:'Apply and track time off', salary:'View your current compensation details' };
+  const pageTitles = { dashboard:'Dashboard', profile:'My Profile', attendance:'Attendance', tasks:'My Tasks', leaves:'Leave Requests', salary:'Salary Slip', worklog:'Daily EOD Work Log', expense:'Expense Reimbursement Claim', noticeboard:'Company Notice Board' };
+  const pageSubs = { dashboard:'Live data from GrowthApex EMS', profile:'Manage your personal information', attendance:'Track your daily check-ins', tasks:'View and update your assignments', leaves:'Apply and track time off', salary:'View your current compensation details', worklog:'Submit your daily tasks & end-of-day summary', expense:'Submit travel & work expenses for reimbursement', noticeboard:'Stay updated with latest announcements & holiday notices' };
   function showPage(id, el) {
     // Close sidebar on mobile navigation
     const sidebar = document.querySelector('.sidebar');
@@ -623,8 +714,8 @@
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     document.getElementById('page-'+id).classList.add('active');
     if (el) el.classList.add('active');
-    document.getElementById('page-title').textContent = pageTitles[id];
-    document.getElementById('page-sub').innerHTML = id === 'dashboard' ? `Welcome back, <span id="welcome-name">${emp.name.split(' ')[0]}</span>!` : pageSubs[id];
+    document.getElementById('page-title').textContent = pageTitles[id] || 'Dashboard';
+    document.getElementById('page-sub').innerHTML = id === 'dashboard' ? `Welcome back, <span id="welcome-name">${emp.name.split(' ')[0]}</span>!` : (pageSubs[id] || '');
     
     renderPage(id);
   }
@@ -636,6 +727,9 @@
     if (id==='tasks')      renderTasks();
     if (id==='leaves')     { renderLeavesTable(); renderHolidays(); }
     if (id==='salary')     renderSalary();
+    if (id==='worklog')    renderEmpWorkLogs();
+    if (id==='expense')    renderEmpExpenses();
+    if (id==='noticeboard') renderEmpAnnouncements();
   }
   
   function animateVal(id, target) {
@@ -1293,6 +1387,193 @@ function downloadEmpSalarySlipPDF() {
         }).join('')}
       </div>`;
   }
+
+// ─── Employee EOD Work Log Handlers ───────────────────────────
+async function renderEmpWorkLogs() {
+  const container = document.getElementById('emp-worklogs-history');
+  if (!container) return;
+  if (document.getElementById('wl-date')) document.getElementById('wl-date').value = new Date().toISOString().split('T')[0];
+  container.innerHTML = `<div class="empty-state">⏳ Loading your work logs…</div>`;
+
+  try {
+    const logs = await EMS_DB.getWorkLogs(emp.id);
+    if (!logs.length) {
+      container.innerHTML = `<div class="empty-state"><div>📝</div>You haven't submitted any work logs yet.</div>`;
+      return;
+    }
+
+    logs.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
+
+    let html = `
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Hours Worked</th>
+            <th>Tasks Completed &amp; EOD Summary</th>
+            <th>Submitted At</th>
+          </tr>
+        </thead>
+        <tbody>`;
+    logs.forEach(l => {
+      html += `
+        <tr>
+          <td><b>${l.date || '—'}</b></td>
+          <td><span class="badge badge-purple">${l.hours || 8} Hours</span></td>
+          <td style="max-width:350px;white-space:pre-wrap;font-size:12.5px">${l.summary || 'N/A'}</td>
+          <td style="font-size:11.5px;color:#64748b">${l.submittedAt ? new Date(l.submittedAt).toLocaleTimeString('en-IN') : '—'}</td>
+        </tr>`;
+    });
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+  } catch (err) {
+    console.error('renderEmpWorkLogs error:', err);
+    container.innerHTML = `<div class="empty-state red">Failed to load work logs.</div>`;
+  }
+}
+
+async function submitEmpWorkLog() {
+  const date = document.getElementById('wl-date')?.value;
+  const hours = Number(document.getElementById('wl-hours')?.value || 8);
+  const summary = (document.getElementById('wl-summary')?.value || '').trim();
+
+  if (!date || !summary) {
+    toast('Please select a date and enter your tasks summary', 'warning');
+    return;
+  }
+
+  try {
+    await EMS_DB.addWorkLog({
+      empId: emp.id,
+      empName: emp.name,
+      date,
+      hours,
+      summary
+    });
+    toast('EOD Work Log submitted successfully! 📝', 'success');
+    document.getElementById('wl-summary').value = '';
+    renderEmpWorkLogs();
+  } catch (err) {
+    toast('Error submitting work log: ' + err.message, 'error');
+  }
+}
+
+// ─── Employee Expense Claims Handlers ─────────────────────────
+async function renderEmpExpenses() {
+  const container = document.getElementById('emp-expenses-history');
+  if (!container) return;
+  if (document.getElementById('exp-date')) document.getElementById('exp-date').value = new Date().toISOString().split('T')[0];
+  container.innerHTML = `<div class="empty-state">⏳ Loading your expense claims…</div>`;
+
+  try {
+    const claims = await EMS_DB.getExpenses(emp.id);
+    if (!claims.length) {
+      container.innerHTML = `<div class="empty-state"><div>💸</div>You haven't submitted any expense claims yet.</div>`;
+      return;
+    }
+
+    claims.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
+
+    let html = `
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Category</th>
+            <th>Description</th>
+            <th>Amount (₹)</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>`;
+    claims.forEach(c => {
+      html += `
+        <tr>
+          <td><b>${c.date || '—'}</b></td>
+          <td><span class="badge badge-blue">${c.category || 'General'}</span></td>
+          <td>${c.description || 'N/A'}</td>
+          <td><b style="color:#0284c7">₹${Number(c.amount || 0).toLocaleString('en-IN')}</b></td>
+          <td>${sBadge(c.status || 'pending')}</td>
+        </tr>`;
+    });
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+  } catch (err) {
+    console.error('renderEmpExpenses error:', err);
+    container.innerHTML = `<div class="empty-state red">Failed to load expense claims.</div>`;
+  }
+}
+
+async function submitEmpExpenseClaim() {
+  const date = document.getElementById('exp-date')?.value;
+  const category = document.getElementById('exp-category')?.value || 'Other';
+  const amount = Number(document.getElementById('exp-amount')?.value || 0);
+  const description = (document.getElementById('exp-desc')?.value || '').trim();
+
+  if (!date || amount <= 0 || !description) {
+    toast('Please enter valid date, amount, and expense description', 'warning');
+    return;
+  }
+
+  try {
+    await EMS_DB.addExpense({
+      empId: emp.id,
+      empName: emp.name,
+      date,
+      category,
+      amount,
+      description
+    });
+    toast('Expense claim submitted for approval! 💸', 'success');
+    document.getElementById('exp-amount').value = '';
+    document.getElementById('exp-desc').value = '';
+    renderEmpExpenses();
+  } catch (err) {
+    toast('Error submitting expense claim: ' + err.message, 'error');
+  }
+}
+
+// ─── Employee Notice Board Handlers ───────────────────────────
+async function renderEmpAnnouncements() {
+  const container = document.getElementById('emp-noticeboard-list');
+  if (!container) return;
+  container.innerHTML = `<div class="empty-state">⏳ Loading Announcements…</div>`;
+
+  try {
+    const annList = await EMS_DB.getAnnouncements();
+    if (!annList.length) {
+      container.innerHTML = `<div class="empty-state"><div>📢</div>No announcements posted yet.</div>`;
+      return;
+    }
+
+    annList.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+    let html = `<div style="display:flex;flex-direction:column;gap:14px">`;
+    annList.forEach(a => {
+      const categoryBadges = {
+        HOLIDAY: '<span style="background:#fef3c7;color:#d97706;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700">🎉 FESTIVAL / HOLIDAY</span>',
+        ANNOUNCEMENT: '<span style="background:#e0f2fe;color:#0284c7;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700">📢 GENERAL ANNOUNCEMENT</span>',
+        URGENT: '<span style="background:#fee2e2;color:#dc2626;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700">🔴 URGENT NOTICE</span>',
+        POLICY: '<span style="background:#dcfce7;color:#15803d;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700">🟢 POLICY UPDATE</span>'
+      };
+
+      html += `
+        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:18px;box-shadow:0 1px 4px rgba(0,0,0,0.04)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <div>${categoryBadges[a.category] || categoryBadges.ANNOUNCEMENT}</div>
+            <span style="font-size:11.5px;color:#64748b">${fmt(a.createdAt)}</span>
+          </div>
+          <h4 style="margin:0 0 8px 0;font-size:16px;color:#0f172a">${a.title}</h4>
+          <p style="margin:0;font-size:13.5px;color:#334155;line-height:1.65;white-space:pre-wrap">${a.content}</p>
+        </div>`;
+    });
+    html += `</div>`;
+    container.innerHTML = html;
+  } catch (err) {
+    console.error('renderEmpAnnouncements error:', err);
+    container.innerHTML = `<div class="empty-state red">Failed to load announcements.</div>`;
+  }
+}
 
   function logout() {
     EMS_DB.clearSession();

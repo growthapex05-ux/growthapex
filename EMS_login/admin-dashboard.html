@@ -313,6 +313,11 @@
     <div class="nav-item" onclick="showPage('letterpad',this)"><span class="nav-icon">📜</span><span>Letter Pad &amp; Docs</span></div>
     <div class="nav-item" onclick="showPage('reports',this)" id="nav-reports"><span class="nav-icon">📲</span><span>WhatsApp Reports</span></div>
 
+    <div class="nav-label" style="margin-top:14px">Operations Suite</div>
+    <div class="nav-item" onclick="showPage('worklogs',this)"><span class="nav-icon">📝</span><span>EOD Work Logs</span></div>
+    <div class="nav-item" onclick="showPage('expenses',this)"><span class="nav-icon">💸</span><span>Expenses &amp; Claims</span></div>
+    <div class="nav-item" onclick="showPage('noticeboard',this)"><span class="nav-icon">📢</span><span>Notice Board</span></div>
+
   </div>
   <div class="sidebar-footer">
     <button class="logout-btn" onclick="logout()">⏻ &nbsp;Logout</button>
@@ -479,6 +484,7 @@
         <h3>💰 Payroll Details Report</h3>
         <div class="toolbar">
           <input class="search-input" id="salary-search" placeholder="🔍 Search employee…" oninput="renderSalary()">
+          <button class="btn btn-success" onclick="sendBulkSalarySlipsWhatsApp()" style="background:#25D366;color:#fff;border:none;display:inline-flex;align-items:center;gap:6px;font-weight:600">🚀 Bulk WhatsApp Slips</button>
           <button class="btn btn-export" onclick="exportCSV('salary')">⬇ CSV</button>
         </div>
       </div>
@@ -550,6 +556,75 @@
 
   </div>
 
+  <!-- ── EOD Work Logs Page ── -->
+  <div class="page" id="page-worklogs">
+    <div class="section-card">
+      <div class="section-head">
+        <h3>📝 Employee Daily EOD Work Logs</h3>
+        <div class="toolbar">
+          <input type="date" id="worklog-date-filter" class="search-input" onchange="renderWorkLogs()">
+          <button class="btn btn-secondary" onclick="renderWorkLogs()">🔄 Refresh</button>
+        </div>
+      </div>
+      <div class="table-wrap" id="admin-worklogs-table"></div>
+    </div>
+  </div>
+
+  <!-- ── Expenses & Reimbursements Page ── -->
+  <div class="page" id="page-expenses">
+    <div class="section-card">
+      <div class="section-head">
+        <h3>💸 Expense &amp; Reimbursement Claims</h3>
+        <div class="toolbar">
+          <select id="expense-status-filter" class="search-input" onchange="renderExpenses()">
+            <option value="all">All Claims</option>
+            <option value="pending" selected>⏳ Pending Approval</option>
+            <option value="approved">✅ Approved</option>
+            <option value="rejected">❌ Rejected</option>
+          </select>
+          <button class="btn btn-secondary" onclick="renderExpenses()">🔄 Refresh</button>
+        </div>
+      </div>
+      <div class="table-wrap" id="admin-expenses-table"></div>
+    </div>
+  </div>
+
+  <!-- ── Notice Board Page ── -->
+  <div class="page" id="page-noticeboard">
+    <div class="section-card" style="margin-bottom:20px">
+      <div class="section-head">
+        <h3>📢 Post Company Announcement</h3>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div class="form-group">
+          <label>Announcement Title *</label>
+          <input id="ann-title" class="search-input" placeholder="e.g. Festival Holiday Notice / All Hands Meeting" style="width:100%">
+        </div>
+        <div class="form-group">
+          <label>Category / Badge *</label>
+          <select id="ann-category" class="search-input" style="width:100%">
+            <option value="HOLIDAY">🎉 FESTIVAL / HOLIDAY</option>
+            <option value="ANNOUNCEMENT">📢 GENERAL ANNOUNCEMENT</option>
+            <option value="URGENT">🔴 URGENT NOTICE</option>
+            <option value="POLICY">🟢 POLICY UPDATE</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:14px">
+        <label>Announcement Content Details *</label>
+        <textarea id="ann-content" class="search-input" rows="3" placeholder="Write announcement text here..." style="width:100%;font-family:inherit"></textarea>
+      </div>
+      <button class="btn btn-primary" onclick="postAnnouncement()" style="background:#0284c7;color:#fff;border:none">📢 Publish Announcement</button>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>📌 Active Company Announcements</h3>
+      </div>
+      <div id="admin-announcements-list"></div>
+    </div>
+  </div>
+
   <!-- ── Dynamic Letter Pad & Document Studio ── -->
   <div class="page" id="page-letterpad">
     <div class="section-card" style="margin-bottom:20px">
@@ -569,13 +644,20 @@
           <select id="lp-emp-select" class="search-input" style="width:100%" onchange="onLpEmpChange()"></select>
         </div>
         <div class="form-group">
-          <label>Document Template *</label>
+          <label style="display:flex;justify-content:space-between;align-items:center">
+            <span>Document Template *</span>
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#0284c7;font-weight:700;cursor:pointer;user-select:none"><input type="checkbox" id="lp-include-seal" onchange="renderLetterPad()" checked> Official Digital Seal ✓</label>
+          </label>
           <select id="lp-doc-type" class="search-input" style="width:100%" onchange="onLpDocTypeChange()">
             <option value="letterhead">🏢 Corporate Letterhead Document</option>
-            <option value="experience">📜 Experience &amp; Relieving Certificate</option>
+            <option value="experience">📜 Experience Certificate</option>
+            <option value="relieving">👋 Formal Relieving Letter</option>
+            <option value="appraisal">📈 Salary Appraisal &amp; Promotion Letter</option>
+            <option value="offer">✉️ Offer &amp; Appointment Letter (CTC Table)</option>
+            <option value="warning">⚠️ Official Performance Warning Letter</option>
+            <option value="nda">🔒 Non-Disclosure &amp; Confidentiality Agreement</option>
             <option value="memo">📋 Official Memorandum (Memo)</option>
             <option value="payslip">📄 Dynamic Official Payslip</option>
-            <option value="offer">✉️ Offer &amp; Appointment Letter</option>
           </select>
         </div>
       </div>
@@ -977,7 +1059,7 @@ function toggleSidebar() {
 }
 
 // ─── Page Navigation ──────────────────────────────────────────
-const titles = { overview:'Overview', employees:'Employees', attendance:'Attendance', tasks:'Tasks', leaves:'Leave Requests', salary:'Payroll', letterpad:'Letter Pad & Documents', reports:'WhatsApp Reports' };
+const titles = { overview:'Overview', employees:'Employees', attendance:'Attendance', tasks:'Tasks', leaves:'Leave Requests', salary:'Payroll', letterpad:'Letter Pad & Documents', reports:'WhatsApp Reports', worklogs:'EOD Work Logs', expenses:'Expense Claims', noticeboard:'Company Notice Board' };
 function showPage(id, el) {
   // Close sidebar on mobile navigation
   const sidebar = document.querySelector('.sidebar');
@@ -989,13 +1071,16 @@ function showPage(id, el) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
   if (el) el.classList.add('active');
-  document.getElementById('page-title').textContent = titles[id];
+  document.getElementById('page-title').textContent = titles[id] || 'Dashboard';
   { id==='overview' && renderOverview(); id==='employees' && renderEmpTable(); }
   { id==='attendance' && initAtt(); id==='tasks' && initTasks(); }
   { id==='leaves' && initLeaves(); id==='salary' && renderSalary(); }
   if (id==='letterpad') initLetterPadPage();
   if (id==='leaves') renderAdminHolidays();
   if (id==='reports') initReportsPage();
+  if (id==='worklogs') renderWorkLogs();
+  if (id==='expenses') renderExpenses();
+  if (id==='noticeboard') renderAnnouncements();
 }
 
 // ─── OVERVIEW ─────────────────────────────────────────────────
@@ -2391,6 +2476,79 @@ function renderLetterPad() {
       <p style="font-size:13.5px;line-height:1.75;color:#334155;margin-bottom:14px">
         We sincerely thank <b>${name}</b> for their service and wish them every success in their future endeavors.
       </p>`;
+  } else if (docType === 'relieving') {
+    docTitle = 'FORMAL RELIEVING LETTER';
+    bodyHtml = `
+      <p style="font-size:13.5px;line-height:1.75;color:#334155;margin-bottom:14px">
+        Dear <b>${name}</b>,
+      </p>
+      <p style="font-size:13.5px;line-height:1.75;color:#334155;margin-bottom:14px">
+        This has reference to your resignation letter from the services of <b>GrowthApex Digital Media</b>. We hereby accept your resignation and release you from your duties as <b>${designation}</b> in the <b>${department}</b> department, effective close of business hours on <b>${formattedIssueDate}</b>.
+      </p>
+      <p style="font-size:13.5px;line-height:1.75;color:#334155;margin-bottom:14px">
+        We confirm that you have completed all handover formalities and handed over all corporate assets, code bases, and access credentials. Your final dues and settlement have been fully processed.
+      </p>
+      <p style="font-size:13.5px;line-height:1.75;color:#334155;margin-bottom:14px">
+        We thank you for your contributions during your tenure and wish you the best in your career ahead.
+      </p>`;
+  } else if (docType === 'appraisal') {
+    docTitle = 'SALARY REVISION & PROMOTION LETTER';
+    const newSalary = salary;
+    bodyHtml = `
+      <p style="font-size:13.5px;line-height:1.75;color:#334155;margin-bottom:14px">
+        Dear <b>${name}</b>,
+      </p>
+      <p style="font-size:13.5px;line-height:1.75;color:#334155;margin-bottom:14px">
+        In recognition of your outstanding performance, commitment, and valuable contributions to <b>GrowthApex Digital Media</b>, management is pleased to announce a revision in your compensation package.
+      </p>
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;padding:14px 18px;border-radius:6px;margin-bottom:18px;font-size:13px;color:#166534">
+        <b>Appraisal Details:</b>
+        <ul style="margin:8px 0 0 18px;padding:0;line-height:1.7">
+          <li><b>Designation:</b> ${designation}</li>
+          <li><b>Department:</b> ${department}</li>
+          <li><b>Revised Monthly Compensation:</b> ${moneyFmt(newSalary)} / month</li>
+          <li><b>Effective Date:</b> ${formattedIssueDate}</li>
+        </ul>
+      </div>
+      <p style="font-size:13.5px;line-height:1.75;color:#334155;margin-bottom:14px">
+        ${bodyText.replace(/\n/g, '<br>')}
+      </p>
+      <p style="font-size:13.5px;line-height:1.75;color:#334155;margin-bottom:14px">
+        We expect you to continue demonstrating excellence and driving high standards of work in the organization.
+      </p>`;
+  } else if (docType === 'warning') {
+    docTitle = 'OFFICIAL PERFORMANCE WARNING NOTICE';
+    bodyHtml = `
+      <p style="font-size:13.5px;line-height:1.75;color:#334155;margin-bottom:14px">
+        Dear <b>${name}</b>,
+      </p>
+      <p style="font-size:13.5px;line-height:1.75;color:#334155;margin-bottom:14px">
+        This letter serves as an official performance warning regarding your conduct/performance in the <b>${department}</b> department as <b>${designation}</b>.
+      </p>
+      <div style="background:#fef2f2;border:1px solid #fecaca;padding:14px 18px;border-radius:6px;margin-bottom:18px;font-size:13px;color:#991b1b">
+        <b>Issue Summary &amp; Corrective Measures Required:</b><br>
+        ${bodyText ? bodyText.replace(/\n/g, '<br>') : 'Failure to meet designated performance benchmarks and attendance compliance.'}
+      </div>
+      <p style="font-size:13.5px;line-height:1.75;color:#334155;margin-bottom:14px">
+        You are expected to demonstrate immediate improvement within 15 days of this notice. Failure to meet expectations may result in further disciplinary action up to termination.
+      </p>`;
+  } else if (docType === 'nda') {
+    docTitle = 'NON-DISCLOSURE & CONFIDENTIALITY AGREEMENT';
+    bodyHtml = `
+      <p style="font-size:13.5px;line-height:1.75;color:#334155;margin-bottom:14px">
+        This Non-Disclosure &amp; Confidentiality Agreement is entered into between <b>GrowthApex Digital Media</b> and <b>${name}</b> (${designation}, Emp ID: <b>${refNo}</b>).
+      </p>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;padding:14px 18px;border-radius:6px;margin-bottom:18px;font-size:13px;color:#334155">
+        <b>Confidentiality Obligations:</b>
+        <ol style="margin:8px 0 0 18px;padding:0;line-height:1.7">
+          <li>The recipient agrees to keep all proprietary code, client data, and internal strategies strictly confidential.</li>
+          <li>No internal documentation or client asset may be shared or reproduced without written approval.</li>
+          <li>This obligation survives termination of employment.</li>
+        </ol>
+      </div>
+      <p style="font-size:13.5px;line-height:1.75;color:#334155;margin-bottom:14px">
+        ${bodyText.replace(/\n/g, '<br>')}
+      </p>`;
   } else if (docType === 'memo') {
     docTitle = 'OFFICIAL MEMORANDUM';
 
@@ -2452,6 +2610,22 @@ function renderLetterPad() {
       <b>📌 Additional Remarks / Special Note:</b><br>${customNote}
     </div>` : '';
 
+  const includeSeal = document.getElementById('lp-include-seal')?.checked;
+  const sealSvgHtml = includeSeal ? `
+    <div style="display:inline-block;vertical-align:middle;margin-right:12px">
+      <svg width="68" height="68" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="50" cy="50" r="46" stroke="#0284c7" stroke-width="2.5" stroke-dasharray="4 2"/>
+        <circle cx="50" cy="50" r="40" stroke="#002b80" stroke-width="2"/>
+        <path id="sealPath" d="M 20 50 A 30 30 0 1 1 80 50 A 30 30 0 1 1 20 50" fill="none"/>
+        <text font-size="7.5" font-weight="bold" fill="#002b80" letter-spacing="0.5">
+          <textPath href="#sealPath" startOffset="50%" text-anchor="middle">GROWTHAPEX DIGITAL MEDIA</textPath>
+        </text>
+        <circle cx="50" cy="50" r="22" fill="#0284c7" opacity="0.12"/>
+        <text x="50" y="46" font-size="9" font-weight="900" fill="#002b80" text-anchor="middle">OFFICIAL</text>
+        <text x="50" y="57" font-size="8" font-weight="bold" fill="#16a34a" text-anchor="middle">SEAL ✓</text>
+      </svg>
+    </div>` : '';
+
   container.innerHTML = `
     <div class="letterpad-paper" style="background:#ffffff;color:#111827;padding:32px 36px;border:1px solid #e2e8f0;border-radius:8px;font-family:'Urbanist',sans-serif;box-sizing:border-box;max-width:760px;width:100%;margin:0 auto;overflow:hidden">
       <!-- Letterhead Top Header Bar -->
@@ -2498,23 +2672,26 @@ function renderLetterPad() {
         ${customNoteHtml}
       </div>
 
-      <!-- Footer Signatures with Susheel Kumar Digital Signature -->
+      <!-- Footer Signatures with Susheel Kumar Digital Signature & Corporate Seal -->
       <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:36px;padding-top:18px;border-top:1px solid #e2e8f0">
         <div style="text-align:center;width:180px;border-top:1px solid #94a3b8;padding-top:6px;font-size:12px;color:#475569">
           Recipient Signature
         </div>
-        <div style="text-align:center;width:240px;position:relative;display:inline-block">
-          <div style="height:44px;display:flex;align-items:center;justify-content:center;margin-bottom:2px;gap:6px">
-            <svg width="150" height="42" viewBox="0 0 200 50" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 34 C22 14, 28 8, 38 22 C42 32, 32 45, 22 42 C18 40, 30 28, 48 30 C58 31, 62 40, 72 38 C82 36, 88 18, 92 16 C98 14, 92 38, 102 36 C112 34, 120 20, 126 33 C132 40, 142 30, 155 28 C25 36 Q75 46 175 32" stroke="#002b80" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
-              <text x="18" y="28" font-family="'Brush Script MT', 'Dancing Script', cursive, sans-serif" font-size="22" font-weight="bold" fill="#002b80" font-style="italic" opacity="0.95">Susheel Kumar</text>
-            </svg>
-            <span style="background:#dcfce7;color:#15803d;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;border:1px solid #86efac;white-space:nowrap">VERIFIED ✓</span>
-          </div>
-          <div style="border-top:1px solid #94a3b8;padding-top:4px;font-size:12px;color:#475569">
-            <b style="color:#0f172a;font-size:13px">Susheel Kumar</b><br>
-            <span style="font-size:11px;color:#0284c7;font-weight:700">Authorized Signatory</span><br>
-            <span style="font-size:9.5px;color:#64748b">GrowthApex HR &amp; Finance (Digitally Signed)</span>
+        <div style="display:flex;align-items:center">
+          ${sealSvgHtml}
+          <div style="text-align:center;width:220px;position:relative;display:inline-block">
+            <div style="height:44px;display:flex;align-items:center;justify-content:center;margin-bottom:2px;gap:6px">
+              <svg width="150" height="42" viewBox="0 0 200 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 34 C22 14, 28 8, 38 22 C42 32, 32 45, 22 42 C18 40, 30 28, 48 30 C58 31, 62 40, 72 38 C82 36, 88 18, 92 16 C98 14, 92 38, 102 36 C112 34, 120 20, 126 33 C132 40, 142 30, 155 28 C25 36 Q75 46 175 32" stroke="#002b80" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+                <text x="18" y="28" font-family="'Brush Script MT', 'Dancing Script', cursive, sans-serif" font-size="22" font-weight="bold" fill="#002b80" font-style="italic" opacity="0.95">Susheel Kumar</text>
+              </svg>
+              <span style="background:#dcfce7;color:#15803d;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;border:1px solid #86efac;white-space:nowrap">VERIFIED ✓</span>
+            </div>
+            <div style="border-top:1px solid #94a3b8;padding-top:4px;font-size:12px;color:#475569">
+              <b style="color:#0f172a;font-size:13px">Susheel Kumar</b><br>
+              <span style="font-size:11px;color:#0284c7;font-weight:700">Authorized Signatory</span><br>
+              <span style="font-size:9.5px;color:#64748b">GrowthApex HR &amp; Finance (Digitally Signed)</span>
+            </div>
           </div>
         </div>
       </div>
@@ -3139,6 +3316,234 @@ function renderRptHistory() {
         </tbody>
       </table>
     </div>`;
+}
+
+// ─── Bulk WhatsApp Salary Slips Sender ───────────────────────
+async function sendBulkSalarySlipsWhatsApp() {
+  const emps = cache.employees || [];
+  const activeEmps = emps.filter(e => e.status === 'active' && e.phone);
+  if (!activeEmps.length) {
+    toast('No active employees with valid phone numbers found', 'warning');
+    return;
+  }
+  if (!confirm(`Launch WhatsApp Salary Slips for all ${activeEmps.length} active employees?`)) return;
+
+  const monthVal = document.getElementById('salary-month-select')?.value || '2026-08';
+  let count = 0;
+  for (const emp of activeEmps) {
+    const leaveData = calculateCumulativeLeaves(emp, monthVal, cache.attendance);
+    const daysDetails = getWorkingDaysForMonth(emp.joinDate, monthVal, 'month');
+    const baseSalary = Number(emp.salary || 0);
+    let earnedSalary = 0;
+    if (daysDetails.isJoined && daysDetails.workedWorkingDays > 0) {
+      earnedSalary = Math.round((baseSalary * daysDetails.workedWorkingDays) / (daysDetails.totalMonthWorkingDays || 26));
+    }
+    const advanceDeduction = emp.advanceDeduction !== undefined ? Number(emp.advanceDeduction) : 3000;
+    const netPayable = Math.max(0, earnedSalary - advanceDeduction);
+
+    let targetPhone = (emp.phone || '').trim().replace(/\D/g, '');
+    if (targetPhone.length === 10) targetPhone = '91' + targetPhone;
+
+    const msg = `📄 *GrowthApex Official Payslip*\n\n` +
+      `👤 *Name:* ${emp.name} (${emp.id})\n` +
+      `📅 *Period:* ${monthVal}\n` +
+      `💰 *Net Salary Payable:* ₹${netPayable.toLocaleString('en-IN')}\n\n` +
+      `Please check your EMS Employee Portal to view & download your full official payslip.\n\n` +
+      `GrowthApex HR & Finance`;
+
+    window.open(`https://api.whatsapp.com/send?phone=${targetPhone}&text=${encodeURIComponent(msg)}`, '_blank');
+    count++;
+  }
+  toast(`Initiated ${count} WhatsApp salary slips!`, 'success');
+}
+
+// ─── EOD Work Logs Renderer ──────────────────────────────────
+async function renderWorkLogs() {
+  const container = document.getElementById('admin-worklogs-table');
+  if (!container) return;
+  container.innerHTML = `<div class="empty-state">⏳ Loading EOD Work Logs…</div>`;
+  try {
+    const logs = await EMS_DB.getWorkLogs();
+    const filterDate = document.getElementById('worklog-date-filter')?.value;
+    const filtered = filterDate ? logs.filter(l => l.date === filterDate) : logs;
+    
+    if (!filtered.length) {
+      container.innerHTML = `<div class="empty-state"><div>📝</div>No EOD Work Logs submitted for this selection.</div>`;
+      return;
+    }
+
+    filtered.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
+
+    let html = `
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Employee</th>
+            <th>Hours Worked</th>
+            <th>Tasks Completed &amp; EOD Summary</th>
+            <th>Submitted At</th>
+          </tr>
+        </thead>
+        <tbody>`;
+    filtered.forEach(l => {
+      html += `
+        <tr>
+          <td><b>${l.date || '—'}</b></td>
+          <td><b>${l.empName || l.empId || 'Employee'}</b></td>
+          <td><span class="badge badge-purple">${l.hours || 8} Hours</span></td>
+          <td style="max-width:350px;white-space:pre-wrap;font-size:12.5px">${l.summary || 'N/A'}</td>
+          <td style="font-size:11.5px;color:#64748b">${l.submittedAt ? new Date(l.submittedAt).toLocaleTimeString('en-IN') : '—'}</td>
+        </tr>`;
+    });
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+  } catch (err) {
+    console.error('renderWorkLogs error:', err);
+    container.innerHTML = `<div class="empty-state red">Failed to load work logs.</div>`;
+  }
+}
+
+// ─── Expenses & Reimbursements Renderer ──────────────────────
+async function renderExpenses() {
+  const container = document.getElementById('admin-expenses-table');
+  if (!container) return;
+  container.innerHTML = `<div class="empty-state">⏳ Loading Expense Claims…</div>`;
+  try {
+    const expenses = await EMS_DB.getExpenses();
+    const filterStatus = document.getElementById('expense-status-filter')?.value || 'all';
+    const filtered = filterStatus === 'all' ? expenses : expenses.filter(e => e.status === filterStatus);
+
+    if (!filtered.length) {
+      container.innerHTML = `<div class="empty-state"><div>💸</div>No expense claims found.</div>`;
+      return;
+    }
+
+    filtered.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
+
+    let html = `
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Claim ID / Date</th>
+            <th>Employee</th>
+            <th>Category</th>
+            <th>Description</th>
+            <th>Amount (₹)</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>`;
+    filtered.forEach(e => {
+      html += `
+        <tr>
+          <td><b>${e.date || fmt(e.submittedAt)}</b></td>
+          <td><b>${e.empName || e.empId || 'Employee'}</b></td>
+          <td><span class="badge badge-blue">${e.category || 'General'}</span></td>
+          <td>${e.description || 'N/A'}</td>
+          <td><b style="color:#0284c7">₹${Number(e.amount || 0).toLocaleString('en-IN')}</b></td>
+          <td>${sBadge(e.status || 'pending')}</td>
+          <td>
+            ${e.status === 'pending' ? `
+              <button class="btn btn-sm btn-success" onclick="updateExpenseClaimStatus('${e.id}','approved')" style="padding:3px 8px;font-size:11px">✅ Approve</button>
+              <button class="btn btn-sm btn-cancel" onclick="updateExpenseClaimStatus('${e.id}','rejected')" style="padding:3px 8px;font-size:11px">❌ Reject</button>
+            ` : '—'}
+          </td>
+        </tr>`;
+    });
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+  } catch (err) {
+    console.error('renderExpenses error:', err);
+    container.innerHTML = `<div class="empty-state red">Failed to load expense claims.</div>`;
+  }
+}
+
+async function updateExpenseClaimStatus(id, status) {
+  try {
+    await EMS_DB.updateExpense(id, status);
+    toast(`Expense claim ${status}!`, status === 'approved' ? 'success' : 'info');
+    renderExpenses();
+  } catch (err) {
+    toast('Error updating expense status: ' + err.message, 'error');
+  }
+}
+
+// ─── Notice Board & Announcements ────────────────────────────
+async function renderAnnouncements() {
+  const container = document.getElementById('admin-announcements-list');
+  if (!container) return;
+  container.innerHTML = `<div class="empty-state">⏳ Loading Announcements…</div>`;
+  try {
+    const annList = await EMS_DB.getAnnouncements();
+    if (!annList.length) {
+      container.innerHTML = `<div class="empty-state"><div>📢</div>No announcements posted yet.</div>`;
+      return;
+    }
+
+    annList.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+    let html = `<div style="display:flex;flex-direction:column;gap:12px">`;
+    annList.forEach(a => {
+      const categoryBadges = {
+        HOLIDAY: '<span style="background:#fef3c7;color:#d97706;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700">🎉 FESTIVAL / HOLIDAY</span>',
+        ANNOUNCEMENT: '<span style="background:#e0f2fe;color:#0284c7;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700">📢 GENERAL ANNOUNCEMENT</span>',
+        URGENT: '<span style="background:#fee2e2;color:#dc2626;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700">🔴 URGENT NOTICE</span>',
+        POLICY: '<span style="background:#dcfce7;color:#15803d;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700">🟢 POLICY UPDATE</span>'
+      };
+
+      html += `
+        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div>${categoryBadges[a.category] || categoryBadges.ANNOUNCEMENT}</div>
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="font-size:11.5px;color:#64748b">${fmt(a.createdAt)}</span>
+              <button class="btn btn-sm btn-cancel" onclick="removeAnnouncement('${a.id}')" style="padding:2px 8px;font-size:11px">🗑️ Delete</button>
+            </div>
+          </div>
+          <h4 style="margin:0 0 6px 0;font-size:15px;color:#0f172a">${a.title}</h4>
+          <p style="margin:0;font-size:13px;color:#334155;line-height:1.6;white-space:pre-wrap">${a.content}</p>
+        </div>`;
+    });
+    html += `</div>`;
+    container.innerHTML = html;
+  } catch (err) {
+    console.error('renderAnnouncements error:', err);
+    container.innerHTML = `<div class="empty-state red">Failed to load announcements.</div>`;
+  }
+}
+
+async function postAnnouncement() {
+  const title = (document.getElementById('ann-title')?.value || '').trim();
+  const category = document.getElementById('ann-category')?.value || 'ANNOUNCEMENT';
+  const content = (document.getElementById('ann-content')?.value || '').trim();
+
+  if (!title || !content) {
+    toast('Please fill out announcement title and content details', 'warning');
+    return;
+  }
+
+  try {
+    await EMS_DB.addAnnouncement({ title, category, content });
+    toast('Announcement published to Notice Board! 📢', 'success');
+    document.getElementById('ann-title').value = '';
+    document.getElementById('ann-content').value = '';
+    renderAnnouncements();
+  } catch (err) {
+    toast('Error publishing announcement: ' + err.message, 'error');
+  }
+}
+
+async function removeAnnouncement(id) {
+  if (!confirm('Are you sure you want to delete this announcement?')) return;
+  try {
+    await EMS_DB.deleteAnnouncement(id);
+    toast('Announcement deleted', 'info');
+    renderAnnouncements();
+  } catch (err) {
+    toast('Error deleting announcement: ' + err.message, 'error');
+  }
 }
 
 // ─── Init ─────────────────────────────────────────────────────

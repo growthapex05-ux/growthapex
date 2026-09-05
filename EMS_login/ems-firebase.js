@@ -182,6 +182,64 @@ const EMS_DB = {
     await this._col('leaves').doc(String(id)).update({ status });
   },
 
+  // ── Daily EOD Work Logs ───────────────────────────────────
+
+  async getWorkLogs(empId) {
+    let q = this._col('worklogs');
+    if (empId) q = q.where('empId', '==', empId);
+    const snap = await q.get();
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  },
+
+  async addWorkLog(log) {
+    const ref = await this._col('worklogs').add({
+      ...log,
+      submittedAt: new Date().toISOString(),
+    });
+    return { id: ref.id, ...log };
+  },
+
+  // ── Expenses & Reimbursements ─────────────────────────────
+
+  async getExpenses(empId) {
+    let q = this._col('expenses');
+    if (empId) q = q.where('empId', '==', empId);
+    const snap = await q.get();
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  },
+
+  async addExpense(exp) {
+    const ref = await this._col('expenses').add({
+      ...exp,
+      status: 'pending',
+      submittedAt: new Date().toISOString(),
+    });
+    return { id: ref.id, ...exp, status: 'pending' };
+  },
+
+  async updateExpense(id, status) {
+    await this._col('expenses').doc(String(id)).update({ status });
+  },
+
+  // ── Notice Board & Announcements ─────────────────────────
+
+  async getAnnouncements() {
+    const snap = await this._col('announcements').get();
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  },
+
+  async addAnnouncement(ann) {
+    const ref = await this._col('announcements').add({
+      ...ann,
+      createdAt: new Date().toISOString(),
+    });
+    return { id: ref.id, ...ann };
+  },
+
+  async deleteAnnouncement(id) {
+    await this._col('announcements').doc(String(id)).delete();
+  },
+
   // ── Auth + Session ────────────────────────────────────────
 
   /**
