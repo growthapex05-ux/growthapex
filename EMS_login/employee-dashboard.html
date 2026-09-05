@@ -1169,10 +1169,10 @@
     if (typeof html2pdf !== 'undefined') {
       const empName = (emp && emp.name) ? emp.name.replace(/\s+/g, '_') : 'Employee';
       const opt = {
-        margin:       [6, 6, 6, 6],
+        margin:       [4, 4, 4, 4],
         filename:     `GrowthApex_Salary_Slip_${empName}.pdf`,
         image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, logging: false, scrollY: 0 },
+        html2canvas:  { scale: 2, useCORS: true, logging: false, scrollY: 0, windowWidth: 794 },
         jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
 
