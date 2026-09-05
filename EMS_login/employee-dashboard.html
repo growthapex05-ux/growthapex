@@ -7,6 +7,7 @@
   <link rel="shortcut icon" type="image/svg+xml" href="../assets/images/logo/favicon.svg">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Urbanist:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -1016,7 +1017,10 @@
 
         <div style="display:flex;justify-content:space-between;align-items:center;background:#f3f4f6;padding:10px 16px;border-radius:8px;margin-bottom:16px;border:1px solid #e5e7eb">
           <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;color:#111827">PAYSLIP FOR: ${currentMonthStr.toUpperCase()}</div>
-          <button class="btn btn-primary" onclick="printEmpSalarySlip()" style="padding:6px 14px;font-size:12px">🖨️ Print / Save PDF</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary" onclick="downloadEmpSalarySlipPDF()" style="padding:6px 14px;font-size:12px;background:#0284c7;color:#fff;border:none">📥 Download PDF</button>
+            <button class="btn btn-secondary" onclick="printEmpSalarySlip()" style="padding:6px 14px;font-size:12px;background:#e5e7eb;color:#111827;border:none">🖨️ Print Slip</button>
+          </div>
         </div>
 
         <!-- Meta Table -->
@@ -1091,6 +1095,28 @@
           </div>
         </div>
       </div>`;
+  }
+
+  function downloadEmpSalarySlipPDF() {
+    const container = document.getElementById('salary-info');
+    if (!container || !container.children.length) return;
+    const cloned = container.cloneNode(true);
+    const btns = cloned.querySelectorAll('.btn, button');
+    btns.forEach(b => b.remove());
+
+    if (typeof html2pdf !== 'undefined') {
+      const empName = (emp && emp.name) ? emp.name.replace(/\s+/g, '_') : 'Employee';
+      const opt = {
+        margin:       [8, 8, 8, 8],
+        filename:     `GrowthApex_Salary_Slip_${empName}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, logging: false },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      html2pdf().set(opt).from(cloned).save();
+    } else {
+      printEmpSalarySlip();
+    }
   }
 
   function printEmpSalarySlip() {

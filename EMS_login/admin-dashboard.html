@@ -7,6 +7,7 @@
   <link rel="shortcut icon" type="image/svg+xml" href="../assets/images/logo/favicon.svg">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Urbanist:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     :root{
@@ -671,7 +672,8 @@
     <div class="modal-header no-print" style="margin-bottom:16px;border-bottom:1px solid #e5e7eb;padding-bottom:12px">
       <h3 style="color:#111827">📄 GrowthApex Official Payslip</h3>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-primary" onclick="printSalarySlip()">🖨️ Print / Save PDF</button>
+        <button class="btn btn-primary" onclick="downloadSalarySlipPDF()" style="background:#0284c7;color:#fff;border:none">📥 Download PDF</button>
+        <button class="btn btn-secondary" onclick="printSalarySlip()" style="background:#e5e7eb;color:#111827;border:none">🖨️ Print Slip</button>
         <button class="modal-close" onclick="closeModal('modal-salary-slip')">✕</button>
       </div>
     </div>
@@ -1870,6 +1872,23 @@ function openSalarySlipModal(empId, monthVal) {
     </div>`;
 
   document.getElementById('modal-salary-slip').classList.add('open');
+}
+
+function downloadSalarySlipPDF() {
+  const container = document.getElementById('salary-slip-container');
+  if (!container || !container.children.length) return;
+  if (typeof html2pdf !== 'undefined') {
+    const opt = {
+      margin:       [8, 8, 8, 8],
+      filename:     `GrowthApex_Salary_Slip.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true, logging: false },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    html2pdf().set(opt).from(container).save();
+  } else {
+    printSalarySlip();
+  }
 }
 
 function printSalarySlip() {
