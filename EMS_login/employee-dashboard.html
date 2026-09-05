@@ -1163,28 +1163,48 @@
     const container = document.getElementById('salary-info');
     if (!container || !container.children.length) return;
 
-    const btns = container.querySelectorAll('.btn, button');
-    btns.forEach(b => b.style.display = 'none');
-
     if (typeof html2pdf !== 'undefined') {
       const empName = (emp && emp.name) ? emp.name.replace(/\s+/g, '_') : 'Employee';
+
+      const clone = container.cloneNode(true);
+      const btns = clone.querySelectorAll('.btn, button');
+      btns.forEach(b => b.remove());
+
+      clone.style.position = 'absolute';
+      clone.style.top = '-9999px';
+      clone.style.left = '0px';
+      clone.style.width = '750px';
+      clone.style.maxWidth = '750px';
+      clone.style.background = '#ffffff';
+      clone.style.margin = '0';
+      clone.style.padding = '0';
+      clone.style.boxSizing = 'border-box';
+      document.body.appendChild(clone);
+
+      const innerBox = clone.firstElementChild;
+      if (innerBox) {
+        innerBox.style.maxWidth = '100%';
+        innerBox.style.width = '100%';
+        innerBox.style.boxSizing = 'border-box';
+        innerBox.style.margin = '0';
+      }
+
       const opt = {
         margin:       [4, 4, 4, 4],
         filename:     `GrowthApex_Salary_Slip_${empName}.pdf`,
         image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, logging: false, scrollY: 0, windowWidth: 794 },
+        html2canvas:  { scale: 2, useCORS: true, logging: false, scrollY: 0 },
         jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
 
-      html2pdf().set(opt).from(container).save().then(() => {
-        btns.forEach(b => b.style.display = '');
+      html2pdf().set(opt).from(clone).save().then(() => {
+        if (document.body.contains(clone)) document.body.removeChild(clone);
       }).catch(err => {
         console.error('PDF export error:', err);
-        btns.forEach(b => b.style.display = '');
+        if (document.body.contains(clone)) document.body.removeChild(clone);
         printEmpSalarySlip();
       });
     } else {
-      btns.forEach(b => b.style.display = '');
       printEmpSalarySlip();
     }
   }
