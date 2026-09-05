@@ -1107,42 +1107,28 @@
     const container = document.getElementById('salary-info');
     if (!container || !container.children.length) return;
 
+    const btns = container.querySelectorAll('.btn, button');
+    btns.forEach(b => b.style.display = 'none');
+
     if (typeof html2pdf !== 'undefined') {
-      const wrapper = document.createElement('div');
-      wrapper.style.position = 'absolute';
-      wrapper.style.left = '-9999px';
-      wrapper.style.top = '0';
-      wrapper.style.width = '750px';
-      wrapper.style.background = '#ffffff';
-      wrapper.style.color = '#111827';
-      wrapper.style.padding = '0';
-      wrapper.style.boxSizing = 'border-box';
-
-      const cloned = container.cloneNode(true);
-      const btns = cloned.querySelectorAll('.btn, button');
-      btns.forEach(b => b.remove());
-
-      wrapper.appendChild(cloned);
-      document.body.appendChild(wrapper);
-
       const empName = (emp && emp.name) ? emp.name.replace(/\s+/g, '_') : 'Employee';
       const opt = {
         margin:       [6, 6, 6, 6],
         filename:     `GrowthApex_Salary_Slip_${empName}.pdf`,
         image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, logging: false, scrollY: 0, windowWidth: 1024 },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+        html2canvas:  { scale: 2, useCORS: true, logging: false, scrollY: 0 },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
 
-      html2pdf().set(opt).from(wrapper).save().then(() => {
-        if (document.body.contains(wrapper)) document.body.removeChild(wrapper);
+      html2pdf().set(opt).from(container).save().then(() => {
+        btns.forEach(b => b.style.display = '');
       }).catch(err => {
         console.error('PDF export error:', err);
-        if (document.body.contains(wrapper)) document.body.removeChild(wrapper);
+        btns.forEach(b => b.style.display = '');
         printEmpSalarySlip();
       });
     } else {
+      btns.forEach(b => b.style.display = '');
       printEmpSalarySlip();
     }
   }
