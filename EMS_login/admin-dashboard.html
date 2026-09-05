@@ -2124,20 +2124,35 @@ async function generateReportText(type) {
     return msg;
   }
 
-  // ── LOGIN ──────────────────────────────────────────────────
   if (type === 'login') {
-    let logins = [];
+    let entriesMap = new Map();
     try {
-      const snap = await db.collection('logins').where('date', '==', today).get();
-      logins = snap.docs.map(d => d.data());
+      const [loginSnap, attSnap] = await Promise.all([
+        db.collection('logins').where('date', '==', today).get(),
+        db.collection('attendance').where('date', '==', today).get()
+      ]);
+      loginSnap.forEach(d => {
+        const data = d.data();
+        const key = (data.empId || data.name || d.id).toUpperCase();
+        entriesMap.set(key, { name: data.name, role: (data.role || 'employee').toUpperCase(), time: data.loginTime || 'Logged in' });
+      });
+      attSnap.forEach(d => {
+        const data = d.data();
+        const key = (data.empId || d.id).toUpperCase();
+        if (!entriesMap.has(key)) {
+          const emp = active.find(e => e.id === key) || (cache.employees || []).find(e => e.id === key);
+          entriesMap.set(key, { name: emp ? emp.name : key, role: 'EMPLOYEE', time: data.checkIn ? `${data.checkIn} (Check-in)` : 'Checked in' });
+        }
+      });
     } catch (_) {}
+    const entries = Array.from(entriesMap.values());
     let msg = `🔑 *GROWTHAPEX EMS - LOGIN REPORT* 🔑\n📅 *Date:* ${today}\n`;
     msg += `━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
-    if (!logins.length) {
-      msg += `ℹ️ No system logins recorded for this date.\n`;
+    if (!entries.length) {
+      msg += `ℹ️ No system logins or check-ins recorded for this date.\n`;
     } else {
-      logins.forEach(l => {
-        msg += `👤 *${l.name}* (${(l.role||'user').toUpperCase()}) — ⏰ ${l.loginTime}\n`;
+      entries.forEach(l => {
+        msg += `👤 *${l.name}* (${l.role}) — ⏰ ${l.time}\n`;
       });
     }
     msg += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;

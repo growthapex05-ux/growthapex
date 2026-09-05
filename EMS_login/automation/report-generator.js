@@ -653,29 +653,57 @@ async function generateMonthlyReport(db) {
 async function generateLoginReport(db, targetDateStr = null) {
   const dateStr = targetDateStr || formatDateString(new Date());
 
-  const loginsSnap = await db.collection('logins')
-    .where('date', '==', dateStr)
-    .get();
+  const [loginsSnap, attSnap, empSnap] = await Promise.all([
+    db.collection('logins').where('date', '==', dateStr).get(),
+    db.collection('attendance').where('date', '==', dateStr).get(),
+    db.collection('employees').get()
+  ]);
 
-  const logins = [];
+  const empMap = {};
+  empSnap.forEach(doc => { empMap[doc.id] = doc.data(); });
+
+  const entriesMap = new Map();
+
+  // 1. Add web logins
   loginsSnap.forEach(doc => {
-    logins.push({ id: doc.id, ...doc.data() });
+    const data = doc.data();
+    const key = (data.empId || data.name || doc.id).toUpperCase();
+    entriesMap.set(key, {
+      name: data.name || empMap[data.empId]?.name || key,
+      empId: data.empId || 'USER',
+      role: data.role || 'employee',
+      time: data.loginTime || 'Logged in'
+    });
   });
 
-  // Sort by loginTime ascending
-  logins.sort((a, b) => (a.loginTime || '').localeCompare(b.loginTime || ''));
+  // 2. Add attendance check-ins
+  attSnap.forEach(doc => {
+    const data = doc.data();
+    const key = (data.empId || doc.id).toUpperCase();
+    if (!entriesMap.has(key)) {
+      const emp = empMap[key] || {};
+      entriesMap.set(key, {
+        name: emp.name || key,
+        empId: key,
+        role: 'employee',
+        time: data.checkIn ? `${data.checkIn} (Check-in)` : 'Checked in'
+      });
+    }
+  });
+
+  const entries = Array.from(entriesMap.values());
 
   let report = `🔑 *GROWTHAPEX EMS - LOGIN REPORT* 🔑\n`;
   report += `📅 *Date:* ${dateStr}\n`;
   report += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
-  if (logins.length === 0) {
-    report += `ℹ️ No system logins recorded for this date.`;
+  if (entries.length === 0) {
+    report += `ℹ️ No system logins or check-ins recorded for this date.`;
   } else {
-    report += `👤 *Total Logins (${logins.length}):*\n`;
-    logins.forEach(l => {
-      const roleStr = l.role ? ` (${l.role.toUpperCase()})` : '';
-      report += ` • *${l.name}* [${l.empId}]${roleStr} at ${l.loginTime || 'N/A'}\n`;
+    report += `👤 *Staff Logins & Check-ins (${entries.length}):*\n`;
+    entries.forEach(e => {
+      const roleStr = e.role ? ` (${e.role.toUpperCase()})` : '';
+      report += ` • *${e.name}* [${e.empId}]${roleStr} — ⏰ ${e.time}\n`;
     });
   }
 
