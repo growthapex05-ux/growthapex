@@ -1750,6 +1750,11 @@ function openSalarySlipModal(empId, monthVal) {
     earnedSalary = Math.round((baseSalary * daysDetails.workedWorkingDays) / (daysDetails.totalMonthWorkingDays || 26));
   }
 
+  const empMonthAtt = (cache.attendance || []).filter(a => a.empId === empId && a.date && a.date.startsWith(monthVal));
+  const leavesTaken = empMonthAtt.filter(a => a.status === 'leave' || a.status === 'absent').length;
+  const earnedLeaveAllowance = 1.5;
+  const remainingLeaveBalance = Math.max(0, earnedLeaveAllowance - leavesTaken);
+
   const advanceDeduction = 3000; // Raksha Bandhan Advance Deduction
   const netPayable = Math.max(0, earnedSalary - advanceDeduction);
 
@@ -1794,6 +1799,12 @@ function openSalarySlipModal(empId, monthVal) {
           <td style="padding:6px;font-weight:700;color:#4b5563">Payment Status:</td>
           <td style="padding:6px"><span style="background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:12px;font-weight:700;font-size:11px">PAID ✅</span></td>
         </tr>
+        <tr>
+          <td style="padding:6px;font-weight:700;color:#4b5563">Leaves Taken:</td>
+          <td style="padding:6px">${leavesTaken} Days</td>
+          <td style="padding:6px;font-weight:700;color:#4b5563">Earned Leave Credit:</td>
+          <td style="padding:6px"><span style="background:#e0f2fe;color:#0284c7;padding:2px 8px;border-radius:12px;font-weight:700;font-size:11px">+${remainingLeaveBalance} Days Credit (1.5/mo) 🎁</span></td>
+        </tr>
       </table>
 
       <!-- Days Breakdown Table -->
@@ -1803,6 +1814,8 @@ function openSalarySlipModal(empId, monthVal) {
             <th style="border:1px solid #e5e7eb;padding:8px;color:#374151">Total Calendar Days</th>
             <th style="border:1px solid #e5e7eb;padding:8px;color:#374151">Sundays (Week Off)</th>
             <th style="border:1px solid #e5e7eb;padding:8px;color:#374151">Working Days Worked</th>
+            <th style="border:1px solid #e5e7eb;padding:8px;color:#374151">Leaves Taken</th>
+            <th style="border:1px solid #e5e7eb;padding:8px;color:#374151">Earned Leave Credit</th>
             <th style="border:1px solid #e5e7eb;padding:8px;color:#374151">Net Payable Days</th>
           </tr>
         </thead>
@@ -1811,6 +1824,8 @@ function openSalarySlipModal(empId, monthVal) {
             <td style="border:1px solid #e5e7eb;padding:8px">${daysDetails.workedCalendarDays} Days</td>
             <td style="border:1px solid #e5e7eb;padding:8px;color:#dc2626">${daysDetails.sundays} Sundays</td>
             <td style="border:1px solid #e5e7eb;padding:8px;font-weight:700;color:#0284c7">${daysDetails.workedWorkingDays} Days</td>
+            <td style="border:1px solid #e5e7eb;padding:8px;color:${leavesTaken > 0 ? '#dc2626' : '#16a34a'}">${leavesTaken} Days</td>
+            <td style="border:1px solid #e5e7eb;padding:8px;font-weight:700;color:#16a34a">+${remainingLeaveBalance} Days</td>
             <td style="border:1px solid #e5e7eb;padding:8px;font-weight:700;color:#16a34a">${daysDetails.workedWorkingDays} Days</td>
           </tr>
         </tbody>
@@ -1877,15 +1892,38 @@ function openSalarySlipModal(empId, monthVal) {
 function downloadSalarySlipPDF() {
   const container = document.getElementById('salary-slip-container');
   if (!container || !container.children.length) return;
+
   if (typeof html2pdf !== 'undefined') {
+    const wrapper = document.createElement('div');
+    wrapper.style.position = 'absolute';
+    wrapper.style.left = '-9999px';
+    wrapper.style.top = '0';
+    wrapper.style.width = '750px';
+    wrapper.style.background = '#ffffff';
+    wrapper.style.color = '#111827';
+    wrapper.style.padding = '0';
+    wrapper.style.boxSizing = 'border-box';
+
+    const cloned = container.cloneNode(true);
+    wrapper.appendChild(cloned);
+    document.body.appendChild(wrapper);
+
     const opt = {
-      margin:       [8, 8, 8, 8],
+      margin:       [6, 6, 6, 6],
       filename:     `GrowthApex_Salary_Slip.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true, logging: false },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      html2canvas:  { scale: 2, useCORS: true, logging: false, scrollY: 0, windowWidth: 1024 },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
     };
-    html2pdf().set(opt).from(container).save();
+
+    html2pdf().set(opt).from(wrapper).save().then(() => {
+      if (document.body.contains(wrapper)) document.body.removeChild(wrapper);
+    }).catch(err => {
+      console.error('PDF export error:', err);
+      if (document.body.contains(wrapper)) document.body.removeChild(wrapper);
+      printSalarySlip();
+    });
   } else {
     printSalarySlip();
   }
