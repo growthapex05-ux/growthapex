@@ -446,13 +446,35 @@
   <!-- ── Payroll ── -->
   <div class="page" id="page-salary">
     <div class="stats-grid" style="margin-bottom:20px">
-      <div class="stat-card purple"><div class="stat-icon">💰</div><div class="stat-val" id="p-total">₹0</div><div class="stat-label">Monthly Payroll</div></div>
+      <div class="stat-card purple"><div class="stat-icon">💰</div><div class="stat-val" id="p-total">₹0</div><div class="stat-label">Total Earned Payroll</div></div>
       <div class="stat-card green"><div class="stat-icon">👥</div><div class="stat-val" id="p-count">0</div><div class="stat-label">Active Employees</div></div>
-      <div class="stat-card cyan"><div class="stat-icon">📊</div><div class="stat-val" id="p-avg">₹0</div><div class="stat-label">Average Salary</div></div>
-      <div class="stat-card amber"><div class="stat-icon">🏦</div><div class="stat-val" id="p-pf">₹0</div><div class="stat-label">Total PF</div></div>
+      <div class="stat-card cyan"><div class="stat-icon">📊</div><div class="stat-val" id="p-avg">₹0</div><div class="stat-label">Average Earned Pay</div></div>
+      <div class="stat-card amber"><div class="stat-icon">🗓️</div><div class="stat-val" id="p-workdays">0</div><div class="stat-label">Working Days (Non-Sunday)</div></div>
     </div>
+
+    <!-- Payroll Controls & Chart Card -->
+    <div class="section-card" style="margin-bottom:20px;">
+      <div class="section-head">
+        <h3>📊 Monthly Payroll Breakdown &amp; Working Days Chart</h3>
+        <div class="toolbar">
+          <label style="font-size:12px;font-weight:600;color:var(--muted)">Select Month:</label>
+          <input type="month" id="salary-month-select" class="search-input" style="width:150px" value="2026-08" onchange="renderSalary()">
+          <label style="font-size:12px;font-weight:600;color:var(--muted)">Calc Mode:</label>
+          <select id="salary-calc-mode" class="search-input" style="width:230px" onchange="renderSalary()">
+            <option value="month">Selected Month (Join Date Prorated)</option>
+            <option value="cumulative">Cumulative (Join Date to Month End)</option>
+          </select>
+        </div>
+      </div>
+      <div class="chart-wrap" style="height:250px;">
+        <canvas id="payrollChartCanvas"></canvas>
+      </div>
+    </div>
+
+    <!-- Payroll Table Card -->
     <div class="section-card">
-      <div class="section-head"><h3>💰 Payroll Details</h3>
+      <div class="section-head">
+        <h3>💰 Payroll Details Report</h3>
         <div class="toolbar">
           <input class="search-input" id="salary-search" placeholder="🔍 Search employee…" oninput="renderSalary()">
           <button class="btn btn-export" onclick="exportCSV('salary')">⬇ CSV</button>
@@ -1392,41 +1414,280 @@ async function actLeave(id, status) {
   toast(`Leave ${status}!`, status==='approved'?'success':'error');
 }
 
-// ─── PAYROLL ──────────────────────────────────────────────────
+// ─── PAYROLL & SALARY CALCULATION ────────────────────────────────
+let payrollChartInstance = null;
+
+function getWorkingDaysForMonth(joinDateStr, monthStr, mode = 'month') {
+  const [yearStr, mStr] = monthStr.split('-');
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(mStr, 10); // 1-indexed
+
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const monthEndStr = `${year}-${String(month).padStart(2,'0')}-${String(daysInMonth).padStart(2,'0')}`;
+
+  let calcStartStr = `${year}-${String(month).padStart(2,'0')}-01`;
+  if (mode === 'cumulative' && joinDateStr) {
+    calcStartStr = joinDateStr;
+  } else if (joinDateStr) {
+    const jDate = new Date(joinDateStr + 'T00:00:00');
+    const mStart = new Date(year, month - 1, 1);
+    const mEnd = new Date(year, month - 1, daysInMonth);
+    
+    if (jDate > mEnd) {
+      return { totalMonthWorkingDays: 0, workedWorkingDays: 0, workedCalendarDays: 0, sundays: 0, isJoined: false };
+    }
+    if (jDate > mStart) {
+      calcStartStr = joinDateStr;
+    }
+  }
+
+  let totalMonthWorkingDays = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    let dt = new Date(year, month - 1, d);
+    if (dt.getDay() !== 0) totalMonthWorkingDays++;
+  }
+
+  let start = new Date(calcStartStr + 'T00:00:00');
+  let end = new Date(monthEndStr + 'T00:00:00');
+
+  let workedCalendarDays = 0;
+  let sundays = 0;
+  let workedWorkingDays = 0;
+
+  let current = new Date(start);
+  while (current <= end) {
+    workedCalendarDays++;
+    if (current.getDay() === 0) sundays++;
+    else workedWorkingDays++;
+    current.setDate(current.getDate() + 1);
+  }
+
+  return {
+    totalMonthWorkingDays,
+    workedWorkingDays,
+    workedCalendarDays,
+    sundays,
+    isJoined: true
+  };
+}
+
+function calcCumulativeSalary(joinDateStr, targetMonthStr, baseSalary) {
+  if (!joinDateStr) return 0;
+  const [targetYear, targetMonth] = targetMonthStr.split('-').map(Number);
+  let start = new Date(joinDateStr + 'T00:00:00');
+
+  if (isNaN(start.getTime()) || start > new Date(targetYear, targetMonth, 0)) return 0;
+
+  let total = 0;
+  let curYear = start.getFullYear();
+  let curMonth = start.getMonth() + 1; // 1-indexed
+
+  while (curYear < targetYear || (curYear === targetYear && curMonth <= targetMonth)) {
+    const daysInM = new Date(curYear, curMonth, 0).getDate();
+    let mStart = 1;
+    let mEnd = daysInM;
+
+    if (curYear === start.getFullYear() && curMonth === (start.getMonth() + 1)) {
+      mStart = start.getDate();
+    }
+
+    let mFullWorkDays = 0;
+    for (let d = 1; d <= daysInM; d++) {
+      if (new Date(curYear, curMonth - 1, d).getDay() !== 0) mFullWorkDays++;
+    }
+
+    let mWorkedWorkDays = 0;
+    for (let d = mStart; d <= mEnd; d++) {
+      if (new Date(curYear, curMonth - 1, d).getDay() !== 0) mWorkedWorkDays++;
+    }
+
+    if (mStart === 1 && mEnd === daysInM) {
+      total += baseSalary;
+    } else {
+      total += (baseSalary * mWorkedWorkDays) / (mFullWorkDays || 26);
+    }
+
+    curMonth++;
+    if (curMonth > 12) {
+      curMonth = 1;
+      curYear++;
+    }
+  }
+
+  return Math.round(total);
+}
+
 async function renderSalary() {
-  const q = (document.getElementById('salary-search')?.value||'').toLowerCase();
-  let emps = cache.employees.filter(e=>e.status==='active');
-  if (q) emps = emps.filter(e=>(e.name+e.department).toLowerCase().includes(q));
+  const monthVal = document.getElementById('salary-month-select')?.value || '2026-08';
+  const calcMode = document.getElementById('salary-calc-mode')?.value || 'month';
+  const q = (document.getElementById('salary-search')?.value || '').toLowerCase();
 
-  const totalNet   = emps.reduce((s,e)=>s+Number(e.salary||0), 0);
-  const totalPF    = emps.reduce((s,e)=>s+Math.round(Math.round(Number(e.salary||0)/1.38)*0.12), 0);
-  const totalGross = emps.reduce((s,e)=>{
-    const n = Number(e.salary||0);
-    const b = Math.round(n/1.38);
-    return s + b + Math.round(b*0.4) + Math.round(b*0.1);
-  }, 0);
-  const avg        = emps.length ? Math.round(totalNet/emps.length) : 0;
+  let emps = cache.employees.filter(e => e.status === 'active');
+  if (q) emps = emps.filter(e => (e.name + e.department + (e.designation||'')).toLowerCase().includes(q));
 
-  document.getElementById('p-total').textContent = money(totalNet);
-  document.getElementById('p-count').textContent = emps.length;
-  document.getElementById('p-avg').textContent   = money(avg);
-  document.getElementById('p-pf').textContent    = money(totalPF);
+  const [selYear, selMonth] = monthVal.split('-').map(Number);
+  const totalDaysInMonth = new Date(selYear, selMonth, 0).getDate();
 
-  document.getElementById('admin-salary-table').innerHTML = emps.length ? `
-    <table><thead><tr><th>Employee</th><th>Department</th><th>Basic</th><th>HRA</th><th>TA</th><th>PF</th><th>Net Pay</th></tr></thead>
-    <tbody>${emps.map(e=>{
-      const net=Number(e.salary||0), b=Math.round(net/1.38), hra=Math.round(b*.4), ta=Math.round(b*.1), pf=Math.round(b*.12);
-      const pct = Math.round((net/(b+hra+ta))*100);
-      return `<tr>
-        <td><div style="font-weight:600">${e.name}</div><div style="font-size:11px;color:var(--muted)">${e.id}</div></td>
-        <td>${e.department}</td>
-        <td>${money(b)}</td><td>${money(hra)}</td><td>${money(ta)}</td>
-        <td style="color:#f87171">-${money(pf)}</td>
-        <td><div style="font-weight:700;color:#34d399">${money(net)}</div>
-            <div class="progress" style="width:100px"><div class="progress-bar" style="width:${pct}%;background:var(--green)"></div></div></td>
-      </tr>`;
-    }).join('')}</tbody></table>`
-  : '<div class="empty-state"><div>💰</div>No salary data</div>';
+  let monthFullWorkingDays = 0;
+  for (let d = 1; d <= totalDaysInMonth; d++) {
+    let dt = new Date(selYear, selMonth - 1, d);
+    if (dt.getDay() !== 0) monthFullWorkingDays++;
+  }
+
+  let totalEarnedPayroll = 0;
+  let totalPF = 0;
+
+  const empPayrollData = emps.map(e => {
+    const baseSalary = Number(e.salary || 0);
+    const joinDate = e.joinDate || 'N/A';
+    const daysDetails = getWorkingDaysForMonth(joinDate, monthVal, calcMode);
+
+    let earnedSalary = 0;
+    if (daysDetails.isJoined && daysDetails.workedWorkingDays > 0) {
+      if (calcMode === 'cumulative') {
+        earnedSalary = calcCumulativeSalary(joinDate, monthVal, baseSalary);
+      } else {
+        earnedSalary = Math.round((baseSalary * daysDetails.workedWorkingDays) / (daysDetails.totalMonthWorkingDays || 26));
+      }
+    }
+
+    totalEarnedPayroll += earnedSalary;
+    const b = Math.round(earnedSalary / 1.38);
+    const pf = Math.round(b * 0.12);
+    totalPF += pf;
+
+    return {
+      ...e,
+      baseSalary,
+      earnedSalary,
+      joinDate,
+      daysDetails,
+      basic: b,
+      hra: Math.round(b * 0.4),
+      ta: Math.round(b * 0.1),
+      pf
+    };
+  });
+
+  const avg = emps.length ? Math.round(totalEarnedPayroll / emps.length) : 0;
+
+  if (document.getElementById('p-total'))    document.getElementById('p-total').textContent    = money(totalEarnedPayroll);
+  if (document.getElementById('p-count'))    document.getElementById('p-count').textContent    = emps.length;
+  if (document.getElementById('p-avg'))      document.getElementById('p-avg').textContent      = money(avg);
+  if (document.getElementById('p-workdays')) document.getElementById('p-workdays').textContent = `${monthFullWorkingDays} Days`;
+
+  const tableEl = document.getElementById('admin-salary-table');
+  if (tableEl) {
+    tableEl.innerHTML = emps.length ? `
+      <table>
+        <thead>
+          <tr>
+            <th>Employee</th>
+            <th>Joining Date</th>
+            <th>Department</th>
+            <th>Base Salary</th>
+            <th>Cal. Days</th>
+            <th>Sundays (Off)</th>
+            <th>Working Days</th>
+            <th>Earned Pay (${monthVal})</th>
+            <th>PF (Deduction)</th>
+          </tr>
+        </thead>
+        <tbody>${empPayrollData.map(e => {
+          const pct = e.baseSalary > 0 ? Math.min(100, Math.round((e.earnedSalary / e.baseSalary) * 100)) : 0;
+          return `<tr>
+            <td>
+              <div style="font-weight:700;color:var(--text)">${e.name}</div>
+              <div style="font-size:11px;color:var(--muted)">${e.id} • ${e.designation||''}</div>
+            </td>
+            <td><span class="badge badge-blue">${e.joinDate}</span></td>
+            <td>${e.department}</td>
+            <td><b>${money(e.baseSalary)}</b></td>
+            <td>${e.daysDetails.workedCalendarDays} d</td>
+            <td><span style="color:#f87171">${e.daysDetails.sundays} Sun</span></td>
+            <td><b style="color:var(--purple-lt)">${e.daysDetails.workedWorkingDays} Days</b></td>
+            <td>
+              <div style="font-weight:800;color:#34d399;font-size:14px">${money(e.earnedSalary)}</div>
+              <div class="progress" style="width:110px;margin-top:4px" title="${pct}% of base earned">
+                <div class="progress-bar" style="width:${pct}%;background:var(--green)"></div>
+              </div>
+            </td>
+            <td style="color:#f87171">-${money(e.pf)}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>`
+    : '<div class="empty-state"><div>💰</div>No salary data available</div>';
+  }
+
+  renderPayrollChart(empPayrollData, monthVal);
+}
+
+function renderPayrollChart(empData, monthVal) {
+  const canvas = document.getElementById('payrollChartCanvas');
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  if (payrollChartInstance) {
+    payrollChartInstance.destroy();
+  }
+
+  const labels = empData.map(e => e.name.split(' ')[0] + ` (${e.id})`);
+  const baseSalaries = empData.map(e => e.baseSalary);
+  const earnedSalaries = empData.map(e => e.earnedSalary);
+
+  payrollChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Base Monthly Salary (₹)',
+          data: baseSalaries,
+          backgroundColor: 'rgba(107, 114, 128, 0.25)',
+          borderColor: 'rgba(107, 114, 128, 0.6)',
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+        {
+          label: `Earned Pay for ${monthVal} (₹)`,
+          data: earnedSalaries,
+          backgroundColor: 'rgba(0, 212, 255, 0.75)',
+          borderColor: '#00D4FF',
+          borderWidth: 1.5,
+          borderRadius: 4,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#1F1F25', font: { family: 'Urbanist', weight: '600' } } },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const idx = context.dataIndex;
+              const emp = empData[idx];
+              if (context.datasetIndex === 1) {
+                return ` Earned: ₹${context.raw.toLocaleString('en-IN')} (${emp.daysDetails.workedWorkingDays} Working Days Worked)`;
+              }
+              return ` Base: ₹${context.raw.toLocaleString('en-IN')}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#6B7280', font: { family: 'Urbanist' } }, grid: { display: false } },
+        y: {
+          ticks: {
+            color: '#6B7280',
+            callback: function(val) { return '₹' + (val >= 1000 ? (val/1000) + 'k' : val); }
+          },
+          grid: { color: 'rgba(0,0,0,0.05)' }
+        }
+      }
+    }
+  });
 }
 
 // ─── CSV Export ───────────────────────────────────────────────
@@ -1444,12 +1705,26 @@ async function exportCSV(type) {
     rows = [h, ...allAtt.map(a=>{ const emp=empMap[a.empId]||{}; return [a.empId,emp.name||'',a.date,a.status,a.checkIn||'',a.checkOut||'']; })];
     filename = 'attendance.csv';
   } else {
-    const h = ['ID','Name','Department','Basic','HRA','TA','PF','Net Pay'];
-    rows = [h, cache.employees.filter(e=>e.status==='active').map(e=>{
-      const net=Number(e.salary||0), b=Math.round(net/1.38), hra=Math.round(b*.4), ta=Math.round(b*.1), pf=Math.round(b*.12);
-      return [e.id,e.name,e.department,b,hra,ta,pf,net];
+    const monthVal = document.getElementById('salary-month-select')?.value || '2026-08';
+    const calcMode = document.getElementById('salary-calc-mode')?.value || 'month';
+    const h = ['ID','Name','Joining Date','Department','Designation','Base Salary','Calendar Days','Sundays Off','Working Days Worked','Earned Salary','PF Deduction'];
+    rows = [h, ...cache.employees.filter(e=>e.status==='active').map(e=>{
+      const baseSalary = Number(e.salary||0);
+      const joinDate = e.joinDate || 'N/A';
+      const daysDetails = getWorkingDaysForMonth(joinDate, monthVal, calcMode);
+      let earnedSalary = 0;
+      if (daysDetails.isJoined && daysDetails.workedWorkingDays > 0) {
+        if (calcMode === 'cumulative') {
+          earnedSalary = calcCumulativeSalary(joinDate, monthVal, baseSalary);
+        } else {
+          earnedSalary = Math.round((baseSalary * daysDetails.workedWorkingDays) / (daysDetails.totalMonthWorkingDays || 26));
+        }
+      }
+      const b = Math.round(earnedSalary / 1.38);
+      const pf = Math.round(b * 0.12);
+      return [e.id, `"${e.name}"`, joinDate, e.department, `"${e.designation||''}"`, baseSalary, daysDetails.workedCalendarDays, daysDetails.sundays, daysDetails.workedWorkingDays, earnedSalary, pf];
     })];
-    filename = 'payroll.csv';
+    filename = `payroll_${monthVal}.csv`;
   }
   const csv = rows.map(r=>r.join(',')).join('\n');
   const a = document.createElement('a');
