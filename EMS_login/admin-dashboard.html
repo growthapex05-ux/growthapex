@@ -1590,7 +1590,6 @@ async function renderSalary() {
             <th>Sundays (Off)</th>
             <th>Working Days</th>
             <th>Earned Pay (${monthVal})</th>
-            <th>PF (Deduction)</th>
           </tr>
         </thead>
         <tbody>${empPayrollData.map(e => {
@@ -1612,7 +1611,6 @@ async function renderSalary() {
                 <div class="progress-bar" style="width:${pct}%;background:var(--green)"></div>
               </div>
             </td>
-            <td style="color:#f87171">-${money(e.pf)}</td>
           </tr>`;
         }).join('')}</tbody>
       </table>`
@@ -1707,7 +1705,7 @@ async function exportCSV(type) {
   } else {
     const monthVal = document.getElementById('salary-month-select')?.value || '2026-08';
     const calcMode = document.getElementById('salary-calc-mode')?.value || 'month';
-    const h = ['ID','Name','Joining Date','Department','Designation','Base Salary','Calendar Days','Sundays Off','Working Days Worked','Earned Salary','PF Deduction'];
+    const h = ['ID','Name','Joining Date','Department','Designation','Base Salary','Calendar Days','Sundays Off','Working Days Worked','Earned Salary'];
     rows = [h, ...cache.employees.filter(e=>e.status==='active').map(e=>{
       const baseSalary = Number(e.salary||0);
       const joinDate = e.joinDate || 'N/A';
@@ -1720,9 +1718,7 @@ async function exportCSV(type) {
           earnedSalary = Math.round((baseSalary * daysDetails.workedWorkingDays) / (daysDetails.totalMonthWorkingDays || 26));
         }
       }
-      const b = Math.round(earnedSalary / 1.38);
-      const pf = Math.round(b * 0.12);
-      return [e.id, `"${e.name}"`, joinDate, e.department, `"${e.designation||''}"`, baseSalary, daysDetails.workedCalendarDays, daysDetails.sundays, daysDetails.workedWorkingDays, earnedSalary, pf];
+      return [e.id, `"${e.name}"`, joinDate, e.department, `"${e.designation||''}"`, baseSalary, daysDetails.workedCalendarDays, daysDetails.sundays, daysDetails.workedWorkingDays, earnedSalary];
     })];
     filename = `payroll_${monthVal}.csv`;
   }
