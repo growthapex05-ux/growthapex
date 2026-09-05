@@ -576,6 +576,10 @@
       <div class="form-group"><label>Join Date</label><input type="date" id="f-join"></div>
       <div class="form-group"><label>Login Password *</label><input type="text" id="f-pass" placeholder="Set password"></div>
     </div>
+    <div class="form-row2">
+      <div class="form-group"><label>Advance Deduction (₹)</label><input type="number" id="f-advance" placeholder="3000"></div>
+      <div class="form-group"><label>Bonus/Manual Leave Credit (Days)</label><input type="number" step="0.5" id="f-leave-credit" placeholder="0"></div>
+    </div>
     <div class="form-group" id="f-id-group">
       <label>Employee ID <span style="font-size:11px;font-weight:500;color:var(--muted)">(leave blank to auto-assign)</span></label>
       <input id="f-custom-id" placeholder="e.g. EMP003" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
@@ -1008,6 +1012,8 @@ function openEmpModal(emp) {
   document.getElementById('f-pass').value   = emp?.password||'';
   document.getElementById('f-dept').value   = emp?.department||'Management';
   document.getElementById('f-status').value = emp?.status||'active';
+  document.getElementById('f-advance').value = emp?.advanceDeduction !== undefined ? emp.advanceDeduction : 3000;
+  document.getElementById('f-leave-credit').value = emp?.customLeaveCredit || 0;
   document.getElementById('f-edit-id').value= emp?.id||'';
   document.getElementById('emp-modal-msg').textContent = '';
 
@@ -1118,6 +1124,8 @@ async function saveEmployee() {
     password:    document.getElementById('f-pass').value || 'emp@123',
     joinDate:    document.getElementById('f-join').value,
     status:      document.getElementById('f-status').value,
+    advanceDeduction: Number(document.getElementById('f-advance').value || 3000),
+    customLeaveCredit: Number(document.getElementById('f-leave-credit').value || 0),
   };
   const msg = document.getElementById('emp-modal-msg');
   if (!data.name||!data.email) { msg.innerHTML='<span style="color:#f87171">Name and Email are required.</span>'; return; }
@@ -1729,6 +1737,47 @@ function numberToWords(num) {
   return inWords(Math.round(num)).trim() + ' Rupees Only';
 }
 
+function calculateCumulativeLeaves(emp, targetMonthVal, allAttendance) {
+  if (!emp) {
+    return { monthsWorked: 1, totalAccrued: 1.5, leavesTakenInMonth: 0, totalLeavesTaken: 0, balance: 1.5 };
+  }
+
+  const joinDateStr = emp.joinDate || `${targetMonthVal}-01`;
+  const [joinYear, joinMonth] = joinDateStr.split('-').map(Number);
+  const [targetYear, targetMonth] = targetMonthVal.split('-').map(Number);
+
+  let monthsWorked = (targetYear - joinYear) * 12 + (targetMonth - joinMonth) + 1;
+  if (monthsWorked < 1) monthsWorked = 1;
+
+  const monthlyCredit = 1.5;
+  const customCredit = Number(emp.customLeaveCredit || 0);
+  const totalAccrued = (monthsWorked * monthlyCredit) + customCredit;
+
+  let totalLeavesTaken = 0;
+  let leavesTakenInMonth = 0;
+
+  (allAttendance || []).forEach(a => {
+    if (a.empId === emp.id && a.date && a.date <= `${targetMonthVal}-31`) {
+      let lVal = 0;
+      if (a.status === 'leave' || a.status === 'absent') lVal = 1;
+      else if (a.status === 'half-day') lVal = 0.5;
+
+      totalLeavesTaken += lVal;
+      if (a.date.startsWith(targetMonthVal)) {
+        leavesTakenInMonth += lVal;
+      }
+    }
+  });
+
+  if ((emp.id === 'EMP004' || (emp.name && emp.name.toLowerCase().includes('janvi'))) && totalLeavesTaken === 0) {
+    totalLeavesTaken = 0.5;
+    leavesTakenInMonth = 0.5;
+  }
+
+  const balance = Math.max(0, totalAccrued - totalLeavesTaken);
+  return { monthsWorked, totalAccrued, leavesTakenInMonth, totalLeavesTaken, balance };
+}
+
 function openSalarySlipModal(empId, monthVal) {
   const emp = cache.employees.find(e => e.id === empId);
   if (!emp) {
@@ -1750,21 +1799,8 @@ function openSalarySlipModal(empId, monthVal) {
     earnedSalary = Math.round((baseSalary * daysDetails.workedWorkingDays) / (daysDetails.totalMonthWorkingDays || 26));
   }
 
-  const empMonthAtt = (cache.attendance || []).filter(a => a.empId === empId && a.date && a.date.startsWith(monthVal));
-  let leavesTaken = 0;
-  empMonthAtt.forEach(a => {
-    if (a.status === 'leave' || a.status === 'absent') leavesTaken += 1;
-    else if (a.status === 'half-day') leavesTaken += 0.5;
-  });
-
-  if ((empId === 'EMP004' || (emp && emp.name && emp.name.toLowerCase().includes('janvi'))) && leavesTaken === 0) {
-    leavesTaken = 0.5;
-  }
-
-  const earnedLeaveAllowance = 1.5;
-  const remainingLeaveBalance = Math.max(0, earnedLeaveAllowance - leavesTaken);
-
-  const advanceDeduction = 3000; // Raksha Bandhan Advance Deduction
+  const leaveData = calculateCumulativeLeaves(emp, monthVal, cache.attendance);
+  const advanceDeduction = emp.advanceDeduction !== undefined ? Number(emp.advanceDeduction) : 3000;
   const netPayable = Math.max(0, earnedSalary - advanceDeduction);
 
   const basic = Math.round(earnedSalary * 0.60);
@@ -1810,9 +1846,9 @@ function openSalarySlipModal(empId, monthVal) {
         </tr>
         <tr>
           <td style="padding:6px;font-weight:700;color:#4b5563">Leaves Taken:</td>
-          <td style="padding:6px">${leavesTaken} Days</td>
+          <td style="padding:6px">${leaveData.leavesTakenInMonth} Days (${leaveData.totalLeavesTaken} Total)</td>
           <td style="padding:6px;font-weight:700;color:#4b5563">Earned Leave Credit:</td>
-          <td style="padding:6px"><span style="background:#e0f2fe;color:#0284c7;padding:2px 8px;border-radius:12px;font-weight:700;font-size:11px">+${remainingLeaveBalance} Days Credit (1.5/mo) 🎁</span></td>
+          <td style="padding:6px"><span style="background:#e0f2fe;color:#0284c7;padding:2px 8px;border-radius:12px;font-weight:700;font-size:11px">+${leaveData.balance} Days Balance (${leaveData.totalAccrued} Total Credit) 🎁</span></td>
         </tr>
       </table>
 
@@ -1823,8 +1859,8 @@ function openSalarySlipModal(empId, monthVal) {
             <th style="border:1px solid #e5e7eb;padding:8px;color:#374151">Total Calendar Days</th>
             <th style="border:1px solid #e5e7eb;padding:8px;color:#374151">Sundays (Week Off)</th>
             <th style="border:1px solid #e5e7eb;padding:8px;color:#374151">Working Days Worked</th>
-            <th style="border:1px solid #e5e7eb;padding:8px;color:#374151">Leaves Taken</th>
-            <th style="border:1px solid #e5e7eb;padding:8px;color:#374151">Earned Leave Credit</th>
+            <th style="border:1px solid #e5e7eb;padding:8px;color:#374151">Leaves Taken (Month)</th>
+            <th style="border:1px solid #e5e7eb;padding:8px;color:#374151">Cumulative Leave Balance</th>
             <th style="border:1px solid #e5e7eb;padding:8px;color:#374151">Net Payable Days</th>
           </tr>
         </thead>
@@ -1833,8 +1869,8 @@ function openSalarySlipModal(empId, monthVal) {
             <td style="border:1px solid #e5e7eb;padding:8px">${daysDetails.workedCalendarDays} Days</td>
             <td style="border:1px solid #e5e7eb;padding:8px;color:#dc2626">${daysDetails.sundays} Sundays</td>
             <td style="border:1px solid #e5e7eb;padding:8px;font-weight:700;color:#0284c7">${daysDetails.workedWorkingDays} Days</td>
-            <td style="border:1px solid #e5e7eb;padding:8px;color:${leavesTaken > 0 ? '#dc2626' : '#16a34a'}">${leavesTaken} Days</td>
-            <td style="border:1px solid #e5e7eb;padding:8px;font-weight:700;color:#16a34a">+${remainingLeaveBalance} Days</td>
+            <td style="border:1px solid #e5e7eb;padding:8px;color:${leaveData.leavesTakenInMonth > 0 ? '#dc2626' : '#16a34a'}">${leaveData.leavesTakenInMonth} Days</td>
+            <td style="border:1px solid #e5e7eb;padding:8px;font-weight:700;color:#16a34a">+${leaveData.balance} Days (${leaveData.monthsWorked} Mos)</td>
             <td style="border:1px solid #e5e7eb;padding:8px;font-weight:700;color:#16a34a">${daysDetails.workedWorkingDays} Days</td>
           </tr>
         </tbody>

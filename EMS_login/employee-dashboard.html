@@ -994,29 +994,59 @@
     return inWords(Math.round(num)).trim() + ' Rupees Only';
   }
 
+  function calculateCumulativeLeaves(empObj, targetMonthVal, allAttendance) {
+    if (!empObj) {
+      return { monthsWorked: 1, totalAccrued: 1.5, leavesTakenInMonth: 0, totalLeavesTaken: 0, balance: 1.5 };
+    }
+
+    const joinDateStr = empObj.joinDate || `${targetMonthVal}-01`;
+    const [joinYear, joinMonth] = joinDateStr.split('-').map(Number);
+    const [targetYear, targetMonth] = targetMonthVal.split('-').map(Number);
+
+    let monthsWorked = (targetYear - joinYear) * 12 + (targetMonth - joinMonth) + 1;
+    if (monthsWorked < 1) monthsWorked = 1;
+
+    const monthlyCredit = 1.5;
+    const customCredit = Number(empObj.customLeaveCredit || 0);
+    const totalAccrued = (monthsWorked * monthlyCredit) + customCredit;
+
+    let totalLeavesTaken = 0;
+    let leavesTakenInMonth = 0;
+
+    (allAttendance || []).forEach(a => {
+      if (a.date && a.date <= `${targetMonthVal}-31`) {
+        let lVal = 0;
+        if (a.status === 'leave' || a.status === 'absent') lVal = 1;
+        else if (a.status === 'half-day') lVal = 0.5;
+
+        totalLeavesTaken += lVal;
+        if (a.date.startsWith(targetMonthVal)) {
+          leavesTakenInMonth += lVal;
+        }
+      }
+    });
+
+    if ((empObj.id === 'EMP004' || (empObj.name && empObj.name.toLowerCase().includes('janvi'))) && totalLeavesTaken === 0) {
+      totalLeavesTaken = 0.5;
+      leavesTakenInMonth = 0.5;
+    }
+
+    const balance = Math.max(0, totalAccrued - totalLeavesTaken);
+    return { monthsWorked, totalAccrued, leavesTakenInMonth, totalLeavesTaken, balance };
+  }
+
   function renderSalary() {
+    const currentMonthVal = new Date().toISOString().slice(0, 7);
+    const leaveData = calculateCumulativeLeaves(emp, currentMonthVal, empAtt);
+
     const net = Number(emp.salary || 0);
-    const advanceDeduction = 3000; // Raksha Bandhan Advance Deduction
+    const advanceDeduction = emp.advanceDeduction !== undefined ? Number(emp.advanceDeduction) : 3000;
     const netPayable = Math.max(0, net - advanceDeduction);
 
     const basic = Math.round(net * 0.60);
     const hra = Math.round(net * 0.30);
     const special = net - (basic + hra);
     const currentMonthStr = new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
-    const currentMonthVal = new Date().toISOString().slice(0, 7);
-
-    let leavesTaken = 0;
-    (empAtt || []).filter(a => a.date && a.date.startsWith(currentMonthVal)).forEach(a => {
-      if (a.status === 'leave' || a.status === 'absent') leavesTaken += 1;
-      else if (a.status === 'half-day') leavesTaken += 0.5;
-    });
-
-    if ((emp && emp.name && emp.name.toLowerCase().includes('janvi')) || (emp && emp.id === 'EMP004')) {
-      if (leavesTaken === 0) leavesTaken = 0.5;
-    }
-
-    const earnedLeaveAllowance = 1.5;
-    const remainingLeaveBalance = Math.max(0, earnedLeaveAllowance - leavesTaken);
 
     document.getElementById('salary-info').innerHTML = `
       <div style="max-width:750px;background:#fff;color:#111827;padding:24px;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.05)">
@@ -1059,9 +1089,9 @@
           </tr>
           <tr>
             <td style="padding:6px;font-weight:700;color:#4b5563">Leaves Taken:</td>
-            <td style="padding:6px">${leavesTaken} Days ${leavesTaken === 0.5 ? '(Half-Day)' : ''}</td>
+            <td style="padding:6px">${leaveData.leavesTakenInMonth} Days (${leaveData.totalLeavesTaken} Total)</td>
             <td style="padding:6px;font-weight:700;color:#4b5563">Earned Leave Credit:</td>
-            <td style="padding:6px"><span style="background:#e0f2fe;color:#0284c7;padding:2px 8px;border-radius:12px;font-weight:700;font-size:11px">+${remainingLeaveBalance} Days Credit (1.5/mo) 🎁</span></td>
+            <td style="padding:6px"><span style="background:#e0f2fe;color:#0284c7;padding:2px 8px;border-radius:12px;font-weight:700;font-size:11px">+${leaveData.balance} Days Balance (${leaveData.totalAccrued} Total Credit) 🎁</span></td>
           </tr>
         </table>
 
