@@ -550,11 +550,11 @@
 
   </div>
 
-  <!-- ── Letter Pad & Documents ── -->
+  <!-- ── Dynamic Letter Pad & Document Studio ── -->
   <div class="page" id="page-letterpad">
     <div class="section-card" style="margin-bottom:20px">
       <div class="section-head">
-        <h3>📜 GrowthApex Official Letter Pad &amp; Document Generator</h3>
+        <h3>📜 GrowthApex Dynamic Document &amp; Letterhead Studio</h3>
         <div class="toolbar">
           <button class="btn btn-primary" onclick="downloadLetterPadPDF()" style="background:#0284c7;color:#fff;border:none">📥 Download PDF</button>
           <button class="btn btn-success" onclick="sendLetterPadWhatsApp()" style="background:#25D366;color:#fff;border:none;display:inline-flex;align-items:center;gap:6px;font-weight:600">📱 Send via WhatsApp</button>
@@ -562,37 +562,97 @@
         </div>
       </div>
 
-      <div class="form-row2" style="margin-top:10px">
+      <!-- Controls Row 1 -->
+      <div class="form-row2" style="margin-top:14px">
         <div class="form-group">
-          <label>Select Employee Name *</label>
-          <select id="lp-emp-select" class="search-input" style="width:100%" onchange="renderLetterPad()"></select>
+          <label>Select Employee Name / Recipient *</label>
+          <select id="lp-emp-select" class="search-input" style="width:100%" onchange="onLpEmpChange()"></select>
         </div>
         <div class="form-group">
-          <label>Document Type *</label>
-          <select id="lp-doc-type" class="search-input" style="width:100%" onchange="renderLetterPad()">
-            <option value="payslip">📄 Official Payslip Summary</option>
-            <option value="offer">✉️ Offer / Appointment Letter</option>
+          <label>Document Template *</label>
+          <select id="lp-doc-type" class="search-input" style="width:100%" onchange="onLpDocTypeChange()">
+            <option value="letterhead">🏢 Corporate Letterhead Document</option>
             <option value="experience">📜 Experience &amp; Relieving Certificate</option>
-            <option value="letterhead">📋 Official GrowthApex Letterhead / Memo</option>
+            <option value="memo">📋 Official Memorandum (Memo)</option>
+            <option value="payslip">📄 Dynamic Official Payslip</option>
+            <option value="offer">✉️ Offer &amp; Appointment Letter</option>
           </select>
         </div>
       </div>
 
+      <!-- Controls Row 2: Dynamic Recipient Inputs -->
       <div class="form-row2" style="margin-top:10px">
         <div class="form-group">
-          <label>Issue Date / Ref No.</label>
-          <input type="date" id="lp-date" class="search-input" style="width:100%" onchange="renderLetterPad()">
+          <label>Recipient Name</label>
+          <input id="lp-name" class="search-input" placeholder="Full Name" style="width:100%" oninput="renderLetterPad()">
         </div>
         <div class="form-group">
-          <label>Custom Note / Additional Remarks</label>
-          <input id="lp-custom-note" class="search-input" placeholder="e.g. Performance bonus awarded / Outstanding performer" style="width:100%" oninput="renderLetterPad()">
+          <label>Designation / Role</label>
+          <input id="lp-designation" class="search-input" placeholder="Job Title" style="width:100%" oninput="renderLetterPad()">
         </div>
+      </div>
+
+      <!-- Controls Row 3 -->
+      <div class="form-row2" style="margin-top:10px">
+        <div class="form-group">
+          <label>Department</label>
+          <input id="lp-department" class="search-input" placeholder="Department" style="width:100%" oninput="renderLetterPad()">
+        </div>
+        <div class="form-group">
+          <label>Ref No. / Employee ID</label>
+          <input id="lp-ref-no" class="search-input" placeholder="e.g. EMP003 or GA/MEMO/2026/01" style="width:100%" oninput="renderLetterPad()">
+        </div>
+      </div>
+
+      <!-- Controls Row 4: Dates & Salary -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:10px">
+        <div class="form-group">
+          <label>Joining / Start Date</label>
+          <input type="date" id="lp-join-date" class="search-input" style="width:100%" onchange="renderLetterPad()">
+        </div>
+        <div class="form-group">
+          <label>Issue Date / End Date</label>
+          <input type="date" id="lp-issue-date" class="search-input" style="width:100%" onchange="renderLetterPad()">
+        </div>
+        <div class="form-group">
+          <label>Monthly Salary / CTC (₹)</label>
+          <input type="number" id="lp-salary" class="search-input" placeholder="50000" style="width:100%" oninput="renderLetterPad()">
+        </div>
+      </div>
+
+      <!-- Controls Row 5: Subject & Priority / Category -->
+      <div class="form-row2" style="margin-top:10px">
+        <div class="form-group">
+          <label>Document Heading / Subject</label>
+          <input id="lp-subject" class="search-input" placeholder="e.g. Performance Appreciation / Internal Memo" style="width:100%" oninput="renderLetterPad()">
+        </div>
+        <div class="form-group">
+          <label>Memo Priority / Category</label>
+          <select id="lp-memo-priority" class="search-input" style="width:100%" onchange="renderLetterPad()">
+            <option value="INFO">🔵 INFORMATION / GENERAL</option>
+            <option value="URGENT">🔴 URGENT / HIGH PRIORITY</option>
+            <option value="CONFIDENTIAL">🟡 CONFIDENTIAL / PRIVATE</option>
+            <option value="POLICY">🟢 POLICY UPDATE</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Controls Row 6: Multi-line Letter Body Content -->
+      <div class="form-group" style="margin-top:10px">
+        <label>Document Content (Live Dynamic Body Text)</label>
+        <textarea id="lp-body-text" class="search-input" rows="4" placeholder="Write custom letter content or paragraphs here..." style="width:100%;font-family:inherit" oninput="renderLetterPad()"></textarea>
+      </div>
+
+      <!-- Controls Row 7: Custom Notes / Remarks -->
+      <div class="form-group" style="margin-top:10px">
+        <label>Special Remarks / Additional Notes</label>
+        <input id="lp-custom-note" class="search-input" placeholder="e.g. Special performance incentive awarded for Q3" style="width:100%" oninput="renderLetterPad()">
       </div>
     </div>
 
     <!-- Letter Pad Display Card -->
-    <div class="section-card" style="background:#f3f4f6;padding:30px;display:flex;justify-content:center">
-      <div id="letterpad-container" style="width:100%;max-width:820px;box-shadow:0 10px 30px rgba(0,0,0,0.1);border-radius:8px"></div>
+    <div class="section-card" style="background:#f3f4f6;padding:24px;display:flex;justify-content:center">
+      <div id="letterpad-container" style="width:100%;max-width:800px;box-shadow:0 10px 30px rgba(0,0,0,0.1);border-radius:8px"></div>
     </div>
   </div>
 </main>
@@ -2102,202 +2162,341 @@ function sendSalarySlipWhatsApp() {
   toast(`Opening WhatsApp to send Payslip to ${emp.name} (${targetPhone})...`, 'success');
 }
 
-// ─── LETTER PAD & DOCUMENT GENERATOR ──────────────────────────
+// ─── DYNAMIC LETTER PAD & DOCUMENT STUDIO ──────────────────────
 function initLetterPadPage() {
   const select = document.getElementById('lp-emp-select');
   if (!select) return;
 
-  const dateInp = document.getElementById('lp-date');
+  const dateInp = document.getElementById('lp-issue-date');
   if (dateInp && !dateInp.value) {
     dateInp.value = new Date().toISOString().split('T')[0];
   }
 
   const emps = cache.employees || [];
   select.innerHTML = emps.length
-    ? emps.map(e => `<option value="${e.id}">${e.name} (${e.id} - ${e.department||'General'})</option>`).join('')
-    : '<option value="">No employees found</option>';
+    ? `<option value="custom">✍️ Custom Recipient (Non-Employee)</option>` +
+      emps.map(e => `<option value="${e.id}">${e.name} (${e.id} - ${e.department||'General'})</option>`).join('')
+    : '<option value="custom">✍️ Custom Recipient</option>';
+
+  if (emps.length) {
+    select.value = emps[0].id;
+  }
+
+  onLpEmpChange();
+}
+
+function onLpEmpChange() {
+  const empId = document.getElementById('lp-emp-select')?.value;
+  const emp = (cache.employees || []).find(e => e.id === empId);
+
+  const issueDateStr = document.getElementById('lp-issue-date')?.value || new Date().toISOString().split('T')[0];
+
+  if (emp) {
+    if (document.getElementById('lp-name')) document.getElementById('lp-name').value = emp.name || '';
+    if (document.getElementById('lp-designation')) document.getElementById('lp-designation').value = emp.designation || '';
+    if (document.getElementById('lp-department')) document.getElementById('lp-department').value = emp.department || '';
+    if (document.getElementById('lp-ref-no')) document.getElementById('lp-ref-no').value = `GA/HR/${new Date(issueDateStr).getFullYear()}/${emp.id}`;
+    if (document.getElementById('lp-join-date')) document.getElementById('lp-join-date').value = emp.joinDate || '2025-01-01';
+    if (document.getElementById('lp-salary')) document.getElementById('lp-salary').value = emp.salary || 50000;
+  } else {
+    if (document.getElementById('lp-name')) document.getElementById('lp-name').value = 'Recipient Name';
+    if (document.getElementById('lp-designation')) document.getElementById('lp-designation').value = 'Executive';
+    if (document.getElementById('lp-department')) document.getElementById('lp-department').value = 'Operations';
+    if (document.getElementById('lp-ref-no')) document.getElementById('lp-ref-no').value = `GA/DOC/${new Date(issueDateStr).getFullYear()}/001`;
+    if (document.getElementById('lp-join-date')) document.getElementById('lp-join-date').value = '2025-01-01';
+    if (document.getElementById('lp-salary')) document.getElementById('lp-salary').value = 50000;
+  }
+
+  onLpDocTypeChange();
+}
+
+function onLpDocTypeChange() {
+  const docType = document.getElementById('lp-doc-type')?.value || 'letterhead';
+  const name = document.getElementById('lp-name')?.value || 'Recipient';
+  const designation = document.getElementById('lp-designation')?.value || 'Executive';
+  const department = document.getElementById('lp-department')?.value || 'Operations';
+  const joinDate = document.getElementById('lp-join-date')?.value || '2025-01-01';
+  const issueDate = document.getElementById('lp-issue-date')?.value || new Date().toISOString().split('T')[0];
+
+  const subjectInp = document.getElementById('lp-subject');
+  const bodyInp = document.getElementById('lp-body-text');
+
+  if (docType === 'letterhead') {
+    if (subjectInp) subjectInp.value = 'Official Communication & Corporate Update';
+    if (bodyInp) bodyInp.value = `This official letter serves to formally document corporate guidelines and project milestones at GrowthApex Digital Media.\n\nWe appreciate your continued commitment, professional excellence, and dedication to team objectives. Please ensure all operational workflows align with standard organization protocols.`;
+  } else if (docType === 'experience') {
+    if (subjectInp) subjectInp.value = 'Experience & Relieving Certificate';
+    if (bodyInp) bodyInp.value = `This is to certify that ${name} has been employed with GrowthApex Digital Media as ${designation} in the ${department} department from ${joinDate} to ${issueDate}.\n\nDuring their tenure, we found ${name} to be hardworking, sincere, professional, and highly result-oriented. Their contributions to department projects were exemplary, and we wish them great success in all future endeavors.`;
+  } else if (docType === 'memo') {
+    if (subjectInp) subjectInp.value = 'Internal Policy & Operations Memorandum';
+    if (bodyInp) bodyInp.value = `This Memorandum is issued to all concerned personnel in the ${department} department regarding operational productivity, attendance compliance, and active project timelines.\n\n1. All team members must log daily check-ins on the GrowthApex EMS Portal by 10:00 AM.\n2. Task status updates must be recorded upon completion.\n3. Any leave requests should be submitted at least 24 hours prior for supervisor approval.`;
+  } else if (docType === 'payslip') {
+    if (subjectInp) subjectInp.value = 'Official Monthly Payslip & Earnings Statement';
+    if (bodyInp) bodyInp.value = `Confirmed payout statement for the pay period. All statutory and advance deductions have been reconciled.`;
+  } else if (docType === 'offer') {
+    if (subjectInp) subjectInp.value = 'Letter of Appointment & Employment Offer';
+    if (bodyInp) bodyInp.value = `We are pleased to offer you the position of ${designation} in the ${department} department at GrowthApex Digital Media.\n\nWe were very impressed by your qualifications and performance during the selection process and look forward to welcoming you aboard to drive key growth initiatives.`;
+  }
 
   renderLetterPad();
+}
+
+function calcTenure(startDateStr, endDateStr) {
+  if (!startDateStr || !endDateStr) return 'N/A';
+  const start = new Date(startDateStr);
+  const end = new Date(endDateStr);
+  let months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+  if (months < 1) months = 1;
+  const yrs = Math.floor(months / 12);
+  const remMonths = months % 12;
+  let str = '';
+  if (yrs > 0) str += `${yrs} Year${yrs > 1 ? 's' : ''} `;
+  if (remMonths > 0) str += `${remMonths} Month${remMonths > 1 ? 's' : ''}`;
+  return str.trim() || '1 Month';
 }
 
 function renderLetterPad() {
   const container = document.getElementById('letterpad-container');
   if (!container) return;
 
-  const empId = document.getElementById('lp-emp-select')?.value;
-  const docType = document.getElementById('lp-doc-type')?.value || 'payslip';
-  const issueDateStr = document.getElementById('lp-date')?.value || new Date().toISOString().split('T')[0];
+  const docType = document.getElementById('lp-doc-type')?.value || 'letterhead';
+  const name = (document.getElementById('lp-name')?.value || 'Recipient Name').trim();
+  const designation = (document.getElementById('lp-designation')?.value || 'Executive').trim();
+  const department = (document.getElementById('lp-department')?.value || 'Operations').trim();
+  const refNo = (document.getElementById('lp-ref-no')?.value || 'GA/DOC/2026/001').trim();
+  const joinDateStr = document.getElementById('lp-join-date')?.value || '2025-01-01';
+  const issueDateStr = document.getElementById('lp-issue-date')?.value || new Date().toISOString().split('T')[0];
+  const salary = Number(document.getElementById('lp-salary')?.value || 50000);
+  const subject = (document.getElementById('lp-subject')?.value || 'Official Document').trim();
+  const priority = document.getElementById('lp-memo-priority')?.value || 'INFO';
+  const bodyText = (document.getElementById('lp-body-text')?.value || '').trim();
   const customNote = (document.getElementById('lp-custom-note')?.value || '').trim();
 
-  const emp = (cache.employees || []).find(e => e.id === empId) || (cache.employees || [])[0];
-  if (!emp) {
-    container.innerHTML = '<div style="padding:40px;background:#fff;text-align:center;color:#6b7280;border-radius:8px">Select or add an employee to render Letter Pad.</div>';
-    return;
-  }
-
-  const formattedDate = new Date(issueDateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
-  const refNo = `GA/HR/${new Date(issueDateStr).getFullYear()}/${emp.id}`;
-
-  let docTitle = 'OFFICIAL DOCUMENT';
-  let bodyHtml = '';
+  const formattedIssueDate = new Date(issueDateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+  const formattedJoinDate = new Date(joinDateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
 
   const moneyFmt = n => '₹' + Number(n||0).toLocaleString('en-IN');
-  const baseSalary = Number(emp.salary || 0);
+
+  const priorityBadges = {
+    URGENT: '<span style="background:#fee2e2;color:#dc2626;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;border:1px solid #fca5a5">🔴 URGENT MEMORANDUM</span>',
+    CONFIDENTIAL: '<span style="background:#fef3c7;color:#d97706;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;border:1px solid #fcd34d">🟡 STRICTLY CONFIDENTIAL</span>',
+    POLICY: '<span style="background:#dcfce7;color:#15803d;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;border:1px solid #86efac">🟢 POLICY DIRECTIVE</span>',
+    INFO: '<span style="background:#e0f2fe;color:#0284c7;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;border:1px solid #7dd3fc">🔵 INFORMATION NOTICE</span>'
+  };
+
+  let docTitle = 'GROWTHAPEX OFFICIAL DOCUMENT';
+  let bodyHtml = '';
 
   if (docType === 'payslip') {
     docTitle = 'OFFICIAL SALARY PAYSLIP STATEMENT';
-    const basic = Math.round(baseSalary * 0.60);
-    const hra = Math.round(baseSalary * 0.30);
-    const special = baseSalary - (basic + hra);
-    const advanceDeduction = emp.advanceDeduction !== undefined ? Number(emp.advanceDeduction) : 3000;
-    const netPayable = Math.max(0, baseSalary - advanceDeduction);
+    const basic = Math.round(salary * 0.60);
+    const hra = Math.round(salary * 0.30);
+    const special = salary - (basic + hra);
+    const advanceDeduction = 3000;
+    const netPayable = Math.max(0, salary - advanceDeduction);
 
     bodyHtml = `
-      <div style="background:#f9fafb;padding:12px;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:16px;font-size:13px">
-        <b>Pay Month / Ref:</b> ${formattedDate} | Status: <span style="color:#16a34a;font-weight:700">CONFIRMED PAID ✅</span>
+      <div style="background:#f8fafc;padding:10px 14px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:16px;font-size:12.5px;display:flex;justify-content:space-between">
+        <div><b>Pay Period:</b> ${formattedIssueDate}</div>
+        <div><b>Payment Status:</b> <span style="color:#16a34a;font-weight:700">CONFIRMED PAID ✅</span></div>
       </div>
-      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:13px;color:#111827">
+
+      <!-- Days Table -->
+      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:11px;text-align:center;color:#111827;table-layout:fixed">
         <thead>
-          <tr style="background:#f3f4f6">
-            <th style="border:1px solid #e5e7eb;padding:10px;text-align:left">Earnings Component</th>
-            <th style="border:1px solid #e5e7eb;padding:10px;text-align:right">Amount (₹)</th>
-            <th style="border:1px solid #e5e7eb;padding:10px;text-align:left">Deductions</th>
-            <th style="border:1px solid #e5e7eb;padding:10px;text-align:right">Amount (₹)</th>
+          <tr style="background:#f1f5f9">
+            <th style="border:1px solid #e2e8f0;padding:6px 3px;width:16.6%">Calendar Days</th>
+            <th style="border:1px solid #e2e8f0;padding:6px 3px;width:16.6%">Sundays Off</th>
+            <th style="border:1px solid #e2e8f0;padding:6px 3px;width:16.6%">Working Days</th>
+            <th style="border:1px solid #e2e8f0;padding:6px 3px;width:16.6%">Leaves Taken</th>
+            <th style="border:1px solid #e2e8f0;padding:6px 3px;width:16.8%">Leave Balance</th>
+            <th style="border:1px solid #e2e8f0;padding:6px 3px;width:16.8%">Payable Days</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td style="border:1px solid #e5e7eb;padding:8px">Basic Pay (60%)</td>
-            <td style="border:1px solid #e5e7eb;padding:8px;text-align:right">${moneyFmt(basic)}</td>
-            <td style="border:1px solid #e5e7eb;padding:8px;color:#dc2626">Advance / Statutory Deduction</td>
-            <td style="border:1px solid #e5e7eb;padding:8px;text-align:right;color:#dc2626">-${moneyFmt(advanceDeduction)}</td>
-          </tr>
-          <tr>
-            <td style="border:1px solid #e5e7eb;padding:8px">House Rent Allowance (HRA 30%)</td>
-            <td style="border:1px solid #e5e7eb;padding:8px;text-align:right">${moneyFmt(hra)}</td>
-            <td style="border:1px solid #e5e7eb;padding:8px">PF / ESI Deduction</td>
-            <td style="border:1px solid #e5e7eb;padding:8px;text-align:right;color:#16a34a">₹0 (Nil)</td>
-          </tr>
-          <tr>
-            <td style="border:1px solid #e5e7eb;padding:8px">Special / Performance Allowance</td>
-            <td style="border:1px solid #e5e7eb;padding:8px;text-align:right">${moneyFmt(special)}</td>
-            <td style="border:1px solid #e5e7eb;padding:8px;font-weight:700">Total Deductions</td>
-            <td style="border:1px solid #e5e7eb;padding:8px;text-align:right;font-weight:700;color:#dc2626">-${moneyFmt(advanceDeduction)}</td>
-          </tr>
-          <tr style="background:#f0fdf4;font-weight:700">
-            <td style="border:1px solid #e5e7eb;padding:10px;color:#166534">Gross Monthly Salary</td>
-            <td style="border:1px solid #e5e7eb;padding:10px;text-align:right;color:#166534">${moneyFmt(baseSalary)}</td>
-            <td style="border:1px solid #e5e7eb;padding:10px;color:#166534">Net Salary Payable</td>
-            <td style="border:1px solid #e5e7eb;padding:10px;text-align:right;color:#166534;font-size:15px">${moneyFmt(netPayable)}</td>
+            <td style="border:1px solid #e2e8f0;padding:6px">26 Days</td>
+            <td style="border:1px solid #e2e8f0;padding:6px;color:#dc2626">4 Sundays</td>
+            <td style="border:1px solid #e2e8f0;padding:6px;font-weight:700;color:#0284c7">22 Days</td>
+            <td style="border:1px solid #e2e8f0;padding:6px;color:#16a34a">0 Days</td>
+            <td style="border:1px solid #e2e8f0;padding:6px;font-weight:700;color:#16a34a">+1.5 Days Balance</td>
+            <td style="border:1px solid #e2e8f0;padding:6px;font-weight:700;color:#16a34a">22 Days</td>
           </tr>
         </tbody>
       </table>
-      <div style="background:#f9fafb;padding:10px;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:20px;font-size:13px">
+
+      <!-- Earnings Breakdown Table -->
+      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12.5px;color:#111827;table-layout:fixed">
+        <thead>
+          <tr style="background:#f1f5f9">
+            <th style="border:1px solid #e2e8f0;padding:8px;text-align:left;width:33%">Earnings Component</th>
+            <th style="border:1px solid #e2e8f0;padding:8px;text-align:right;width:17%">Amount (₹)</th>
+            <th style="border:1px solid #e2e8f0;padding:8px;text-align:left;width:33%">Deductions</th>
+            <th style="border:1px solid #e2e8f0;padding:8px;text-align:right;width:17%">Amount (₹)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="border:1px solid #e2e8f0;padding:7px">Basic Pay (60%)</td>
+            <td style="border:1px solid #e2e8f0;padding:7px;text-align:right">${moneyFmt(basic)}</td>
+            <td style="border:1px solid #e2e8f0;padding:7px;color:#dc2626">Raksha Bandhan / Advance</td>
+            <td style="border:1px solid #e2e8f0;padding:7px;text-align:right;color:#dc2626">-${moneyFmt(advanceDeduction)}</td>
+          </tr>
+          <tr>
+            <td style="border:1px solid #e2e8f0;padding:7px">House Rent Allowance (HRA 30%)</td>
+            <td style="border:1px solid #e2e8f0;padding:7px;text-align:right">${moneyFmt(hra)}</td>
+            <td style="border:1px solid #e2e8f0;padding:7px">PF / ESI Deduction</td>
+            <td style="border:1px solid #e2e8f0;padding:7px;text-align:right;color:#16a34a">₹0 (Nil)</td>
+          </tr>
+          <tr>
+            <td style="border:1px solid #e2e8f0;padding:7px">Special / Performance Allowance</td>
+            <td style="border:1px solid #e2e8f0;padding:7px;text-align:right">${moneyFmt(special)}</td>
+            <td style="border:1px solid #e2e8f0;padding:7px;font-weight:700">Total Deductions</td>
+            <td style="border:1px solid #e2e8f0;padding:7px;text-align:right;font-weight:700;color:#dc2626">-${moneyFmt(advanceDeduction)}</td>
+          </tr>
+          <tr style="background:#f0fdf4;font-weight:700">
+            <td style="border:1px solid #e2e8f0;padding:9px;color:#166534">Gross Monthly Salary</td>
+            <td style="border:1px solid #e2e8f0;padding:9px;text-align:right;color:#166534">${moneyFmt(salary)}</td>
+            <td style="border:1px solid #e2e8f0;padding:9px;color:#166534">Net Salary Payable</td>
+            <td style="border:1px solid #e2e8f0;padding:9px;text-align:right;color:#166534;font-size:14px">${moneyFmt(netPayable)}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="background:#f8fafc;padding:10px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:20px;font-size:12.5px">
         <b>Amount in Words:</b> <span style="color:#0284c7;font-weight:600">${numberToWords(netPayable)}</span>
+      </div>`;
+  } else if (docType === 'experience') {
+    docTitle = 'EXPERIENCE & RELIEVING CERTIFICATE';
+    const tenureStr = calcTenure(joinDateStr, issueDateStr);
+
+    bodyHtml = `
+      <div style="text-align:center;margin-bottom:20px;font-weight:700;font-size:15px;color:#1e293b;letter-spacing:.05em">
+        TO WHOMSOEVER IT MAY CONCERN
+      </div>
+      <p style="font-size:13.5px;line-height:1.75;color:#334155;margin-bottom:14px">
+        This is to certify that <b>${name}</b> (Ref / Emp ID: <b>${refNo}</b>) was employed with <b>GrowthApex Digital Media</b> as <b>${designation}</b> in the <b>${department}</b> department from <b>${formattedJoinDate}</b> to <b>${formattedIssueDate}</b> (Total Service Tenure: <b>${tenureStr}</b>).
+      </p>
+      <p style="font-size:13.5px;line-height:1.75;color:#334155;margin-bottom:14px">
+        ${bodyText.replace(/\n/g, '<br>')}
+      </p>
+      <p style="font-size:13.5px;line-height:1.75;color:#334155;margin-bottom:14px">
+        During their employment tenure, we found <b>${name}</b> to be diligent, hardworking, professional, and dedicated to organization goals. They have fulfilled all relieving formalities and carry no outstanding dues.
+      </p>
+      <p style="font-size:13.5px;line-height:1.75;color:#334155;margin-bottom:14px">
+        We sincerely thank <b>${name}</b> for their service and wish them every success in their future endeavors.
+      </p>`;
+  } else if (docType === 'memo') {
+    docTitle = 'OFFICIAL MEMORANDUM';
+
+    bodyHtml = `
+      <div style="display:flex;justify-content:space-between;align-items:center;background:#f8fafc;padding:12px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:20px">
+        <div>
+          <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.05em">MEMO CATEGORY</div>
+          <div style="margin-top:2px">${priorityBadges[priority] || priorityBadges.INFO}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.05em">SUBJECT</div>
+          <div style="font-weight:700;color:#0f172a;font-size:13px">${subject}</div>
+        </div>
+      </div>
+
+      <div style="font-size:13.5px;line-height:1.8;color:#334155;margin-bottom:16px">
+        ${bodyText.replace(/\n/g, '<br>')}
       </div>`;
   } else if (docType === 'offer') {
     docTitle = 'LETTER OF APPOINTMENT & OFFER';
+
     bodyHtml = `
-      <p style="font-size:14px;line-height:1.7;color:#374151;margin-bottom:14px">
-        Dear <b>${emp.name}</b>,
+      <p style="font-size:13.5px;line-height:1.75;color:#334155;margin-bottom:14px">
+        Dear <b>${name}</b>,
       </p>
-      <p style="font-size:14px;line-height:1.7;color:#374151;margin-bottom:14px">
-        We are pleased to offer you the position of <b>${emp.designation || 'Specialist'}</b> in the <b>${emp.department || 'General'}</b> department at <b>GrowthApex Digital Media</b>. We were very impressed by your background and experience during the evaluation process.
+      <p style="font-size:13.5px;line-height:1.75;color:#334155;margin-bottom:14px">
+        We are pleased to offer you the position of <b>${designation}</b> in the <b>${department}</b> department at <b>GrowthApex Digital Media</b>. We were very impressed by your qualifications and performance during our evaluation process.
       </p>
-      <div style="background:#f0fdf4;border:1px solid #bbf7d0;padding:14px;border-radius:6px;margin-bottom:16px;font-size:13px;color:#166534">
-        <b>Key Terms of Appointment:</b>
-        <ul style="margin:8px 0 0 20px;padding:0">
-          <li><b>Designation:</b> ${emp.designation || 'N/A'}</li>
-          <li><b>Department:</b> ${emp.department || 'N/A'}</li>
-          <li><b>Joining Date:</b> ${emp.joinDate || formattedDate}</li>
-          <li><b>Monthly Compensation (Gross CTC):</b> ${moneyFmt(baseSalary)} / month</li>
+
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;padding:14px 18px;border-radius:6px;margin-bottom:18px;font-size:13px;color:#166534">
+        <b>Key Terms &amp; Appointment Summary:</b>
+        <ul style="margin:8px 0 0 18px;padding:0;line-height:1.7">
+          <li><b>Designation:</b> ${designation}</li>
+          <li><b>Department:</b> ${department}</li>
+          <li><b>Joining Date:</b> ${formattedJoinDate}</li>
+          <li><b>Monthly CTC / Compensation:</b> ${moneyFmt(salary)} / month</li>
           <li><b>Work Location:</b> GrowthApex Headquarters</li>
         </ul>
       </div>
-      <p style="font-size:14px;line-height:1.7;color:#374151;margin-bottom:14px">
-        Your role will focus on driving high-impact digital initiatives and maintaining technical & operational excellence. We look forward to a mutually fruitful association.
-      </p>`;
-  } else if (docType === 'experience') {
-    docTitle = 'EXPERIENCE & RELIEVING CERTIFICATE';
-    bodyHtml = `
-      <p style="font-size:14px;line-height:1.7;color:#374151;margin-bottom:14px">
-        <b>TO WHOMSOEVER IT MAY CONCERN</b>
+
+      <p style="font-size:13.5px;line-height:1.75;color:#334155;margin-bottom:14px">
+        ${bodyText.replace(/\n/g, '<br>')}
       </p>
-      <p style="font-size:14px;line-height:1.7;color:#374151;margin-bottom:14px">
-        This is to certify that <b>${emp.name}</b> (Employee ID: <b>${emp.id}</b>) has been employed with <b>GrowthApex Digital Media</b> as <b>${emp.designation || 'Specialist'}</b> in the <b>${emp.department || 'General'}</b> department from <b>${emp.joinDate || 'joining date'}</b> to <b>${formattedDate}</b>.
-      </p>
-      <p style="font-size:14px;line-height:1.7;color:#374151;margin-bottom:14px">
-        During their tenure with GrowthApex, we found <b>${emp.name}</b> to be hardworking, sincere, professional, and dedicated to achieving team objectives. Their conduct during the service period was exemplary.
-      </p>
-      <p style="font-size:14px;line-height:1.7;color:#374151;margin-bottom:14px">
-        We wish <b>${emp.name}</b> every success in all future professional endeavors.
+      <p style="font-size:13.5px;line-height:1.75;color:#334155;margin-bottom:14px">
+        We look forward to welcoming you to GrowthApex Digital Media and building a highly successful association together.
       </p>`;
   } else {
-    docTitle = 'OFFICIAL MEMORANDUM';
+    // Default Corporate Letterhead
+    docTitle = subject.toUpperCase();
+
     bodyHtml = `
-      <p style="font-size:14px;line-height:1.7;color:#374151;margin-bottom:14px">
-        This official memorandum serves as formal documentation for <b>${emp.name}</b> (${emp.id}), working as <b>${emp.designation || 'Team Member'}</b> in the <b>${emp.department || 'GrowthApex'}</b> department.
-      </p>
-      <p style="font-size:14px;line-height:1.7;color:#374151;margin-bottom:14px">
-        Please refer to the authorized instructions and operational guidelines provided by GrowthApex HR & Management. All company policies and confidentiality agreements remain strictly applicable.
-      </p>`;
+      <div style="font-size:13.5px;line-height:1.8;color:#334155;margin-bottom:16px">
+        ${bodyText.replace(/\n/g, '<br>')}
+      </div>`;
   }
 
   const customNoteHtml = customNote ? `
-    <div style="background:#fffbe6;border:1px solid #ffe58f;padding:12px 14px;border-radius:6px;margin-bottom:16px;font-size:13px;color:#873800">
+    <div style="background:#fffbe6;border:1px solid #ffe58f;padding:12px 16px;border-radius:6px;margin-bottom:20px;font-size:12.5px;color:#873800">
       <b>📌 Additional Remarks / Special Note:</b><br>${customNote}
     </div>` : '';
 
   container.innerHTML = `
-    <div class="letterpad-paper" style="background:#ffffff;color:#111827;padding:36px;border:1px solid #e5e7eb;border-radius:8px;font-family:'Urbanist',sans-serif;box-sizing:border-box">
-      <!-- Letterhead Top Bar -->
-      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #00D4FF;padding-bottom:16px;margin-bottom:20px">
+    <div class="letterpad-paper" style="background:#ffffff;color:#111827;padding:32px 36px;border:1px solid #e2e8f0;border-radius:8px;font-family:'Urbanist',sans-serif;box-sizing:border-box;max-width:760px;width:100%;margin:0 auto;overflow:hidden">
+      <!-- Letterhead Top Header Bar -->
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #00D4FF;padding-bottom:14px;margin-bottom:18px">
         <div>
-          <img src="../assets/images/logo/growthapex-logo.png" alt="GrowthApex Logo" style="height:52px;object-fit:contain;filter:brightness(0)" onerror="this.src='../assets/images/logo/favicon.svg'">
+          <img src="../assets/images/logo/growthapex-logo.png" alt="GrowthApex Logo" style="height:48px;object-fit:contain;filter:brightness(0)" onerror="this.src='../assets/images/logo/favicon.svg'">
         </div>
         <div style="text-align:right">
-          <h2 style="font-family:'Space Grotesk',sans-serif;font-size:20px;margin:0;color:#111827;letter-spacing:.02em">GROWTHAPEX DIGITAL MEDIA</h2>
-          <p style="font-size:11px;color:#6b7280;margin:3px 0 0 0">HQ: India • Email: HR@growthapex.in | www.growthapex.in</p>
+          <h2 style="font-family:'Space Grotesk',sans-serif;font-size:19px;margin:0;color:#0f172a;letter-spacing:.02em">GROWTHAPEX DIGITAL MEDIA</h2>
+          <p style="font-size:11px;color:#64748b;margin:3px 0 0 0">HQ: India • Email: support@growthapex.in | www.growthapex.in</p>
         </div>
       </div>
 
-      <!-- Ref & Date -->
-      <div style="display:flex;justify-content:space-between;font-size:12px;color:#6b7280;margin-bottom:20px;border-bottom:1px dashed #e5e7eb;padding-bottom:10px">
+      <!-- Ref & Date Row -->
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:#64748b;margin-bottom:18px;border-bottom:1px dashed #e2e8f0;padding-bottom:8px">
         <div><b>Ref No:</b> ${refNo}</div>
-        <div><b>Date of Issue:</b> ${formattedDate}</div>
+        <div><b>Date of Issue:</b> ${formattedIssueDate}</div>
       </div>
 
-      <!-- Recipient Meta Table -->
-      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:13px;background:#f9fafb;padding:12px;border-radius:6px;border:1px solid #e5e7eb">
+      <!-- Recipient Meta Card -->
+      <table style="width:100%;border-collapse:collapse;margin-bottom:18px;font-size:12.5px;background:#f8fafc;padding:10px 14px;border-radius:6px;border:1px solid #e2e8f0;table-layout:fixed">
         <tr>
-          <td style="padding:6px 10px;font-weight:700;color:#4b5563;width:18%">Employee Name:</td>
-          <td style="padding:6px 10px;font-weight:700;color:#111827;width:32%">${emp.name}</td>
-          <td style="padding:6px 10px;font-weight:700;color:#4b5563;width:18%">Employee ID:</td>
-          <td style="padding:6px 10px;font-weight:700;color:#0284c7;width:32%">${emp.id}</td>
+          <td style="padding:5px 8px;font-weight:700;color:#64748b;width:18%">Recipient Name:</td>
+          <td style="padding:5px 8px;font-weight:700;color:#0f172a;width:32%">${name}</td>
+          <td style="padding:5px 8px;font-weight:700;color:#64748b;width:18%">Ref / Emp ID:</td>
+          <td style="padding:5px 8px;font-weight:700;color:#0284c7;width:32%">${refNo}</td>
         </tr>
         <tr>
-          <td style="padding:6px 10px;font-weight:700;color:#4b5563">Designation:</td>
-          <td style="padding:6px 10px">${emp.designation || 'N/A'}</td>
-          <td style="padding:6px 10px;font-weight:700;color:#4b5563">Department:</td>
-          <td style="padding:6px 10px">${emp.department || 'N/A'}</td>
+          <td style="padding:5px 8px;font-weight:700;color:#64748b">Designation:</td>
+          <td style="padding:5px 8px;color:#334155">${designation}</td>
+          <td style="padding:5px 8px;font-weight:700;color:#64748b">Department:</td>
+          <td style="padding:5px 8px;color:#334155">${department}</td>
         </tr>
       </table>
 
-      <!-- Document Title Header -->
-      <div style="background:#1e293b;color:#ffffff;text-align:center;padding:10px;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;letter-spacing:.06em;margin-bottom:20px;border-radius:6px">
+      <!-- Document Header Banner -->
+      <div style="background:#0f172a;color:#ffffff;text-align:center;padding:9px 12px;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;letter-spacing:.05em;margin-bottom:20px;border-radius:6px">
         ${docTitle}
       </div>
 
-      <!-- Main Body -->
+      <!-- Document Body Area -->
       <div style="min-height:160px;margin-bottom:20px">
         ${bodyHtml}
         ${customNoteHtml}
       </div>
 
-      <!-- Signatures Footer with Digital Signature of Susheel Kumar -->
-      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:40px;padding-top:20px;border-top:1px solid #e5e7eb">
-        <div style="text-align:center;width:180px;border-top:1px solid #9ca3af;padding-top:6px;font-size:12px;color:#4b5563">
-          Employee Signature
+      <!-- Footer Signatures with Susheel Kumar Digital Signature -->
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:36px;padding-top:18px;border-top:1px solid #e2e8f0">
+        <div style="text-align:center;width:180px;border-top:1px solid #94a3b8;padding-top:6px;font-size:12px;color:#475569">
+          Recipient Signature
         </div>
         <div style="text-align:center;width:240px;position:relative;display:inline-block">
           <div style="height:44px;display:flex;align-items:center;justify-content:center;margin-bottom:2px;gap:6px">
@@ -2307,10 +2506,10 @@ function renderLetterPad() {
             </svg>
             <span style="background:#dcfce7;color:#15803d;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;border:1px solid #86efac;white-space:nowrap">VERIFIED ✓</span>
           </div>
-          <div style="border-top:1px solid #9ca3af;padding-top:4px;font-size:12px;color:#4b5563">
-            <b style="color:#111827;font-size:13px">Susheel Kumar</b><br>
+          <div style="border-top:1px solid #94a3b8;padding-top:4px;font-size:12px;color:#475569">
+            <b style="color:#0f172a;font-size:13px">Susheel Kumar</b><br>
             <span style="font-size:11px;color:#0284c7;font-weight:700">Authorized Signatory</span><br>
-            <span style="font-size:9.5px;color:#6b7280">GrowthApex HR &amp; Finance (Digitally Signed)</span>
+            <span style="font-size:9.5px;color:#64748b">GrowthApex HR &amp; Finance (Digitally Signed)</span>
           </div>
         </div>
       </div>
@@ -2344,18 +2543,16 @@ function downloadLetterPadPDF() {
 
 function sendLetterPadWhatsApp() {
   const empId = document.getElementById('lp-emp-select')?.value;
-  const docType = document.getElementById('lp-doc-type')?.value || 'Letter';
+  const name = (document.getElementById('lp-name')?.value || 'Recipient').trim();
+  const docType = document.getElementById('lp-doc-type')?.value || 'letterhead';
+  const subject = (document.getElementById('lp-subject')?.value || 'Official Document').trim();
   const customNote = (document.getElementById('lp-custom-note')?.value || '').trim();
 
-  const emp = (cache.employees || []).find(e => e.id === empId) || (cache.employees || [])[0];
-  if (!emp) {
-    toast('Please select an employee first', 'warning');
-    return;
-  }
+  const emp = (cache.employees || []).find(e => e.id === empId);
 
-  let targetPhone = (emp.phone || '').trim().replace(/\D/g, '');
+  let targetPhone = (emp ? emp.phone || '' : '').trim().replace(/\D/g, '');
   if (!targetPhone || targetPhone.length < 10) {
-    targetPhone = prompt(`Enter 10-digit WhatsApp number for ${emp.name}:`, targetPhone || '');
+    targetPhone = prompt(`Enter 10-digit WhatsApp number for ${name}:`, targetPhone || '');
     if (!targetPhone) return;
     targetPhone = targetPhone.trim().replace(/\D/g, '');
   }
@@ -2364,30 +2561,28 @@ function sendLetterPadWhatsApp() {
 
   const docTitles = {
     payslip: 'OFFICIAL SALARY PAYSLIP STATEMENT',
-    offer: 'OFFER & APPOINTMENT LETTER',
+    offer: 'LETTER OF APPOINTMENT & OFFER',
     experience: 'EXPERIENCE & RELIEVING CERTIFICATE',
-    letterhead: 'OFFICIAL MEMORANDUM'
+    memo: 'OFFICIAL MEMORANDUM',
+    letterhead: 'CORPORATE LETTERHEAD DOCUMENT'
   };
 
   const msg = `📜 *GROWTHAPEX DIGITAL MEDIA - OFFICIAL DOCUMENT* 📜
 ━━━━━━━━━━━━━━━━━━━━━━━━
-👤 *Employee Name:* ${emp.name}
-🆔 *Employee ID:* ${emp.id}
-💼 *Designation:* ${emp.designation || 'N/A'}
-🏢 *Department:* ${emp.department || 'N/A'}
-
-📋 *DOCUMENT:* ${docTitles[docType] || docType.toUpperCase()}
+👤 *Recipient Name:* ${name}
+📋 *Document:* ${docTitles[docType] || docType.toUpperCase()}
+📌 *Subject:* ${subject}
 📅 *Date of Issue:* ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
-${customNote ? `\n📌 *Notes:* ${customNote}\n` : ''}
+${customNote ? `\n💬 *Remarks:* ${customNote}\n` : ''}
 ━━━━━━━━━━━━━━━━━━━━━━━━
 ✍️ *Digitally Signed By:* Susheel Kumar (Authorized Signatory)
 ✅ *Verification Status:* GrowthApex Certified Digital Signature
 
-🌐 *Portal:* https://growthapex.in`;
+🌐 *EMS Portal:* https://growthapex.in`;
 
   const waUrl = `https://api.whatsapp.com/send?phone=${targetPhone}&text=${encodeURIComponent(msg)}`;
   window.open(waUrl, '_blank');
-  toast(`Opening WhatsApp to send document to ${emp.name} (${targetPhone})...`, 'success');
+  toast(`Opening WhatsApp to send document to ${name} (${targetPhone})...`, 'success');
 }
 
 function printLetterPad() {
@@ -2400,7 +2595,7 @@ function printLetterPad() {
     <!DOCTYPE html>
     <html>
     <head>
-      <title>GrowthApex - Official Letter Pad</title>
+      <title>GrowthApex - Official Letter Pad Studio</title>
       <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Urbanist:wght@400;600;700&display=swap" rel="stylesheet">
       <style>
         body { font-family: 'Urbanist', sans-serif; margin: 20px; color: #111827; background: #fff; }
