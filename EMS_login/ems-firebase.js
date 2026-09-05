@@ -240,6 +240,32 @@ const EMS_DB = {
     await this._col('announcements').doc(String(id)).delete();
   },
 
+  // ── Salary Releases ───────────────────────────────────────
+
+  async getReleasedSalarySlips(empId) {
+    let q = this._col('salary_releases');
+    if (empId) q = q.where('empId', '==', empId.toUpperCase());
+    const snap = await q.get();
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  },
+
+  async releaseSalarySlip(empId, monthVal, slipData) {
+    const docId = `${empId.toUpperCase()}_${monthVal}`;
+    await this._col('salary_releases').doc(docId).set({
+      empId: empId.toUpperCase(),
+      monthVal: monthVal,
+      status: 'released',
+      releasedAt: new Date().toISOString(),
+      slipData: slipData || {}
+    }, { merge: true });
+    return { id: docId, status: 'released' };
+  },
+
+  async unreleaseSalarySlip(empId, monthVal) {
+    const docId = `${empId.toUpperCase()}_${monthVal}`;
+    await this._col('salary_releases').doc(docId).delete();
+  },
+
   // ── Auth + Session ────────────────────────────────────────
 
   /**

@@ -865,6 +865,7 @@
     <div class="modal-header no-print" style="margin-bottom:16px;border-bottom:1px solid #e5e7eb;padding-bottom:12px">
       <h3 style="color:#111827">📄 GrowthApex Official Payslip</h3>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-success" id="btn-release-slip" onclick="approveAndReleaseSalarySlip()" style="background:#16a34a;color:#fff;border:none;display:inline-flex;align-items:center;gap:6px;font-weight:700">✅ Approve &amp; Release to Employee</button>
         <button class="btn btn-primary" onclick="downloadSalarySlipPDF()" style="background:#0284c7;color:#fff;border:none">📥 Download PDF</button>
         <button class="btn btn-success" onclick="sendSalarySlipWhatsApp()" style="background:#25D366;color:#fff;border:none;display:inline-flex;align-items:center;gap:6px;font-weight:600">📱 Send WhatsApp</button>
         <button class="btn btn-secondary" onclick="printSalarySlip()" style="background:#e5e7eb;color:#111827;border:none">🖨️ Print Slip</button>
@@ -1743,6 +1744,8 @@ async function renderSalary() {
   let emps = cache.employees.filter(e => e.status === 'active');
   if (q) emps = emps.filter(e => (e.name + e.department + (e.designation||'')).toLowerCase().includes(q));
 
+  const releasedSlips = await EMS_DB.getReleasedSalarySlips();
+
   const [selYear, selMonth] = monthVal.split('-').map(Number);
   const totalDaysInMonth = new Date(selYear, selMonth, 0).getDate();
 
@@ -1774,12 +1777,15 @@ async function renderSalary() {
     const pf = Math.round(b * 0.12);
     totalPF += pf;
 
+    const isReleased = releasedSlips.some(r => r.empId === e.id && r.monthVal === monthVal);
+
     return {
       ...e,
       baseSalary,
       earnedSalary,
       joinDate,
       daysDetails,
+      isReleased,
       basic: b,
       hra: Math.round(b * 0.4),
       ta: Math.round(b * 0.1),
@@ -1808,6 +1814,7 @@ async function renderSalary() {
             <th>Sundays (Off)</th>
             <th>Working Days</th>
             <th>Earned Pay (${monthVal})</th>
+            <th>Portal Release Status</th>
             <th style="text-align:center">Payslip</th>
           </tr>
         </thead>
@@ -1830,8 +1837,13 @@ async function renderSalary() {
                 <div class="progress-bar" style="width:${pct}%;background:var(--green)"></div>
               </div>
             </td>
+            <td>
+              ${e.isReleased 
+                ? '<span class="badge badge-green">✅ Approved &amp; Released</span>' 
+                : '<span class="badge badge-amber">⏳ Pending Release</span>'}
+            </td>
             <td style="text-align:center">
-              <button class="btn btn-sm btn-primary" onclick="openSalarySlipModal('${e.id}', '${monthVal}')">📄 Slip</button>
+              <button class="btn btn-sm btn-primary" onclick="openSalarySlipModal('${e.id}', '${monthVal}')">📄 View &amp; Approve</button>
             </td>
           </tr>`;
         }).join('')}</tbody>
@@ -2003,6 +2015,22 @@ function openSalarySlipModal(empId, monthVal) {
 
   // Store active salary slip data for WhatsApp share & export
   currentSalarySlipData = { emp, monthVal, monthName, earnedSalary, advanceDeduction, netPayable, basic, hra, special, daysDetails, leaveData };
+
+  // Update release button state
+  const btnRelease = document.getElementById('btn-release-slip');
+  if (btnRelease) {
+    btnRelease.disabled = false;
+    EMS_DB.getReleasedSalarySlips(emp.id).then(releasedSlips => {
+      const isReleased = (releasedSlips || []).some(r => r.monthVal === monthVal);
+      if (isReleased) {
+        btnRelease.style.background = '#15803d';
+        btnRelease.innerHTML = '✅ Approved &amp; Released';
+      } else {
+        btnRelease.style.background = '#16a34a';
+        btnRelease.innerHTML = '✅ Approve &amp; Release to Employee';
+      }
+    }).catch(() => {});
+  }
 
   const container = document.getElementById('salary-slip-container');
   container.innerHTML = `
@@ -2197,6 +2225,45 @@ function printSalarySlip() {
   printWindow.document.close();
   printWindow.focus();
   setTimeout(() => { printWindow.print(); }, 250);
+}
+
+async function approveAndReleaseSalarySlip() {
+  if (!currentSalarySlipData || !currentSalarySlipData.emp) {
+    toast('No active salary slip selected', 'error');
+    return;
+  }
+  const { emp, monthVal } = currentSalarySlipData;
+  const btnRelease = document.getElementById('btn-release-slip');
+  if (btnRelease) {
+    btnRelease.disabled = true;
+    btnRelease.innerHTML = '⌛ Approving & Releasing...';
+  }
+
+  try {
+    const res = await EMS_DB.releaseSalarySlip(emp.id, monthVal, currentSalarySlipData);
+    if (res && res.success) {
+      toast(`Salary slip for ${emp.name} (${monthVal}) successfully Approved & Released to Employee Portal!`, 'success');
+      if (btnRelease) {
+        btnRelease.disabled = false;
+        btnRelease.style.background = '#15803d';
+        btnRelease.innerHTML = '✅ Approved & Released';
+      }
+      renderSalary();
+    } else {
+      toast(res.error || 'Failed to release salary slip', 'error');
+      if (btnRelease) {
+        btnRelease.disabled = false;
+        btnRelease.innerHTML = '✅ Approve & Release to Employee';
+      }
+    }
+  } catch (err) {
+    console.error('Release salary slip error:', err);
+    toast('Error releasing salary slip', 'error');
+    if (btnRelease) {
+      btnRelease.disabled = false;
+      btnRelease.innerHTML = '✅ Approve & Release to Employee';
+    }
+  }
 }
 
 // ─── WhatsApp Salary Slip Share ──────────────────────────────
