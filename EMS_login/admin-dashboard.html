@@ -2076,7 +2076,8 @@ async function generateReportText(type) {
     const presentRecs = att.filter(a => a.date === today && a.status === 'present');
     const presentIds  = presentRecs.map(a => a.empId);
     const absentList  = active.filter(e => !presentIds.includes(e.id)).map(e => e.name);
-    const todayTasks  = tasks.filter(t => t.createdAt && t.createdAt.startsWith(today));
+    const todoTasks   = tasks.filter(t => t.status === 'todo' || t.status === 'doing' || t.status === 'in-progress');
+    const doneToday   = tasks.filter(t => (t.status === 'done' || t.status === 'completed') && ((t.updatedAt && t.updatedAt.startsWith(today)) || (t.createdAt && t.createdAt.startsWith(today))));
 
     let msg = `📢 *GROWTHAPEX EMS - DAILY REPORT* 📢\n`;
     msg += `📅 *Date:* ${today}\n`;
@@ -2086,28 +2087,40 @@ async function generateReportText(type) {
     msg += `• Present: ${presentIds.length}\n`;
     msg += `• Absent: ${absentList.length}\n`;
     if (absentList.length) msg += `\n❌ *Absent:* \n${absentList.map(n => ` - ${n}`).join('\n')}\n`;
-    msg += `\n📝 *Task Updates Today:*\n`;
-    if (todayTasks.length === 0) {
-      msg += `• No new tasks assigned or submitted today.\n`;
-    } else {
-      todayTasks.forEach(t => { msg += `• [${t.status}] ${t.title} — ${t.empId}\n`; });
+    msg += `\n📝 *Task Updates & Ongoing Work:*\n`;
+    if (doneToday.length > 0) {
+      msg += `✅ *Completed Today (${doneToday.length}):*\n`;
+      doneToday.forEach(t => {
+        const empName = active.find(e => e.id === t.empId)?.name || t.empId;
+        msg += ` - ${t.title} (by ${empName})\n`;
+      });
+    }
+    if (todoTasks.length > 0) {
+      msg += `${doneToday.length > 0 ? '\n' : ''}📌 *Active / In-Progress Tasks (${todoTasks.length}):*\n`;
+      todoTasks.forEach(t => {
+        const empName = active.find(e => e.id === t.empId)?.name || t.empId;
+        const dueStr = t.deadline ? ` | Due: ${t.deadline}` : '';
+        msg += ` - ${t.title} (assigned to ${empName}${dueStr})\n`;
+      });
+    }
+    if (doneToday.length === 0 && todoTasks.length === 0) {
+      msg += `• No active or completed tasks recorded.\n`;
     }
     msg += `\n📊 *Task Completion % by Employee:*\n`;
-    const hasTasks = active.some(e => tasks.filter(t => t.empId === e.id).length > 0);
-    if (!hasTasks) {
-      msg += `• No tasks assigned yet.\n`;
-    } else {
-      active.forEach(e => {
-        const empTasks = tasks.filter(t => t.empId === e.id);
-        const done     = empTasks.filter(t => t.status === 'done').length;
-        const total    = empTasks.length;
-        const pct      = total ? Math.round(done / total * 100) : 0;
+    active.forEach(e => {
+      const empTasks = tasks.filter(t => t.empId === e.id);
+      const done     = empTasks.filter(t => t.status === 'done' || t.status === 'completed').length;
+      const total    = empTasks.length;
+      if (total === 0) {
+        msg += ` • *${e.name}*: ➖ *N/A* (No tasks assigned)\n`;
+      } else {
+        const pct      = Math.round(done / total * 100);
         const filled   = Math.round(pct / 10);
         const bar      = '█'.repeat(filled) + '░'.repeat(10 - filled);
         const star     = pct === 100 ? ' ⭐' : '';
         msg += ` • *${e.name}*: ${bar} ${pct}% (${done}/${total})${star}\n`;
-      });
-    }
+      }
+    });
     msg += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
     return msg;
   }

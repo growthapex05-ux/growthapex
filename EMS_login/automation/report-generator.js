@@ -123,20 +123,31 @@ async function generateDailyReport(db, targetDateStr = null) {
   });
   const leaveEmpIds = new Set(leavesActiveToday.map(l => l.empId));
 
-  // 4. Fetch tasks created or completed today
-  // Query tasks created today
-  const targetDateParts = todayStr.split('-').map(Number);
-  const startOfDay = new Date(targetDateParts[0], targetDateParts[1] - 1, targetDateParts[2], 0, 0, 0, 0);
-  const endOfDay = new Date(targetDateParts[0], targetDateParts[1] - 1, targetDateParts[2], 23, 59, 59, 999);
-
-  const tasksSnap = await db.collection('tasks')
-    .where('createdAt', '>=', startOfDay.toISOString())
-    .where('createdAt', '<=', endOfDay.toISOString())
-    .get();
-
-  const tasksCreatedToday = [];
+  // 4. Fetch all tasks (open/pending tasks + tasks created/completed today)
+  const tasksSnap = await db.collection('tasks').get();
+  const allTasks = [];
   tasksSnap.forEach(doc => {
-    tasksCreatedToday.push(doc.data());
+    allTasks.push({ id: doc.id, ...doc.data() });
+  });
+
+  const todoTasks = allTasks.filter(t => t.status === 'todo' || t.status === 'doing' || t.status === 'in-progress');
+  const doneTodayTasks = allTasks.filter(t => {
+    const isDone = (t.status === 'done' || t.status === 'completed');
+    if (!isDone) return false;
+    const dateStr = t.updatedAt || t.createdAt || '';
+    return dateStr.startsWith(todayStr);
+  });
+
+  // Calculate per-employee task completion (active open tasks + completed tasks)
+  const empTaskStats = {};
+  employees.forEach(emp => {
+    const empTasks = allTasks.filter(t => t.empId === emp.id);
+    const completed = empTasks.filter(t => t.status === 'done' || t.status === 'completed').length;
+    empTaskStats[emp.id] = {
+      name: emp.name,
+      total: empTasks.length,
+      completed: completed
+    };
   });
 
   // Analyze attendance
@@ -192,28 +203,41 @@ async function generateDailyReport(db, targetDateStr = null) {
     report += `❌ *Absent:* \n${absentList.map(name => ` - ${name}`).join('\n')}\n\n`;
   }
 
-  report += `📝 *Task Updates Today:*\n`;
-  if (tasksCreatedToday.length === 0) {
-    report += `• No new tasks assigned or submitted today.`;
-  } else {
-    const todoTasks = tasksCreatedToday.filter(t => t.status === 'todo' || t.status === 'doing');
-    const doneTasks = tasksCreatedToday.filter(t => t.status === 'done' || t.status === 'completed');
-    
-    if (doneTasks.length > 0) {
-      report += `✅ *Completed Tasks (${doneTasks.length}):*\n`;
-      doneTasks.forEach(t => {
-        const empName = employeeMap[t.empId]?.name || t.empId;
-        report += ` - ${t.title} (by ${empName})\n`;
-      });
-    }
-    if (todoTasks.length > 0) {
-      report += `${doneTasks.length > 0 ? '\n' : ''}📌 *Assigned/In-Progress (${todoTasks.length}):*\n`;
-      todoTasks.forEach(t => {
-        const empName = employeeMap[t.empId]?.name || t.empId;
-        report += ` - ${t.title} (assigned to ${empName})\n`;
-      });
-    }
+  report += `📝 *Task Updates & Ongoing Work:*\n`;
+  if (doneTodayTasks.length > 0) {
+    report += `✅ *Completed Today (${doneTodayTasks.length}):*\n`;
+    doneTodayTasks.forEach(t => {
+      const empName = employeeMap[t.empId]?.name || t.empId;
+      report += ` - ${t.title} (by ${empName})\n`;
+    });
   }
+  if (todoTasks.length > 0) {
+    report += `${doneTodayTasks.length > 0 ? '\n' : ''}📌 *Active / In-Progress Tasks (${todoTasks.length}):*\n`;
+    todoTasks.forEach(t => {
+      const empName = employeeMap[t.empId]?.name || t.empId;
+      const dueStr = t.deadline ? ` | Due: ${t.deadline}` : '';
+      report += ` - ${t.title} (assigned to ${empName}${dueStr})\n`;
+    });
+  }
+  if (doneTodayTasks.length === 0 && todoTasks.length === 0) {
+    report += `• No active or completed tasks recorded.`;
+  }
+  report += `\n\n`;
+
+  report += `📊 *Task Completion % by Employee:*\n`;
+  employees.forEach(emp => {
+    const stats = empTaskStats[emp.id];
+    if (!stats || stats.total === 0) {
+      report += ` • *${emp.name}*: ➖ *N/A* (No tasks assigned)\n`;
+    } else {
+      const pct = Math.round((stats.completed / stats.total) * 100);
+      const blocks = Math.round(pct / 10);
+      const filled = '█'.repeat(blocks);
+      const empty = '░'.repeat(10 - blocks);
+      const star = pct === 100 ? ' ⭐' : '';
+      report += ` • *${emp.name}*: ${filled}${empty} ${pct}% (${stats.completed}/${stats.total})${star}\n`;
+    }
+  });
 
   return report;
 }
