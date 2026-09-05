@@ -310,6 +310,7 @@
     <div class="nav-item" onclick="showPage('tasks',this)"><span class="nav-icon">✅</span><span>Tasks</span></div>
     <div class="nav-item" onclick="showPage('leaves',this)"><span class="nav-icon">🌴</span><span>Leave Requests</span></div>
     <div class="nav-item" onclick="showPage('salary',this)"><span class="nav-icon">💰</span><span>Payroll</span></div>
+    <div class="nav-item" onclick="showPage('letterpad',this)"><span class="nav-icon">📜</span><span>Letter Pad &amp; Docs</span></div>
     <div class="nav-item" onclick="showPage('reports',this)" id="nav-reports"><span class="nav-icon">📲</span><span>WhatsApp Reports</span></div>
 
   </div>
@@ -548,6 +549,52 @@
     </div>
 
   </div>
+
+  <!-- ── Letter Pad & Documents ── -->
+  <div class="page" id="page-letterpad">
+    <div class="section-card" style="margin-bottom:20px">
+      <div class="section-head">
+        <h3>📜 GrowthApex Official Letter Pad &amp; Document Generator</h3>
+        <div class="toolbar">
+          <button class="btn btn-primary" onclick="downloadLetterPadPDF()" style="background:#0284c7;color:#fff;border:none">📥 Download PDF</button>
+          <button class="btn btn-success" onclick="sendLetterPadWhatsApp()" style="background:#25D366;color:#fff;border:none;display:inline-flex;align-items:center;gap:6px;font-weight:600">📱 Send via WhatsApp</button>
+          <button class="btn btn-secondary" onclick="printLetterPad()" style="background:#e5e7eb;color:#111827;border:none">🖨️ Print Letter</button>
+        </div>
+      </div>
+
+      <div class="form-row2" style="margin-top:10px">
+        <div class="form-group">
+          <label>Select Employee Name *</label>
+          <select id="lp-emp-select" class="search-input" style="width:100%" onchange="renderLetterPad()"></select>
+        </div>
+        <div class="form-group">
+          <label>Document Type *</label>
+          <select id="lp-doc-type" class="search-input" style="width:100%" onchange="renderLetterPad()">
+            <option value="payslip">📄 Official Payslip Summary</option>
+            <option value="offer">✉️ Offer / Appointment Letter</option>
+            <option value="experience">📜 Experience &amp; Relieving Certificate</option>
+            <option value="letterhead">📋 Official GrowthApex Letterhead / Memo</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row2" style="margin-top:10px">
+        <div class="form-group">
+          <label>Issue Date / Ref No.</label>
+          <input type="date" id="lp-date" class="search-input" style="width:100%" onchange="renderLetterPad()">
+        </div>
+        <div class="form-group">
+          <label>Custom Note / Additional Remarks</label>
+          <input id="lp-custom-note" class="search-input" placeholder="e.g. Performance bonus awarded / Outstanding performer" style="width:100%" oninput="renderLetterPad()">
+        </div>
+      </div>
+    </div>
+
+    <!-- Letter Pad Display Card -->
+    <div class="section-card" style="background:#f3f4f6;padding:30px;display:flex;justify-content:center">
+      <div id="letterpad-container" style="width:100%;max-width:820px;box-shadow:0 10px 30px rgba(0,0,0,0.1);border-radius:8px"></div>
+    </div>
+  </div>
 </main>
 
 <!-- Modals -->
@@ -675,8 +722,9 @@
   <div class="modal" style="max-width:820px;padding:24px;background:#ffffff;color:#111827">
     <div class="modal-header no-print" style="margin-bottom:16px;border-bottom:1px solid #e5e7eb;padding-bottom:12px">
       <h3 style="color:#111827">📄 GrowthApex Official Payslip</h3>
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-primary" onclick="downloadSalarySlipPDF()" style="background:#0284c7;color:#fff;border:none">📥 Download PDF</button>
+        <button class="btn btn-success" onclick="sendSalarySlipWhatsApp()" style="background:#25D366;color:#fff;border:none;display:inline-flex;align-items:center;gap:6px;font-weight:600">📱 Send WhatsApp</button>
         <button class="btn btn-secondary" onclick="printSalarySlip()" style="background:#e5e7eb;color:#111827;border:none">🖨️ Print Slip</button>
         <button class="modal-close" onclick="closeModal('modal-salary-slip')">✕</button>
       </div>
@@ -869,7 +917,7 @@ function toggleSidebar() {
 }
 
 // ─── Page Navigation ──────────────────────────────────────────
-const titles = { overview:'Overview', employees:'Employees', attendance:'Attendance', tasks:'Tasks', leaves:'Leave Requests', salary:'Payroll', reports:'WhatsApp Reports' };
+const titles = { overview:'Overview', employees:'Employees', attendance:'Attendance', tasks:'Tasks', leaves:'Leave Requests', salary:'Payroll', letterpad:'Letter Pad & Documents', reports:'WhatsApp Reports' };
 function showPage(id, el) {
   // Close sidebar on mobile navigation
   const sidebar = document.querySelector('.sidebar');
@@ -885,6 +933,7 @@ function showPage(id, el) {
   { id==='overview' && renderOverview(); id==='employees' && renderEmpTable(); }
   { id==='attendance' && initAtt(); id==='tasks' && initTasks(); }
   { id==='leaves' && initLeaves(); id==='salary' && renderSalary(); }
+  if (id==='letterpad') initLetterPadPage();
   if (id==='leaves') renderAdminHolidays();
   if (id==='reports') initReportsPage();
 }
@@ -1807,6 +1856,9 @@ function openSalarySlipModal(empId, monthVal) {
   const hra = Math.round(earnedSalary * 0.30);
   const special = earnedSalary - (basic + hra);
 
+  // Store active salary slip data for WhatsApp share & export
+  currentSalarySlipData = { emp, monthVal, monthName, earnedSalary, advanceDeduction, netPayable, basic, hra, special, daysDetails, leaveData };
+
   const container = document.getElementById('salary-slip-container');
   container.innerHTML = `
     <div class="salary-slip-box" style="background:#fff;color:#111827;padding:24px;border:1px solid #e5e7eb;border-radius:8px;font-family:'Urbanist',sans-serif">
@@ -1919,14 +1971,24 @@ function openSalarySlipModal(empId, monthVal) {
         <b>Amount in Words:</b> <span style="color:#0284c7;font-weight:600">${numberToWords(netPayable)}</span>
       </div>
 
-      <!-- Signatures Footer -->
+      <!-- Signatures Footer with Digital Signature of Susheel Kumar -->
       <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:30px;padding-top:16px">
         <div style="text-align:center;width:180px;border-top:1px solid #9ca3af;padding-top:6px;font-size:12px;color:#4b5563">
           Employee Signature
         </div>
-        <div style="text-align:center;width:220px;border-top:1px solid #9ca3af;padding-top:6px;font-size:12px;color:#4b5563">
-          <b>Authorized Signatory</b><br>
-          <span style="font-size:10px;color:#6b7280">GrowthApex HR &amp; Finance</span>
+        <div style="text-align:center;width:240px;position:relative;display:inline-block">
+          <div style="height:44px;display:flex;align-items:center;justify-content:center;margin-bottom:2px;gap:6px">
+            <svg width="150" height="42" viewBox="0 0 200 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 34 C22 14, 28 8, 38 22 C42 32, 32 45, 22 42 C18 40, 30 28, 48 30 C58 31, 62 40, 72 38 C82 36, 88 18, 92 16 C98 14, 92 38, 102 36 C112 34, 120 20, 126 33 C132 40, 142 30, 155 28 C25 36 Q75 46 175 32" stroke="#002b80" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+              <text x="18" y="28" font-family="'Brush Script MT', 'Dancing Script', cursive, sans-serif" font-size="22" font-weight="bold" fill="#002b80" font-style="italic" opacity="0.95">Susheel Kumar</text>
+            </svg>
+            <span style="background:#dcfce7;color:#15803d;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;border:1px solid #86efac;white-space:nowrap">VERIFIED ✓</span>
+          </div>
+          <div style="border-top:1px solid #9ca3af;padding-top:4px;font-size:12px;color:#4b5563">
+            <b style="color:#111827;font-size:13px">Susheel Kumar</b><br>
+            <span style="font-size:11px;color:#0284c7;font-weight:700">Authorized Signatory</span><br>
+            <span style="font-size:9.5px;color:#6b7280">GrowthApex HR &amp; Finance (Digitally Signed)</span>
+          </div>
         </div>
       </div>
     </div>`;
@@ -1972,6 +2034,375 @@ function printSalarySlip() {
           body { margin: 0; }
           .salary-slip-box { border: none; padding: 0; }
         }
+      </style>
+    </head>
+    <body>
+      ${content}
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => { printWindow.print(); }, 250);
+}
+
+// ─── WhatsApp Salary Slip Share ──────────────────────────────
+function sendSalarySlipWhatsApp() {
+  if (!currentSalarySlipData) {
+    toast('No active salary slip data found', 'warning');
+    return;
+  }
+  const { emp, monthName, netPayable, earnedSalary, advanceDeduction, basic, hra, special, daysDetails, leaveData } = currentSalarySlipData;
+  
+  let targetPhone = (emp.phone || '').trim().replace(/\D/g, '');
+  if (!targetPhone || targetPhone.length < 10) {
+    targetPhone = prompt(`Enter 10-digit WhatsApp number for ${emp.name}:`, targetPhone || '');
+    if (!targetPhone) return;
+    targetPhone = targetPhone.trim().replace(/\D/g, '');
+  }
+  
+  if (targetPhone.length === 10) {
+    targetPhone = '91' + targetPhone;
+  }
+  
+  const msg = `📄 *GROWTHAPEX DIGITAL MEDIA - OFFICIAL PAYSLIP* 📄
+━━━━━━━━━━━━━━━━━━━━━━━━
+👤 *Employee Name:* ${emp.name}
+🆔 *Employee ID:* ${emp.id}
+💼 *Designation:* ${emp.designation || 'N/A'}
+🏢 *Department:* ${emp.department || 'N/A'}
+📅 *Pay Period:* ${monthName.toUpperCase()}
+
+📊 *ATTENDANCE BREAKDOWN:*
+• Working Days Worked: ${daysDetails.workedWorkingDays} Days
+• Sundays Off: ${daysDetails.sundays} Days
+• Month Leaves Taken: ${leaveData.leavesTakenInMonth} Days
+
+💵 *PAYROLL BREAKDOWN:*
+• Gross Earnings: ₹${Number(earnedSalary).toLocaleString('en-IN')}
+  - Basic Pay (60%): ₹${Number(basic).toLocaleString('en-IN')}
+  - House Rent Allowance (30%): ₹${Number(hra).toLocaleString('en-IN')}
+  - Special Allowances: ₹${Number(special).toLocaleString('en-IN')}
+• Deductions (Advance): -₹${Number(advanceDeduction).toLocaleString('en-IN')}
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+💰 *NET PAYABLE SALARY:* ₹${Number(netPayable).toLocaleString('en-IN')}
+🔤 *In Words:* ${numberToWords(netPayable)}
+━━━━━━━━━━━━━━━━━━━━━━━━
+✍️ *Digitally Signed By:* Susheel Kumar (Authorized Signatory)
+✅ *Verification:* GrowthApex Certified Digital Signature
+
+🌐 *EMS Portal:* https://growthapex.in`;
+
+  const waUrl = `https://api.whatsapp.com/send?phone=${targetPhone}&text=${encodeURIComponent(msg)}`;
+  window.open(waUrl, '_blank');
+  toast(`Opening WhatsApp to send Payslip to ${emp.name} (${targetPhone})...`, 'success');
+}
+
+// ─── LETTER PAD & DOCUMENT GENERATOR ──────────────────────────
+function initLetterPadPage() {
+  const select = document.getElementById('lp-emp-select');
+  if (!select) return;
+
+  const dateInp = document.getElementById('lp-date');
+  if (dateInp && !dateInp.value) {
+    dateInp.value = new Date().toISOString().split('T')[0];
+  }
+
+  const emps = cache.employees || [];
+  select.innerHTML = emps.length
+    ? emps.map(e => `<option value="${e.id}">${e.name} (${e.id} - ${e.department||'General'})</option>`).join('')
+    : '<option value="">No employees found</option>';
+
+  renderLetterPad();
+}
+
+function renderLetterPad() {
+  const container = document.getElementById('letterpad-container');
+  if (!container) return;
+
+  const empId = document.getElementById('lp-emp-select')?.value;
+  const docType = document.getElementById('lp-doc-type')?.value || 'payslip';
+  const issueDateStr = document.getElementById('lp-date')?.value || new Date().toISOString().split('T')[0];
+  const customNote = (document.getElementById('lp-custom-note')?.value || '').trim();
+
+  const emp = (cache.employees || []).find(e => e.id === empId) || (cache.employees || [])[0];
+  if (!emp) {
+    container.innerHTML = '<div style="padding:40px;background:#fff;text-align:center;color:#6b7280;border-radius:8px">Select or add an employee to render Letter Pad.</div>';
+    return;
+  }
+
+  const formattedDate = new Date(issueDateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+  const refNo = `GA/HR/${new Date(issueDateStr).getFullYear()}/${emp.id}`;
+
+  let docTitle = 'OFFICIAL DOCUMENT';
+  let bodyHtml = '';
+
+  const moneyFmt = n => '₹' + Number(n||0).toLocaleString('en-IN');
+  const baseSalary = Number(emp.salary || 0);
+
+  if (docType === 'payslip') {
+    docTitle = 'OFFICIAL SALARY PAYSLIP STATEMENT';
+    const basic = Math.round(baseSalary * 0.60);
+    const hra = Math.round(baseSalary * 0.30);
+    const special = baseSalary - (basic + hra);
+    const advanceDeduction = emp.advanceDeduction !== undefined ? Number(emp.advanceDeduction) : 3000;
+    const netPayable = Math.max(0, baseSalary - advanceDeduction);
+
+    bodyHtml = `
+      <div style="background:#f9fafb;padding:12px;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:16px;font-size:13px">
+        <b>Pay Month / Ref:</b> ${formattedDate} | Status: <span style="color:#16a34a;font-weight:700">CONFIRMED PAID ✅</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:13px;color:#111827">
+        <thead>
+          <tr style="background:#f3f4f6">
+            <th style="border:1px solid #e5e7eb;padding:10px;text-align:left">Earnings Component</th>
+            <th style="border:1px solid #e5e7eb;padding:10px;text-align:right">Amount (₹)</th>
+            <th style="border:1px solid #e5e7eb;padding:10px;text-align:left">Deductions</th>
+            <th style="border:1px solid #e5e7eb;padding:10px;text-align:right">Amount (₹)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="border:1px solid #e5e7eb;padding:8px">Basic Pay (60%)</td>
+            <td style="border:1px solid #e5e7eb;padding:8px;text-align:right">${moneyFmt(basic)}</td>
+            <td style="border:1px solid #e5e7eb;padding:8px;color:#dc2626">Advance / Statutory Deduction</td>
+            <td style="border:1px solid #e5e7eb;padding:8px;text-align:right;color:#dc2626">-${moneyFmt(advanceDeduction)}</td>
+          </tr>
+          <tr>
+            <td style="border:1px solid #e5e7eb;padding:8px">House Rent Allowance (HRA 30%)</td>
+            <td style="border:1px solid #e5e7eb;padding:8px;text-align:right">${moneyFmt(hra)}</td>
+            <td style="border:1px solid #e5e7eb;padding:8px">PF / ESI Deduction</td>
+            <td style="border:1px solid #e5e7eb;padding:8px;text-align:right;color:#16a34a">₹0 (Nil)</td>
+          </tr>
+          <tr>
+            <td style="border:1px solid #e5e7eb;padding:8px">Special / Performance Allowance</td>
+            <td style="border:1px solid #e5e7eb;padding:8px;text-align:right">${moneyFmt(special)}</td>
+            <td style="border:1px solid #e5e7eb;padding:8px;font-weight:700">Total Deductions</td>
+            <td style="border:1px solid #e5e7eb;padding:8px;text-align:right;font-weight:700;color:#dc2626">-${moneyFmt(advanceDeduction)}</td>
+          </tr>
+          <tr style="background:#f0fdf4;font-weight:700">
+            <td style="border:1px solid #e5e7eb;padding:10px;color:#166534">Gross Monthly Salary</td>
+            <td style="border:1px solid #e5e7eb;padding:10px;text-align:right;color:#166534">${moneyFmt(baseSalary)}</td>
+            <td style="border:1px solid #e5e7eb;padding:10px;color:#166534">Net Salary Payable</td>
+            <td style="border:1px solid #e5e7eb;padding:10px;text-align:right;color:#166534;font-size:15px">${moneyFmt(netPayable)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="background:#f9fafb;padding:10px;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:20px;font-size:13px">
+        <b>Amount in Words:</b> <span style="color:#0284c7;font-weight:600">${numberToWords(netPayable)}</span>
+      </div>`;
+  } else if (docType === 'offer') {
+    docTitle = 'LETTER OF APPOINTMENT & OFFER';
+    bodyHtml = `
+      <p style="font-size:14px;line-height:1.7;color:#374151;margin-bottom:14px">
+        Dear <b>${emp.name}</b>,
+      </p>
+      <p style="font-size:14px;line-height:1.7;color:#374151;margin-bottom:14px">
+        We are pleased to offer you the position of <b>${emp.designation || 'Specialist'}</b> in the <b>${emp.department || 'General'}</b> department at <b>GrowthApex Digital Media</b>. We were very impressed by your background and experience during the evaluation process.
+      </p>
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;padding:14px;border-radius:6px;margin-bottom:16px;font-size:13px;color:#166534">
+        <b>Key Terms of Appointment:</b>
+        <ul style="margin:8px 0 0 20px;padding:0">
+          <li><b>Designation:</b> ${emp.designation || 'N/A'}</li>
+          <li><b>Department:</b> ${emp.department || 'N/A'}</li>
+          <li><b>Joining Date:</b> ${emp.joinDate || formattedDate}</li>
+          <li><b>Monthly Compensation (Gross CTC):</b> ${moneyFmt(baseSalary)} / month</li>
+          <li><b>Work Location:</b> GrowthApex Headquarters</li>
+        </ul>
+      </div>
+      <p style="font-size:14px;line-height:1.7;color:#374151;margin-bottom:14px">
+        Your role will focus on driving high-impact digital initiatives and maintaining technical & operational excellence. We look forward to a mutually fruitful association.
+      </p>`;
+  } else if (docType === 'experience') {
+    docTitle = 'EXPERIENCE & RELIEVING CERTIFICATE';
+    bodyHtml = `
+      <p style="font-size:14px;line-height:1.7;color:#374151;margin-bottom:14px">
+        <b>TO WHOMSOEVER IT MAY CONCERN</b>
+      </p>
+      <p style="font-size:14px;line-height:1.7;color:#374151;margin-bottom:14px">
+        This is to certify that <b>${emp.name}</b> (Employee ID: <b>${emp.id}</b>) has been employed with <b>GrowthApex Digital Media</b> as <b>${emp.designation || 'Specialist'}</b> in the <b>${emp.department || 'General'}</b> department from <b>${emp.joinDate || 'joining date'}</b> to <b>${formattedDate}</b>.
+      </p>
+      <p style="font-size:14px;line-height:1.7;color:#374151;margin-bottom:14px">
+        During their tenure with GrowthApex, we found <b>${emp.name}</b> to be hardworking, sincere, professional, and dedicated to achieving team objectives. Their conduct during the service period was exemplary.
+      </p>
+      <p style="font-size:14px;line-height:1.7;color:#374151;margin-bottom:14px">
+        We wish <b>${emp.name}</b> every success in all future professional endeavors.
+      </p>`;
+  } else {
+    docTitle = 'OFFICIAL MEMORANDUM';
+    bodyHtml = `
+      <p style="font-size:14px;line-height:1.7;color:#374151;margin-bottom:14px">
+        This official memorandum serves as formal documentation for <b>${emp.name}</b> (${emp.id}), working as <b>${emp.designation || 'Team Member'}</b> in the <b>${emp.department || 'GrowthApex'}</b> department.
+      </p>
+      <p style="font-size:14px;line-height:1.7;color:#374151;margin-bottom:14px">
+        Please refer to the authorized instructions and operational guidelines provided by GrowthApex HR & Management. All company policies and confidentiality agreements remain strictly applicable.
+      </p>`;
+  }
+
+  const customNoteHtml = customNote ? `
+    <div style="background:#fffbe6;border:1px solid #ffe58f;padding:12px 14px;border-radius:6px;margin-bottom:16px;font-size:13px;color:#873800">
+      <b>📌 Additional Remarks / Special Note:</b><br>${customNote}
+    </div>` : '';
+
+  container.innerHTML = `
+    <div class="letterpad-paper" style="background:#ffffff;color:#111827;padding:36px;border:1px solid #e5e7eb;border-radius:8px;font-family:'Urbanist',sans-serif;box-sizing:border-box">
+      <!-- Letterhead Top Bar -->
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #00D4FF;padding-bottom:16px;margin-bottom:20px">
+        <div>
+          <img src="../assets/images/logo/growthapex-logo.png" alt="GrowthApex Logo" style="height:52px;object-fit:contain;filter:brightness(0)" onerror="this.src='../assets/images/logo/favicon.svg'">
+        </div>
+        <div style="text-align:right">
+          <h2 style="font-family:'Space Grotesk',sans-serif;font-size:20px;margin:0;color:#111827;letter-spacing:.02em">GROWTHAPEX DIGITAL MEDIA</h2>
+          <p style="font-size:11px;color:#6b7280;margin:3px 0 0 0">HQ: India • Email: HR@growthapex.in | www.growthapex.in</p>
+        </div>
+      </div>
+
+      <!-- Ref & Date -->
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:#6b7280;margin-bottom:20px;border-bottom:1px dashed #e5e7eb;padding-bottom:10px">
+        <div><b>Ref No:</b> ${refNo}</div>
+        <div><b>Date of Issue:</b> ${formattedDate}</div>
+      </div>
+
+      <!-- Recipient Meta Table -->
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:13px;background:#f9fafb;padding:12px;border-radius:6px;border:1px solid #e5e7eb">
+        <tr>
+          <td style="padding:6px 10px;font-weight:700;color:#4b5563;width:18%">Employee Name:</td>
+          <td style="padding:6px 10px;font-weight:700;color:#111827;width:32%">${emp.name}</td>
+          <td style="padding:6px 10px;font-weight:700;color:#4b5563;width:18%">Employee ID:</td>
+          <td style="padding:6px 10px;font-weight:700;color:#0284c7;width:32%">${emp.id}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 10px;font-weight:700;color:#4b5563">Designation:</td>
+          <td style="padding:6px 10px">${emp.designation || 'N/A'}</td>
+          <td style="padding:6px 10px;font-weight:700;color:#4b5563">Department:</td>
+          <td style="padding:6px 10px">${emp.department || 'N/A'}</td>
+        </tr>
+      </table>
+
+      <!-- Document Title Header -->
+      <div style="background:#1e293b;color:#ffffff;text-align:center;padding:10px;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;letter-spacing:.06em;margin-bottom:20px;border-radius:6px">
+        ${docTitle}
+      </div>
+
+      <!-- Main Body -->
+      <div style="min-height:160px;margin-bottom:20px">
+        ${bodyHtml}
+        ${customNoteHtml}
+      </div>
+
+      <!-- Signatures Footer with Digital Signature of Susheel Kumar -->
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:40px;padding-top:20px;border-top:1px solid #e5e7eb">
+        <div style="text-align:center;width:180px;border-top:1px solid #9ca3af;padding-top:6px;font-size:12px;color:#4b5563">
+          Employee Signature
+        </div>
+        <div style="text-align:center;width:240px;position:relative;display:inline-block">
+          <div style="height:44px;display:flex;align-items:center;justify-content:center;margin-bottom:2px;gap:6px">
+            <svg width="150" height="42" viewBox="0 0 200 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 34 C22 14, 28 8, 38 22 C42 32, 32 45, 22 42 C18 40, 30 28, 48 30 C58 31, 62 40, 72 38 C82 36, 88 18, 92 16 C98 14, 92 38, 102 36 C112 34, 120 20, 126 33 C132 40, 142 30, 155 28 C25 36 Q75 46 175 32" stroke="#002b80" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+              <text x="18" y="28" font-family="'Brush Script MT', 'Dancing Script', cursive, sans-serif" font-size="22" font-weight="bold" fill="#002b80" font-style="italic" opacity="0.95">Susheel Kumar</text>
+            </svg>
+            <span style="background:#dcfce7;color:#15803d;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;border:1px solid #86efac;white-space:nowrap">VERIFIED ✓</span>
+          </div>
+          <div style="border-top:1px solid #9ca3af;padding-top:4px;font-size:12px;color:#4b5563">
+            <b style="color:#111827;font-size:13px">Susheel Kumar</b><br>
+            <span style="font-size:11px;color:#0284c7;font-weight:700">Authorized Signatory</span><br>
+            <span style="font-size:9.5px;color:#6b7280">GrowthApex HR &amp; Finance (Digitally Signed)</span>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function downloadLetterPadPDF() {
+  const container = document.getElementById('letterpad-container');
+  if (!container || !container.children.length) return;
+
+  const empId = document.getElementById('lp-emp-select')?.value || 'Employee';
+  const docType = document.getElementById('lp-doc-type')?.value || 'Document';
+
+  if (typeof html2pdf !== 'undefined') {
+    const opt = {
+      margin:       [6, 6, 6, 6],
+      filename:     `GrowthApex_${docType}_${empId}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true, logging: false, scrollY: 0 },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(container).save().catch(err => {
+      console.error('Letter Pad PDF error:', err);
+      printLetterPad();
+    });
+  } else {
+    printLetterPad();
+  }
+}
+
+function sendLetterPadWhatsApp() {
+  const empId = document.getElementById('lp-emp-select')?.value;
+  const docType = document.getElementById('lp-doc-type')?.value || 'Letter';
+  const customNote = (document.getElementById('lp-custom-note')?.value || '').trim();
+
+  const emp = (cache.employees || []).find(e => e.id === empId) || (cache.employees || [])[0];
+  if (!emp) {
+    toast('Please select an employee first', 'warning');
+    return;
+  }
+
+  let targetPhone = (emp.phone || '').trim().replace(/\D/g, '');
+  if (!targetPhone || targetPhone.length < 10) {
+    targetPhone = prompt(`Enter 10-digit WhatsApp number for ${emp.name}:`, targetPhone || '');
+    if (!targetPhone) return;
+    targetPhone = targetPhone.trim().replace(/\D/g, '');
+  }
+
+  if (targetPhone.length === 10) targetPhone = '91' + targetPhone;
+
+  const docTitles = {
+    payslip: 'OFFICIAL SALARY PAYSLIP STATEMENT',
+    offer: 'OFFER & APPOINTMENT LETTER',
+    experience: 'EXPERIENCE & RELIEVING CERTIFICATE',
+    letterhead: 'OFFICIAL MEMORANDUM'
+  };
+
+  const msg = `📜 *GROWTHAPEX DIGITAL MEDIA - OFFICIAL DOCUMENT* 📜
+━━━━━━━━━━━━━━━━━━━━━━━━
+👤 *Employee Name:* ${emp.name}
+🆔 *Employee ID:* ${emp.id}
+💼 *Designation:* ${emp.designation || 'N/A'}
+🏢 *Department:* ${emp.department || 'N/A'}
+
+📋 *DOCUMENT:* ${docTitles[docType] || docType.toUpperCase()}
+📅 *Date of Issue:* ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+${customNote ? `\n📌 *Notes:* ${customNote}\n` : ''}
+━━━━━━━━━━━━━━━━━━━━━━━━
+✍️ *Digitally Signed By:* Susheel Kumar (Authorized Signatory)
+✅ *Verification Status:* GrowthApex Certified Digital Signature
+
+🌐 *Portal:* https://growthapex.in`;
+
+  const waUrl = `https://api.whatsapp.com/send?phone=${targetPhone}&text=${encodeURIComponent(msg)}`;
+  window.open(waUrl, '_blank');
+  toast(`Opening WhatsApp to send document to ${emp.name} (${targetPhone})...`, 'success');
+}
+
+function printLetterPad() {
+  const container = document.getElementById('letterpad-container');
+  if (!container || !container.children.length) return;
+
+  const content = container.innerHTML;
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>GrowthApex - Official Letter Pad</title>
+      <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Urbanist:wght@400;600;700&display=swap" rel="stylesheet">
+      <style>
+        body { font-family: 'Urbanist', sans-serif; margin: 20px; color: #111827; background: #fff; }
+        .letterpad-paper { border: none !important; padding: 20px !important; }
+        @media print { body { margin: 0; } }
       </style>
     </head>
     <body>

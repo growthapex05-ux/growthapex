@@ -1061,8 +1061,9 @@
 
         <div style="display:flex;justify-content:space-between;align-items:center;background:#f3f4f6;padding:10px 16px;border-radius:8px;margin-bottom:16px;border:1px solid #e5e7eb">
           <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;color:#111827">PAYSLIP FOR: ${currentMonthStr.toUpperCase()}</div>
-          <div style="display:flex;gap:8px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn btn-primary" onclick="downloadEmpSalarySlipPDF()" style="padding:6px 14px;font-size:12px;background:#0284c7;color:#fff;border:none">📥 Download PDF</button>
+            <button class="btn btn-success" onclick="sendEmpSalarySlipWhatsApp()" style="padding:6px 14px;font-size:12px;background:#25D366;color:#fff;border:none;display:inline-flex;align-items:center;gap:4px;font-weight:600">📱 Send WhatsApp</button>
             <button class="btn btn-secondary" onclick="printEmpSalarySlip()" style="padding:6px 14px;font-size:12px;background:#e5e7eb;color:#111827;border:none">🖨️ Print Slip</button>
           </div>
         </div>
@@ -1140,8 +1141,19 @@
 
         <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:24px;padding-top:16px">
           <div style="text-align:center;width:180px;border-top:1px solid #9ca3af;padding-top:6px;font-size:12px;color:#4b5563">Employee Signature</div>
-          <div style="text-align:center;width:220px;border-top:1px solid #9ca3af;padding-top:6px;font-size:12px;color:#4b5563">
-            <b>Authorized Signatory</b><br><span style="font-size:10px;color:#6b7280">GrowthApex HR &amp; Finance</span>
+          <div style="text-align:center;width:240px;position:relative;display:inline-block">
+            <div style="height:44px;display:flex;align-items:center;justify-content:center;margin-bottom:2px;gap:6px">
+              <svg width="150" height="42" viewBox="0 0 200 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 34 C22 14, 28 8, 38 22 C42 32, 32 45, 22 42 C18 40, 30 28, 48 30 C58 31, 62 40, 72 38 C82 36, 88 18, 92 16 C98 14, 92 38, 102 36 C112 34, 120 20, 126 33 C132 40, 142 30, 155 28 C25 36 Q75 46 175 32" stroke="#002b80" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+                <text x="18" y="28" font-family="'Brush Script MT', 'Dancing Script', cursive, sans-serif" font-size="22" font-weight="bold" fill="#002b80" font-style="italic" opacity="0.95">Susheel Kumar</text>
+              </svg>
+              <span style="background:#dcfce7;color:#15803d;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;border:1px solid #86efac;white-space:nowrap">VERIFIED ✓</span>
+            </div>
+            <div style="border-top:1px solid #9ca3af;padding-top:4px;font-size:12px;color:#4b5563">
+              <b style="color:#111827;font-size:13px">Susheel Kumar</b><br>
+              <span style="font-size:11px;color:#0284c7;font-weight:700">Authorized Signatory</span><br>
+              <span style="font-size:9.5px;color:#6b7280">GrowthApex HR &amp; Finance (Digitally Signed)</span>
+            </div>
           </div>
         </div>
       </div>`;
@@ -1200,6 +1212,40 @@
     printWindow.document.close();
     printWindow.focus();
     setTimeout(() => { printWindow.print(); }, 250);
+  }
+
+  function sendEmpSalarySlipWhatsApp() {
+    if (!emp) {
+      toast('Employee details not available', 'warning');
+      return;
+    }
+    let targetPhone = (emp.phone || '').trim().replace(/\D/g, '');
+    if (!targetPhone || targetPhone.length < 10) {
+      targetPhone = prompt(`Enter 10-digit WhatsApp number:`, targetPhone || '');
+      if (!targetPhone) return;
+      targetPhone = targetPhone.trim().replace(/\D/g, '');
+    }
+
+    if (targetPhone.length === 10) targetPhone = '91' + targetPhone;
+
+    const monthVal = document.getElementById('salary-month-select')?.value || '2026-08';
+    const msg = `📄 *GROWTHAPEX DIGITAL MEDIA - OFFICIAL PAYSLIP* 📄
+━━━━━━━━━━━━━━━━━━━━━━━━
+👤 *Employee Name:* ${emp.name}
+🆔 *Employee ID:* ${emp.id}
+💼 *Designation:* ${emp.designation || 'N/A'}
+🏢 *Department:* ${emp.department || 'N/A'}
+📅 *Period:* ${monthVal}
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+✍️ *Digitally Signed By:* Susheel Kumar (Authorized Signatory)
+✅ *Verification:* GrowthApex Certified Digital Signature
+
+🌐 *EMS Portal:* https://growthapex.in`;
+
+    const waUrl = `https://api.whatsapp.com/send?phone=${targetPhone}&text=${encodeURIComponent(msg)}`;
+    window.open(waUrl, '_blank');
+    toast(`Opening WhatsApp...`, 'success');
   }
 
   // ── Holidays & Festivals ──
