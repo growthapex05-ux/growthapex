@@ -1107,13 +1107,12 @@
       </head>
       <body>
         ${content}
-        <script>
-          setTimeout(() => { window.print(); window.close(); }, 500);
-        </script>
       </body>
       </html>
     `);
     printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); }, 250);
   }
 
   // ── Holidays & Festivals ──
