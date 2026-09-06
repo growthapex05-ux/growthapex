@@ -1106,7 +1106,6 @@
     }
     const widget = document.getElementById('floating-work-timer');
     if (widget) widget.style.display = 'none';
-    closeLiveTimerWindow();
   }
 
   function registerActivityTrackers() {
@@ -1149,15 +1148,14 @@
   });
 
   // ── Attendance ─────────────────────────────────────────────
-  async function renderAttendance() {
-    const todayRec = await EMS_DB.getTodayAttendance(empId);
+  function updateAttendanceButtonsUI(todayRec) {
     document.getElementById('today-att-status').innerHTML = todayRec
       ? sBadge(todayRec.status)
       : '<span style="color:var(--muted);font-size:13px">Not marked yet</span>';
     document.getElementById('today-att-info').innerHTML = todayRec
       ? `<strong>Check-In:</strong> ${todayRec.checkIn||'—'} &nbsp;|&nbsp; <strong>Check-Out:</strong> ${todayRec.checkOut||'—'}`
       : '';
-    
+
     const btnCheckIn = document.getElementById('btn-checkin-action');
     const btnCheckOut = document.getElementById('btn-checkout-action');
 
@@ -1201,7 +1199,11 @@
       stopHeartbeatEngine();
       stopLiveTimerWidget();
     }
+  }
 
+  async function renderAttendance() {
+    const todayRec = await EMS_DB.getTodayAttendance(empId);
+    updateAttendanceButtonsUI(todayRec);
     renderAttendanceTable();
   }
 
@@ -1234,7 +1236,7 @@
         const isReCheckIn = (rec && rec.checkIn && rec.checkOut && rec.checkOut !== '—');
         const checkInTime = isReCheckIn ? rec.checkIn : time;
 
-        await EMS_DB.markAttendance({ 
+        const updatedRec = { 
           empId, 
           date: today, 
           status: 'present', 
@@ -1242,20 +1244,28 @@
           checkOut: '—',
           checkoutReason: '',
           lastHeartbeat: new Date().toISOString() 
-        });
+        };
 
-        toast(isReCheckIn ? 'Resumed work & re-checked in successfully! Live timer restarted. 🟢' : 'Checked in successfully. Active live timer & tracking started! 🟢', 'success');
+        await EMS_DB.markAttendance(updatedRec);
+
+        toast(isReCheckIn ? 'Resumed work & re-checked in successfully! 🟢' : 'Checked in successfully. Active live timer & tracking started! 🟢', 'success');
         startHeartbeatEngine();
         startLiveTimerWidget(checkInTime, today, true);
+        updateAttendanceButtonsUI(updatedRec);
     } else {
         if (!rec || !rec.checkIn) { toast('You must check in first', 'error'); return; }
         if (rec.checkOut && rec.checkOut !== '—') { toast('Check-out already marked for today', 'info'); return; }
-        await EMS_DB.markAttendance({ empId, date:today, status:rec.status, checkIn:rec.checkIn, checkOut:time });
+
+        const updatedRec = { empId, date:today, status:rec.status, checkIn:rec.checkIn, checkOut:time };
+        await EMS_DB.markAttendance(updatedRec);
+
         toast('Checked out successfully. Live timer stopped.', 'success');
         stopHeartbeatEngine();
         stopLiveTimerWidget();
+        closeLiveTimerWindow(); // Explicit close ONLY on Check-Out!
+        updateAttendanceButtonsUI(updatedRec);
     }
-    renderAttendance();
+    renderAttendanceTable();
   }
 
   // ── Tasks ────────────────────────────────────────────────────
