@@ -1518,12 +1518,27 @@
       </table>`;
   }
 
-  // ── Salary ─────────────────────────────────────────────────
   function numberToWords(num) {
     if (!num || isNaN(num)) return 'Zero Rupees Only';
     const a = ['','One ','Two ','Three ','Four ','Five ','Six ','Seven ','Eight ','Nine ','Ten ','Eleven ','Twelve ','Thirteen ','Fourteen ','Fifteen ','Sixteen ','Seventeen ','Eighteen ','Nineteen '];
     const b = ['', '', 'Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
-   function getWorkingDaysForMonth(joinDateStr, monthStr, mode = 'month') {
+    
+    function inWords(n) {
+      if ((n = n.toString()).length > 9) return 'Overflow';
+      let n_arr = ('000000000' + n).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+      if (!n_arr) return '';
+      let str = '';
+      str += (n_arr[1] != 0) ? (a[Number(n_arr[1])] || b[n_arr[1][0]] + ' ' + a[n_arr[1][1]]) + 'Crore ' : '';
+      str += (n_arr[2] != 0) ? (a[Number(n_arr[2])] || b[n_arr[2][0]] + ' ' + a[n_arr[2][1]]) + 'Lakh ' : '';
+      str += (n_arr[3] != 0) ? (a[Number(n_arr[3])] || b[n_arr[3][0]] + ' ' + a[n_arr[3][1]]) + 'Thousand ' : '';
+      str += (n_arr[4] != 0) ? (a[Number(n_arr[4])] || b[n_arr[4][0]] + ' ' + a[n_arr[4][1]]) + 'Hundred ' : '';
+      str += (n_arr[5] != 0) ? ((str != '') ? 'and ' : '') + (a[Number(n_arr[5])] || b[n_arr[5][0]] + ' ' + a[n_arr[5][1]]) : '';
+      return str;
+    }
+    return inWords(Math.round(num)).trim() + ' Rupees Only';
+  }
+
+  function getWorkingDaysForMonth(joinDateStr, monthStr, mode = 'month') {
     const [yearStr, mStr] = monthStr.split('-');
     const year = parseInt(yearStr, 10);
     const month = parseInt(mStr, 10); // 1-indexed
