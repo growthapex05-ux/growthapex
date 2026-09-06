@@ -316,6 +316,25 @@ const EMS_DB = {
     await this._col('announcements').doc(String(id)).delete();
   },
 
+  // ── Client Invoices & Quotations ──────────────────────────
+
+  async getInvoices() {
+    const snap = await this._col('invoices').get();
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  },
+
+  async addInvoice(inv) {
+    const ref = await this._col('invoices').add({
+      ...inv,
+      createdAt: new Date().toISOString()
+    });
+    return { id: ref.id, ...inv };
+  },
+
+  async deleteInvoice(id) {
+    await this._col('invoices').doc(String(id)).delete();
+  },
+
   // ── Salary Releases ───────────────────────────────────────
 
   async getReleasedSalarySlips(empId) {
