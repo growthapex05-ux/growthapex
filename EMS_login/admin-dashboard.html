@@ -484,6 +484,7 @@
         <h3>💰 Payroll Details Report</h3>
         <div class="toolbar">
           <input class="search-input" id="salary-search" placeholder="🔍 Search employee…" oninput="renderSalary()">
+          <button class="btn btn-success" onclick="bulkReleaseAllSalarySlips()" style="background:#16a34a;color:#fff;border:none;display:inline-flex;align-items:center;gap:6px;font-weight:700">✅ Release All Slips to Portal</button>
           <button class="btn btn-success" onclick="sendBulkSalarySlipsWhatsApp()" style="background:#25D366;color:#fff;border:none;display:inline-flex;align-items:center;gap:6px;font-weight:600">🚀 Bulk WhatsApp Slips</button>
           <button class="btn btn-export" onclick="exportCSV('salary')">⬇ CSV</button>
         </div>
@@ -1878,8 +1879,11 @@ async function renderSalary() {
                 ? '<span class="badge badge-green">✅ Approved &amp; Released</span>' 
                 : '<span class="badge badge-amber">⏳ Pending Release</span>'}
             </td>
-            <td style="text-align:center">
-              <button class="btn btn-sm btn-primary" onclick="openSalarySlipModal('${e.id}', '${monthVal}')">📄 View &amp; Approve</button>
+            <td style="text-align:center;display:flex;gap:6px;justify-content:center;align-items:center">
+              <button class="btn btn-sm btn-primary" onclick="openSalarySlipModal('${e.id}', '${monthVal}')">📄 View</button>
+              ${e.isReleased 
+                ? '<button class="btn btn-sm" style="background:#15803d;color:#fff;border:none" disabled>✅ Released</button>' 
+                : `<button class="btn btn-sm btn-success" onclick="quickReleaseSalarySlip('${e.id}', '${monthVal}')" style="background:#16a34a;color:#fff;border:none;font-weight:700">✅ Release</button>`}
             </td>
           </tr>`;
         }).join('')}</tbody>
@@ -2300,6 +2304,72 @@ async function approveAndReleaseSalarySlip() {
       btnRelease.innerHTML = '✅ Approve & Release to Employee';
     }
   }
+}
+async function quickReleaseSalarySlip(empId, monthVal) {
+  const emp = cache.employees.find(e => e.id === empId);
+  if (!emp) return;
+
+  const baseSalary = Number(emp.salary || 0);
+  const daysDetails = getWorkingDaysForMonth(emp.joinDate || 'N/A', monthVal, 'month');
+  let earnedSalary = 0;
+  if (daysDetails.isJoined && daysDetails.workedWorkingDays > 0) {
+    earnedSalary = Math.round((baseSalary * daysDetails.workedWorkingDays) / (daysDetails.totalMonthWorkingDays || 26));
+  }
+  const advanceDeduction = emp.advanceDeduction !== undefined ? Number(emp.advanceDeduction) : 3000;
+  const netPayable = Math.max(0, earnedSalary - advanceDeduction);
+  const basic = Math.round(earnedSalary * 0.60);
+  const hra = Math.round(earnedSalary * 0.30);
+  const special = earnedSalary - (basic + hra);
+
+  const slipData = { emp, monthVal, earnedSalary, advanceDeduction, netPayable, basic, hra, special, daysDetails };
+
+  try {
+    await EMS_DB.releaseSalarySlip(emp.id, monthVal, slipData);
+    toast(`Salary slip for ${emp.name} approved & released to Employee Portal! ✅`, 'success');
+    renderSalary();
+  } catch(err) {
+    console.error('Quick release error:', err);
+    toast('Failed to release salary slip', 'error');
+  }
+}
+
+async function bulkReleaseAllSalarySlips() {
+  const monthVal = document.getElementById('salary-month-select')?.value || '2026-08';
+  const emps = cache.employees || [];
+  if (!emps.length) {
+    toast('No employees found to release', 'warning');
+    return;
+  }
+
+  if (!confirm(`Are you sure you want to approve & release salary slips for ALL ${emps.length} employees for ${monthVal} to the Employee Portal?`)) {
+    return;
+  }
+
+  let successCount = 0;
+  for (const emp of emps) {
+    try {
+      const baseSalary = Number(emp.salary || 0);
+      const daysDetails = getWorkingDaysForMonth(emp.joinDate || 'N/A', monthVal, 'month');
+      let earnedSalary = 0;
+      if (daysDetails.isJoined && daysDetails.workedWorkingDays > 0) {
+        earnedSalary = Math.round((baseSalary * daysDetails.workedWorkingDays) / (daysDetails.totalMonthWorkingDays || 26));
+      }
+      const advanceDeduction = emp.advanceDeduction !== undefined ? Number(emp.advanceDeduction) : 3000;
+      const netPayable = Math.max(0, earnedSalary - advanceDeduction);
+      const basic = Math.round(earnedSalary * 0.60);
+      const hra = Math.round(earnedSalary * 0.30);
+      const special = earnedSalary - (basic + hra);
+
+      const slipData = { emp, monthVal, earnedSalary, advanceDeduction, netPayable, basic, hra, special, daysDetails };
+      await EMS_DB.releaseSalarySlip(emp.id, monthVal, slipData);
+      successCount++;
+    } catch(err) {
+      console.error('Error releasing slip for', emp.id, err);
+    }
+  }
+
+  toast(`Successfully approved & released ${successCount} salary slips to Employee Portal! 🚀`, 'success');
+  renderSalary();
 }
 
 // ─── WhatsApp Salary Slip Share ──────────────────────────────
