@@ -61,35 +61,48 @@
         this._html = $('html')
     },
     methods: function (e) {
-      rdJs.swiperActivation();
-      rdJs.wowActive();
-      rdJs.odoMeter();
-      rdJs.searchOption();
-      rdJs.stickyHeader();
-      rdJs.title_animation();
-      rdJs.typing_text_animation();
-      rdJs.splitText();
-      rdJs.skew_up();
-      rdJs.textTitleAnimation__1();
-      rdJs.gsapAnimationImageScale();
-      rdJs.feedbackCollupsShow();
-      rdJs.imageSlideGsap();
-      rdJs.imageParalax();
-      rdJs.sideMenu();
-      rdJs.metismenu();
-      rdJs.preloader();
-      rdJs.goTop();
-      rdJs.tab_content_animation();
-      rdJs.smoothScroll();
-      rdJs.slice_slider();
-      rdJs.text_highlight();
-      rdJs.showRightRevel();
-      rdJs.scrollingText();
-      rdJs.scrollingText2();
-      rdJs.awardAccordion();
-      rdJs.containerResize();
-      rdJs.featureProjectHover();
-      rdJs.delayStatsProgress();
+      if (typeof rdJs.swiperActivation === "function") rdJs.swiperActivation();
+      if (typeof rdJs.wowActive === "function") rdJs.wowActive();
+      if (typeof rdJs.odoMeter === "function") rdJs.odoMeter();
+      if (typeof rdJs.searchOption === "function") rdJs.searchOption();
+      if (typeof rdJs.stickyHeader === "function") rdJs.stickyHeader();
+      if (typeof rdJs.title_animation === "function") rdJs.title_animation();
+      if (typeof rdJs.typing_text_animation === "function") rdJs.typing_text_animation();
+      if (typeof rdJs.splitText === "function") rdJs.splitText();
+      if (typeof rdJs.skew_up === "function") rdJs.skew_up();
+      if (typeof rdJs.textTitleAnimation__1 === "function") rdJs.textTitleAnimation__1();
+      if (typeof rdJs.gsapAnimationImageScale === "function") rdJs.gsapAnimationImageScale();
+      if (typeof rdJs.feedbackCollupsShow === "function") rdJs.feedbackCollupsShow();
+      if (typeof rdJs.imageSlideGsap === "function") rdJs.imageSlideGsap();
+      if (typeof rdJs.imageParalax === "function") rdJs.imageParalax();
+      if (typeof rdJs.sideMenu === "function") rdJs.sideMenu();
+      if (typeof rdJs.metismenu === "function") rdJs.metismenu();
+      if (typeof rdJs.preloader === "function") rdJs.preloader();
+      if (typeof rdJs.goTop === "function") rdJs.goTop();
+      if (typeof rdJs.tab_content_animation === "function") rdJs.tab_content_animation();
+      if (typeof rdJs.smoothScroll === "function") rdJs.smoothScroll();
+      if (typeof rdJs.slice_slider === "function") rdJs.slice_slider();
+      if (typeof rdJs.text_highlight === "function") rdJs.text_highlight();
+      if (typeof rdJs.showRightRevel === "function") rdJs.showRightRevel();
+      if (typeof rdJs.scrollingText === "function") rdJs.scrollingText();
+      if (typeof rdJs.scrollingText2 === "function") rdJs.scrollingText2();
+      if (typeof rdJs.awardAccordion === "function") rdJs.awardAccordion();
+      if (typeof rdJs.containerResize === "function") rdJs.containerResize();
+      if (typeof rdJs.featureProjectHover === "function") rdJs.featureProjectHover();
+      if (typeof rdJs.delayStatsProgress === "function") rdJs.delayStatsProgress();
+    },
+
+    sideMenu: function () {
+      if ($("#menu-btn").length) {
+        $("#menu-btn").on("click", function () {
+          $("#side-bar").toggleClass("show");
+        });
+      }
+    },
+    metismenu: function () {
+      if ($("#mobile-menu").length && $.fn.metisMenu) {
+        $("#mobile-menu").metisMenu();
+      }
     },
 
     swiperActivation: function () {
@@ -264,24 +277,56 @@
       if ($(".preloader").length) {
         var innerBars = document.querySelectorAll(".inner-bar");
         var increment = 0;
+        var hasAnimated = false;
 
-        function animateBars() {
-          for (var i = 0; i < 2; i++) {
-            var randomWidth = Math.floor(Math.random() * 101);
-            gsap.to(innerBars[i + increment], {
-              width: randomWidth + "%",
+        function hidePreloader() {
+          if ($(".preloader").length) {
+            gsap.to(".preloader", {
+              "--preloader-clip": "100%",
+              opacity: 0,
               duration: 0.3,
               ease: "none",
+              onComplete: function () {
+                $(".preloader").remove();
+              },
             });
+          }
+        }
+
+        // Safety fallback: guaranteed preloader removal after 1.2s max
+        setTimeout(function () {
+          hidePreloader();
+        }, 1200);
+
+        function animateBars() {
+          if (hasAnimated) return;
+          hasAnimated = true;
+
+          if (!innerBars || !innerBars.length) {
+            hidePreloader();
+            return;
+          }
+
+          for (var i = 0; i < 2; i++) {
+            if (innerBars[i + increment]) {
+              var randomWidth = Math.floor(Math.random() * 101);
+              gsap.to(innerBars[i + increment], {
+                width: randomWidth + "%",
+                duration: 0.3,
+                ease: "none",
+              });
+            }
           }
 
           gsap.delayedCall(0.3, function () {
             for (var i = 0; i < 2; i++) {
-              gsap.to(innerBars[i + increment], {
-                width: "100%",
-                duration: 0.3,
-                ease: "none",
-              });
+              if (innerBars[i + increment]) {
+                gsap.to(innerBars[i + increment], {
+                  width: "100%",
+                  duration: 0.3,
+                  ease: "none",
+                });
+              }
             }
 
             increment += 2;
@@ -289,26 +334,18 @@
             if (increment < innerBars.length) {
               animateBars();
             } else {
-              var preloaderTL = gsap.timeline({
-                onComplete: function () {
-                  $(".preloader").remove();
-                },
-              });
-
-              preloaderTL.to(".preloader", {
-                "--preloader-clip": "100%",
-                duration: 0.3,
-                ease: "none",
-              });
+              hidePreloader();
             }
           });
         }
 
-        $(window).on("load", function () {
+        if (document.readyState === "complete" || document.readyState === "interactive") {
           animateBars();
-        });
-      } else {
-
+        } else {
+          $(window).on("load", function () {
+            animateBars();
+          });
+        }
       }
     },
     goTop: function () {
