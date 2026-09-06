@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -7,6 +7,31 @@
     <meta name="description" content="Your Ultimate Solution for Creative Agency">
     <link rel="shortcut icon" type="image/svg+xml" href="assets/images/logo/favicon.svg">
     <title>GrowthApex</title>
+    <!-- Smart redirect: try to serve the .html version of the requested page -->
+    <script>
+      (function() {
+        var path = window.location.pathname;
+        // Remove leading slash and trailing slash
+        var page = path.replace(/^\/|\/$/g, '');
+        // List of known pages
+        var knownPages = [
+          'about','service','work','blog-standard','blog-two-columns','contact',
+          'blog-local-seo','blog-chatgpt-claude-ai-video-kit','blog-claude-ai-update-guide',
+          'blog-chatgpt-sora-video-automation','blog-viral-seo-ai-overviews-2026',
+          'blog-faceless-ai-youtube-empire','consultancy','work-details',
+          'service-details','pricing','faq'
+        ];
+        // If we have a repo prefix (github pages), strip it
+        var parts = page.split('/');
+        var lastPart = parts[parts.length - 1];
+        if (knownPages.indexOf(lastPart) !== -1) {
+          // Redirect to the .html version preserving the base path
+          var base = window.location.origin + (parts.length > 1 ? '/' + parts.slice(0, -1).join('/') + '/' : '/');
+          window.location.replace(base + lastPart + '.html');
+        }
+        // else fall through and show 404 page
+      })();
+    </script>
     <!-- swiper css -->
     <link rel="preload" href="assets/css/plugins/swiper.min.css" as="style">
     <!-- metismenu css -->

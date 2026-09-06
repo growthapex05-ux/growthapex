@@ -19977,3 +19977,95 @@ a.logo img {
   object-fit: contain;
 }
 
+/* ===== Blog Code Block (AI Prompt Box) ===== */
+.blog-code-block {
+  background: #f3f4f6;
+  border: 1px solid rgba(3, 7, 18, 0.12);
+  border-left: 4px solid var(--color-primary);
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.blog-code-block pre {
+  color: var(--color-heading-1);
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 14px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}
+
+.blog-code-block .h6 {
+  color: var(--color-heading-1);
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+/* ===== Blog Single Content – ensure dark readable text ===== */
+.blog-single-wrap h2,
+.blog-single-wrap h3,
+.blog-single-wrap h4 {
+  color: var(--color-heading-1);
+  margin-top: 32px;
+  margin-bottom: 12px;
+}
+
+.blog-single-wrap p,
+.blog-single-wrap li {
+  color: var(--color-body-1);
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+.blog-single-wrap ol,
+.blog-single-wrap ul {
+  padding-left: 20px;
+  margin-bottom: 20px;
+}
+
+.blog-single-wrap .table th,
+.blog-single-wrap .table td {
+  color: var(--color-heading-1);
+  border-color: rgba(3, 7, 18, 0.12);
+}
+
+.blog-single-wrap .table thead tr th {
+  background: rgba(0, 212, 255, 0.1);
+  font-weight: 700;
+}
+
+.blog-single-wrap .table {
+  border: 1px solid rgba(3, 7, 18, 0.12);
+}
+
+/* Blockquote inside blog */
+.blog-single-wrap blockquote,
+.blog-single-wrap .blockquote-wrap {
+  background: rgba(0, 212, 255, 0.06);
+  border-left: 4px solid var(--color-primary);
+  border-radius: 8px;
+  padding: 24px 28px;
+  margin: 24px 0;
+}
+
+.blog-single-wrap blockquote p,
+.blog-single-wrap .blockquote-wrap p {
+  color: var(--color-heading-1);
+  font-size: 17px;
+  font-weight: 500;
+  font-style: italic;
+  margin: 0;
+}
+
+/* ===== Hero / Banner section gap fix ===== */
+.wpr-banner-area {
+  margin-bottom: 0 !important;
+}
+
+/* ===== Team section – align cards centered when only 1-2 members ===== */
+.wpr-team-area .section-bottom-inner .row {
+  justify-content: center;
+}
+
+
