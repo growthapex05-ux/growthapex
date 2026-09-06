@@ -76,4 +76,24 @@
     <loc>https://growthapex.in/blog-content-marketing</loc>
     <priority>0.64</priority>
   </url>
+  <url>
+    <loc>https://growthapex.in/blog-chatgpt-claude-ai-video-kit</loc>
+    <priority>0.80</priority>
+  </url>
+  <url>
+    <loc>https://growthapex.in/blog-claude-ai-update-guide</loc>
+    <priority>0.80</priority>
+  </url>
+  <url>
+    <loc>https://growthapex.in/blog-chatgpt-sora-video-automation</loc>
+    <priority>0.80</priority>
+  </url>
+  <url>
+    <loc>https://growthapex.in/blog-viral-seo-ai-overviews-2026</loc>
+    <priority>0.80</priority>
+  </url>
+  <url>
+    <loc>https://growthapex.in/blog-faceless-ai-youtube-empire</loc>
+    <priority>0.80</priority>
+  </url>
 </urlset>
