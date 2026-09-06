@@ -208,7 +208,7 @@ async function generateDailyReport(db, targetDateStr = null) {
   }
 
   if (absentList.length > 0) {
-    report += `👻 *ABSENT / GHOST MODE (Funny Roast Corner 🛋️)*: \n${absentList.map((name, idx) => ` - *${name}*: ${FUNNY_ABSENT_ROASTS[idx % FUNNY_ABSENT_ROASTS.length]}`).join('\n')}\n\n`;
+    report += `❌ *ABSENT:*\n${absentList.map((name, idx) => ` - *${name}*: ${FUNNY_ABSENT_ROASTS[idx % FUNNY_ABSENT_ROASTS.length]}`).join('\n')}\n\n`;
   }
 
   report += `📝 *TASK SLAYS & ONGOING GRIND:*\n`;

@@ -3227,7 +3227,7 @@ async function generateReportText(type) {
     msg += `• Present & Grinding: ${presentIds.length} ⚡\n`;
     msg += `• Absent / Ghosting: ${absentList.length} 👻\n`;
     if (absentList.length) {
-      msg += `\n👻 *ABSENT / GHOST MODE (Funny Roast Corner 🛋️):*\n`;
+      msg += `\n❌ *ABSENT:*\n`;
       msg += absentList.map((n, idx) => ` - *${n}*: ${FUNNY_ABSENT_ROASTS[idx % FUNNY_ABSENT_ROASTS.length]}`).join('\n') + `\n`;
     }
     msg += `\n📝 *TASK SLAYS & ONGOING GRIND:*\n`;
