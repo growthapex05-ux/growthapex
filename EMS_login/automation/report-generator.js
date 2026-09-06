@@ -174,11 +174,11 @@ async function generateDailyReport(db, targetDateStr = null) {
   });
 
   const FUNNY_ABSENT_ROASTS = [
-    "👻 Ghost Mode Active (Lagta hai sapno ki duniya me busy hain! 😴💤)",
-    "🛋️ Couch Potato Alert (Bed se rishta bohot gehra chal raha hai! 🛏️✨)",
-    "⏰ Snooze Button Victim (Mummy ne bhi uthane se manaa kar diya! 🛑)",
-    "🏖️ Secret Goa Trip? (Bina bataye chutti? Party chal rahi hai! 🍹🔥)",
-    "🛌 Work From Pillow Mode (Attendance? Vo kya hota hai bhai? 🤔)"
+    "Lagta hai sapno ki duniya me busy hain! 😴💤",
+    "Bed se rishta bohot gehra chal raha hai! 🛏️✨",
+    "Snooze button ne aaj dhokha de diya! ⏰🛑",
+    "Bina bataye chutti? Lagta hai Goa nikal gaye! 🏖️🍹",
+    "Work from Pillow mode ON hai aaj! 🛋️✨"
   ];
 
   // Format Daily Report
