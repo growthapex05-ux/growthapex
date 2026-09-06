@@ -1847,9 +1847,9 @@ async function renderSalary() {
             <th>Joining Date</th>
             <th>Department</th>
             <th>Base Salary</th>
-            <th>Cal. Days</th>
-            <th>Sundays (Off)</th>
-            <th>Working Days</th>
+            <th>Tenure Days</th>
+            <th>Sundays (Paid Off)</th>
+            <th>Total Paid Days</th>
             <th>Earned Pay (${monthVal})</th>
             <th>Portal Release Status</th>
             <th style="text-align:center">Payslip</th>
@@ -1865,9 +1865,9 @@ async function renderSalary() {
             <td><span class="badge badge-blue">${e.joinDate}</span></td>
             <td>${e.department}</td>
             <td><b>${money(e.baseSalary)}</b></td>
-            <td>${e.daysDetails.workedCalendarDays} d</td>
-            <td><span style="color:#f87171">${e.daysDetails.sundays} Sun</span></td>
-            <td><b style="color:var(--purple-lt)">${e.daysDetails.workedWorkingDays} Days</b></td>
+            <td>${e.daysDetails.workedCalendarDays} Days</td>
+            <td><span style="color:#10b981;font-weight:600">+${e.daysDetails.sundays} Sun (Paid) ✅</span></td>
+            <td><b style="color:#38bdf8">${e.daysDetails.workedCalendarDays} Paid Days</b> <span style="font-size:11px;color:var(--muted)">(${e.daysDetails.workedWorkingDays}w + ${e.daysDetails.sundays}s)</span></td>
             <td>
               <div style="font-weight:800;color:#34d399;font-size:14px">${money(e.earnedSalary)}</div>
               <div class="progress" style="width:110px;margin-top:4px" title="${pct}% of base earned">
