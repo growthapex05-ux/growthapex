@@ -13129,6 +13129,7 @@ section .section-inner.border-1 {
 }
 
 .preloader {
+  display: none !important;
   width: 100vw;
   height: 100vh;
   position: fixed;
