@@ -113,48 +113,63 @@
   <script src="/EMS_login/ems-firebase.js"></script>
 
   <script>
-    const sess = JSON.parse(localStorage.getItem('ems_session') || '{}');
-    const empId = sess.id;
+    const params = new URLSearchParams(window.location.search);
+    let empId = params.get('empId');
+    let checkInStr = params.get('checkIn');
+    let dateStr = params.get('date');
 
     if (!empId) {
-      document.body.innerHTML = '<div style="color:#ef4444;font-weight:700;padding:20px">Not Authenticated</div>';
+      const sess = JSON.parse(localStorage.getItem('ems_session') || '{}');
+      empId = sess.id;
     }
 
     let checkInDate = new Date();
+    let clockStarted = false;
 
-    async function initTimerPage() {
-      const today = new Date().toISOString().split('T')[0];
-      const todayRec = await EMS_DB.getTodayAttendance(empId);
+    function parseCheckInDate(timeStr, dStr) {
+      if (!timeStr || timeStr === '--:--') return new Date();
 
-      if (!todayRec || !todayRec.checkIn || (todayRec.checkOut && todayRec.checkOut !== '—')) {
-        document.getElementById('clock-val').textContent = 'CHECKED OUT';
-        document.getElementById('status-badge').innerHTML = '🔴 CHECKED OUT';
-        document.getElementById('status-badge').style.background = 'rgba(239,68,68,0.2)';
-        document.getElementById('status-badge').style.color = '#f87171';
-        setTimeout(() => window.close(), 2000);
-        return;
+      const result = new Date();
+      if (dStr) {
+        const parts = dStr.split('-');
+        if (parts.length === 3) {
+          result.setFullYear(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        }
       }
 
-      const checkInStr = todayRec.checkIn;
-      document.getElementById('checkin-val').textContent = checkInStr;
+      const cleanStr = timeStr.trim();
+      if (cleanStr.includes('AM') || cleanStr.includes('PM')) {
+        const parts = cleanStr.split(' ');
+        const tParts = parts[0].split(':');
+        let hours = parseInt(tParts[0] || '0', 10);
+        const minutes = parseInt(tParts[1] || '0', 10);
+        const seconds = parseInt(tParts[2] || '0', 10);
 
-      // Parse checkIn time
-      if (checkInStr.includes('AM') || checkInStr.includes('PM')) {
-        const parts = checkInStr.trim().split(' ');
-        let [hours, minutes, seconds] = parts[0].split(':');
-        if (!seconds) seconds = '00';
-        if (hours === '12') hours = '00';
-        if (parts[1] === 'PM') hours = parseInt(hours, 10) + 12;
-        checkInDate.setHours(parseInt(hours, 10), parseInt(minutes, 10), parseInt(seconds, 10), 0);
+        if (parts[1].toUpperCase() === 'PM' && hours < 12) hours += 12;
+        if (parts[1].toUpperCase() === 'AM' && hours === 12) hours = 0;
+
+        result.setHours(hours, minutes, seconds, 0);
       } else {
-        const [h, m, s] = checkInStr.split(':');
-        if (h !== undefined) checkInDate.setHours(parseInt(h, 10));
-        if (m !== undefined) checkInDate.setMinutes(parseInt(m, 10));
-        if (s !== undefined) checkInDate.setSeconds(parseInt(s, 10));
+        const tParts = cleanStr.split(':');
+        const hours = parseInt(tParts[0] || '0', 10);
+        const minutes = parseInt(tParts[1] || '0', 10);
+        const seconds = parseInt(tParts[2] || '0', 10);
+        result.setHours(hours, minutes, seconds, 0);
       }
 
-      // Update timer clock every second
-      setInterval(() => {
+      return result;
+    }
+
+    function startClock(timeVal, dVal) {
+      if (clockStarted) return;
+      clockStarted = true;
+
+      if (timeVal) {
+        document.getElementById('checkin-val').textContent = timeVal;
+        checkInDate = parseCheckInDate(timeVal, dVal);
+      }
+
+      const updateTick = () => {
         const now = new Date();
         let diffSecs = Math.floor((now - checkInDate) / 1000);
         if (diffSecs < 0) diffSecs = 0;
@@ -164,40 +179,71 @@
         const secs = String(diffSecs % 60).padStart(2, '0');
 
         document.getElementById('clock-val').textContent = `${hrs} : ${mins} : ${secs}`;
-      }, 1000);
+      };
 
-      // Heartbeat & status sync
-      setInterval(async () => {
-        const rec = await EMS_DB.getTodayAttendance(empId);
-        if (rec) {
-          if (rec.activityStatus === 'idle') {
-            document.getElementById('status-badge').innerHTML = '🟡 IDLE (AWAY)';
-            document.getElementById('status-badge').style.background = 'rgba(245,158,11,0.2)';
-            document.getElementById('status-badge').style.color = '#fbbf24';
-          } else {
-            document.getElementById('status-badge').innerHTML = '🟢 ACTIVE WORKING';
-            document.getElementById('status-badge').style.background = 'rgba(34,197,94,0.2)';
-            document.getElementById('status-badge').style.color = '#4ade80';
-          }
-
-          if (rec.checkOut && rec.checkOut !== '—') {
-            window.close();
-          }
-        }
-      }, 4000);
+      updateTick();
+      setInterval(updateTick, 1000);
     }
 
-    initTimerPage();
+    // Start timer immediately from URL params if available!
+    if (checkInStr && checkInStr !== 'null' && checkInStr !== 'undefined') {
+      startClock(checkInStr, dateStr);
+    }
 
-    // Check-out button
+    // Firestore sync in background
+    async function syncFirestoreState() {
+      if (!empId) return;
+      try {
+        const todayRec = await EMS_DB.getTodayAttendance(empId);
+        if (todayRec && todayRec.checkIn) {
+          if (!clockStarted) {
+            startClock(todayRec.checkIn, todayRec.date);
+          }
+
+          if (todayRec.activityStatus === 'idle') {
+            const badge = document.getElementById('status-badge');
+            badge.innerHTML = '🟡 IDLE (AWAY)';
+            badge.style.background = 'rgba(245,158,11,0.2)';
+            badge.style.color = '#fbbf24';
+          } else {
+            const badge = document.getElementById('status-badge');
+            badge.innerHTML = '🟢 ACTIVE WORKING';
+            badge.style.background = 'rgba(34,197,94,0.2)';
+            badge.style.color = '#4ade80';
+          }
+
+          // Only close if checkOut is explicitly marked and valid
+          if (todayRec.checkOut && todayRec.checkOut !== '—') {
+            document.getElementById('clock-val').textContent = 'CHECKED OUT';
+            document.getElementById('status-badge').innerHTML = '🔴 CHECKED OUT';
+            document.getElementById('status-badge').style.background = 'rgba(239,68,68,0.2)';
+            document.getElementById('status-badge').style.color = '#f87171';
+            setTimeout(() => window.close(), 1500);
+          }
+        }
+      } catch(e) {
+        console.warn('Sync timer state error:', e);
+      }
+    }
+
+    syncFirestoreState();
+    setInterval(syncFirestoreState, 5000);
+
+    // Check-out button handler
     document.getElementById('btn-checkout').onclick = async () => {
+      if (!empId) return;
+      const btn = document.getElementById('btn-checkout');
+      btn.disabled = true;
+      btn.textContent = '⌛ Checking out...';
+
       const today = new Date().toISOString().split('T')[0];
       const time  = new Date().toLocaleTimeString('en-IN', { hour12: false });
       const rec   = await EMS_DB.getTodayAttendance(empId);
-      if (rec) {
+      
+      if (rec && rec.checkIn) {
         await EMS_DB.markAttendance({ empId, date: today, status: rec.status, checkIn: rec.checkIn, checkOut: time });
       }
-      alert('Checked out successfully!');
+
       if (window.opener) {
         try { window.opener.location.reload(); } catch(e) {}
       }

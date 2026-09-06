@@ -931,13 +931,15 @@
 
   let timerPopoutWindow = null;
 
-  async function openLiveTimerWindow(checkInStr) {
+  async function openLiveTimerWindow(checkInStr, dateStr) {
     if (timerPopoutWindow && !timerPopoutWindow.closed) return;
 
     try {
+      const today = dateStr || new Date().toISOString().split('T')[0];
+      const url = `/EMS_login/timer.html?empId=${encodeURIComponent(empId)}&checkIn=${encodeURIComponent(checkInStr || '')}&date=${encodeURIComponent(today)}`;
       const left = window.screen.width - 360;
       const top = window.screen.height - 280;
-      timerPopoutWindow = window.open('/EMS_login/timer.html', 'EMS_LiveTimerWindow', `width=340,height=250,left=${left},top=${top},resizable=no,scrollbars=no,status=no,toolbar=no,menubar=no`);
+      timerPopoutWindow = window.open(url, 'EMS_LiveTimerWindow', `width=340,height=250,left=${left},top=${top},resizable=no,scrollbars=no,status=no,toolbar=no,menubar=no`);
     } catch(err) {
       console.warn('Popout window launch failed:', err);
     }
@@ -967,7 +969,7 @@
 
     // Launch Always On Top PiP Popout window ONLY on direct click gesture!
     if (triggerPopout) {
-      openLiveTimerWindow(displayCheckIn).catch(() => {});
+      openLiveTimerWindow(displayCheckIn, dateStr).catch(() => {});
     }
 
     const updateTimer = () => {
