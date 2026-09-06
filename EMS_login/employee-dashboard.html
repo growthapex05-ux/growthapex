@@ -1471,19 +1471,58 @@
     if (!num || isNaN(num)) return 'Zero Rupees Only';
     const a = ['','One ','Two ','Three ','Four ','Five ','Six ','Seven ','Eight ','Nine ','Ten ','Eleven ','Twelve ','Thirteen ','Fourteen ','Fifteen ','Sixteen ','Seventeen ','Eighteen ','Nineteen '];
     const b = ['', '', 'Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
-    function inWords(n) {
-      if ((n = n.toString()).length > 9) return 'Overflow';
-      let n_arr = ('000000000' + n).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
-      if (!n_arr) return '';
-      let str = '';
-      str += (n_arr[1] != 0) ? (a[Number(n_arr[1])] || b[n_arr[1][0]] + ' ' + a[n_arr[1][1]]) + 'Crore ' : '';
-      str += (n_arr[2] != 0) ? (a[Number(n_arr[2])] || b[n_arr[2][0]] + ' ' + a[n_arr[2][1]]) + 'Lakh ' : '';
-      str += (n_arr[3] != 0) ? (a[Number(n_arr[3])] || b[n_arr[3][0]] + ' ' + a[n_arr[3][1]]) + 'Thousand ' : '';
-      str += (n_arr[4] != 0) ? (a[Number(n_arr[4])] || b[n_arr[4][0]] + ' ' + a[n_arr[4][1]]) + 'Hundred ' : '';
-      str += (n_arr[5] != 0) ? ((str != '') ? 'and ' : '') + (a[Number(n_arr[5])] || b[n_arr[5][0]] + ' ' + a[n_arr[5][1]]) : '';
-      return str;
+   function getWorkingDaysForMonth(joinDateStr, monthStr, mode = 'month') {
+    const [yearStr, mStr] = monthStr.split('-');
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(mStr, 10); // 1-indexed
+
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const monthEndStr = `${year}-${String(month).padStart(2,'0')}-${String(daysInMonth).padStart(2,'0')}`;
+
+    let calcStartStr = `${year}-${String(month).padStart(2,'0')}-01`;
+    if (mode === 'cumulative' && joinDateStr) {
+      calcStartStr = joinDateStr;
+    } else if (joinDateStr) {
+      const jDate = new Date(joinDateStr + 'T00:00:00');
+      const mStart = new Date(year, month - 1, 1);
+      const mEnd = new Date(year, month - 1, daysInMonth);
+      
+      if (jDate > mEnd) {
+        return { totalMonthWorkingDays: 0, workedWorkingDays: 0, workedCalendarDays: 0, sundays: 0, isJoined: false };
+      }
+      if (jDate > mStart) {
+        calcStartStr = joinDateStr;
+      }
     }
-    return inWords(Math.round(num)).trim() + ' Rupees Only';
+
+    let totalMonthWorkingDays = 0;
+    for (let d = 1; d <= daysInMonth; d++) {
+      let dt = new Date(year, month - 1, d);
+      if (dt.getDay() !== 0) totalMonthWorkingDays++;
+    }
+
+    let start = new Date(calcStartStr + 'T00:00:00');
+    let end = new Date(monthEndStr + 'T00:00:00');
+
+    let workedCalendarDays = 0;
+    let sundays = 0;
+    let workedWorkingDays = 0;
+
+    let current = new Date(start);
+    while (current <= end) {
+      workedCalendarDays++;
+      if (current.getDay() === 0) sundays++;
+      else workedWorkingDays++;
+      current.setDate(current.getDate() + 1);
+    }
+
+    return {
+      totalMonthWorkingDays,
+      workedWorkingDays,
+      workedCalendarDays,
+      sundays,
+      isJoined: true
+    };
   }
 
   function calculateCumulativeLeaves(empObj, targetMonthVal, allAttendance) {
@@ -1539,48 +1578,47 @@
     const container = document.getElementById('salary-info');
     if (!container) return;
 
-    container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted)">⌛ Checking salary release status from HR...</div>`;
-
     if (!emp || !emp.id) {
       container.innerHTML = `<div style="color:var(--danger);padding:20px;text-align:center">Employee profile not loaded</div>`;
       return;
     }
 
     try {
-      const releasedList = await EMS_DB.getReleasedSalarySlips(emp.id);
-      const releaseRecord = (releasedList || []).find(r => r.monthVal === monthVal);
+      let empAtt = [];
+      try {
+        empAtt = await EMS_DB.getAttendance(emp.id) || [];
+      } catch (e) { empAtt = []; }
 
-      if (!releaseRecord || releaseRecord.status !== 'released') {
-        container.innerHTML = `
-          <div style="max-width:750px;background:var(--card-bg, #ffffff);border:1px dashed #f59e0b;padding:32px;border-radius:12px;text-align:center;margin:0 auto">
-            <div style="font-size:48px;margin-bottom:12px">⏳</div>
-            <h3 style="font-family:'Space Grotesk',sans-serif;color:#d97706;margin-bottom:8px">Payslip Pending HR Approval</h3>
-            <p style="color:var(--muted);font-size:14px;max-width:500px;margin:0 auto 20px auto">
-              The salary slip for <b>${monthName}</b> has not been approved or released by HR yet. Once approved from the Admin Portal, it will appear here for viewing and PDF download.
-            </p>
-            <div style="background:#fffbeb;padding:12px 16px;border-radius:8px;display:inline-block;font-size:13px;color:#b45309">
-              ℹ️ For any urgent inquiries, please contact HR at support@growthapex.in
-            </div>
-          </div>`;
-        return;
+      const baseSalary = Number(emp.salary || 0);
+      const joinDate = emp.joinDate || 'N/A';
+      const daysDetails = getWorkingDaysForMonth(joinDate, monthVal, 'month');
+
+      let earnedSalary = 0;
+      if (daysDetails.isJoined && daysDetails.workedWorkingDays > 0) {
+        earnedSalary = Math.round((baseSalary * daysDetails.workedWorkingDays) / (daysDetails.totalMonthWorkingDays || 26));
+      } else {
+        earnedSalary = baseSalary;
       }
 
-      // Slip is released & approved by HR!
-      const slipData = releaseRecord.slipData || {};
-      const baseSalary = Number(emp.salary || 0);
-      const earnedSalary = slipData.earnedSalary !== undefined ? slipData.earnedSalary : baseSalary;
-      const advanceDeduction = slipData.advanceDeduction !== undefined ? slipData.advanceDeduction : (emp.advanceDeduction !== undefined ? Number(emp.advanceDeduction) : 3000);
-      const netPayable = slipData.netPayable !== undefined ? slipData.netPayable : Math.max(0, earnedSalary - advanceDeduction);
-      const basic = slipData.basic !== undefined ? slipData.basic : Math.round(earnedSalary * 0.60);
-      const hra = slipData.hra !== undefined ? slipData.hra : Math.round(earnedSalary * 0.30);
-      const special = slipData.special !== undefined ? slipData.special : earnedSalary - (basic + hra);
-
       const leaveData = calculateCumulativeLeaves(emp, monthVal, empAtt);
-      const releasedDateStr = releaseRecord.releasedAt ? new Date(releaseRecord.releasedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recently';
+      const advanceDeduction = emp.advanceDeduction !== undefined ? Number(emp.advanceDeduction) : 3000;
+      const netPayable = Math.max(0, earnedSalary - advanceDeduction);
+
+      const basic = Math.round(earnedSalary * 0.60);
+      const hra = Math.round(earnedSalary * 0.30);
+      const special = earnedSalary - (basic + hra);
+
+      const releasedList = await EMS_DB.getReleasedSalarySlips(emp.id);
+      const releaseRecord = (releasedList || []).find(r => r.monthVal === monthVal);
+      const isReleased = (releaseRecord && releaseRecord.status === 'released');
+
+      const releasedDateStr = (isReleased && releaseRecord.releasedAt) 
+        ? new Date(releaseRecord.releasedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) 
+        : 'Recently';
 
       container.innerHTML = `
-        <div style="max-width:750px;background:#fff;color:#111827;padding:24px;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.05);margin:0 auto">
-          <!-- Top Bar -->
+        <div style="max-width:760px;background:#fff;color:#111827;padding:24px;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.05);margin:0 auto">
+          <!-- Top Header -->
           <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #00D4FF;padding-bottom:12px;margin-bottom:16px">
             <img src="../assets/images/logo/growthapex-logo.png" alt="GrowthApex Logo" style="height:48px;object-fit:contain" onerror="this.src='../assets/images/logo/favicon.svg'">
             <div style="text-align:right">
@@ -1589,78 +1627,124 @@
             </div>
           </div>
 
-          <div style="display:flex;justify-content:space-between;align-items:center;background:#f0fdf4;padding:10px 16px;border-radius:8px;margin-bottom:16px;border:1px solid #bbf7d0">
+          <!-- Status Banner -->
+          <div style="display:flex;justify-content:space-between;align-items:center;background:${isReleased ? '#f0fdf4' : '#fffbeb'};padding:10px 16px;border-radius:8px;margin-bottom:16px;border:1px solid ${isReleased ? '#bbf7d0' : '#fef3c7'}">
             <div>
-              <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;color:#166534">PAYSLIP FOR: ${monthName.toUpperCase()}</div>
-              <div style="font-size:11px;color:#15803d">Approved &amp; Released by HR on ${releasedDateStr}</div>
+              <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;color:${isReleased ? '#166534' : '#b45309'}">PAYSLIP FOR: ${monthName.toUpperCase()}</div>
+              <div style="font-size:11px;color:${isReleased ? '#15803d' : '#d97706'}">
+                ${isReleased ? `Approved &amp; Released by HR on ${releasedDateStr}` : '⏳ Live Estimate (Pending Final HR Release &amp; Approval)'}
+              </div>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
               <button class="btn btn-primary" onclick="downloadEmpSalarySlipPDF()" style="padding:6px 14px;font-size:12px;background:#0284c7;color:#fff;border:none">📥 Download PDF</button>
               <button class="btn btn-success" onclick="sendEmpSalarySlipWhatsApp('${monthVal}')" style="padding:6px 14px;font-size:12px;background:#25D366;color:#fff;border:none;display:inline-flex;align-items:center;gap:4px;font-weight:600">📱 Send WhatsApp</button>
-              <button class="btn btn-secondary" onclick="printEmpSalarySlip()" style="padding:6px 14px;font-size:12px;background:#e5e7eb;color:#111827;border:none">🖨️ Print Slip</button>
+              <button class="btn btn-secondary" onclick="printEmpSalarySlip()" style="padding:6px 14px;font-size:12px;background:#e5e7eb;color:#111827;border:none">🖨️ Print</button>
             </div>
           </div>
 
           <!-- Meta Table -->
-          <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px;color:#111827">
+          <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12.5px;color:#111827;table-layout:fixed;word-wrap:break-word">
             <tr>
-              <td style="padding:6px;font-weight:700;color:#4b5563">Employee Name:</td>
-              <td style="padding:6px;font-weight:700">${emp.name}</td>
-              <td style="padding:6px;font-weight:700;color:#4b5563">Employee ID:</td>
-              <td style="padding:6px;font-weight:700;color:#0284c7">${emp.id}</td>
+              <td style="padding:5px 6px;font-weight:700;width:18%;color:#4b5563">Employee Name:</td>
+              <td style="padding:5px 6px;width:32%;font-weight:700">${emp.name}</td>
+              <td style="padding:5px 6px;font-weight:700;width:18%;color:#4b5563">Employee ID:</td>
+              <td style="padding:5px 6px;width:32%;font-weight:700;color:#0284c7">${emp.id}</td>
             </tr>
             <tr>
-              <td style="padding:6px;font-weight:700;color:#4b5563">Designation:</td>
-              <td style="padding:6px">${emp.designation || 'N/A'}</td>
-              <td style="padding:6px;font-weight:700;color:#4b5563">Department:</td>
-              <td style="padding:6px">${emp.department || 'N/A'}</td>
+              <td style="padding:5px 6px;font-weight:700;color:#4b5563">Designation:</td>
+              <td style="padding:5px 6px">${emp.designation || 'N/A'}</td>
+              <td style="padding:5px 6px;font-weight:700;color:#4b5563">Department:</td>
+              <td style="padding:5px 6px">${emp.department || 'N/A'}</td>
             </tr>
             <tr>
-              <td style="padding:6px;font-weight:700;color:#4b5563">Joining Date:</td>
-              <td style="padding:6px">${emp.joinDate || 'N/A'}</td>
-              <td style="padding:6px;font-weight:700;color:#4b5563">HR Status:</td>
-              <td style="padding:6px"><span style="background:#dcfce7;color:#15803d;padding:3px 10px;border-radius:12px;font-weight:700;font-size:11px">APPROVED &amp; RELEASED ✅</span></td>
+              <td style="padding:5px 6px;font-weight:700;color:#4b5563">Joining Date:</td>
+              <td style="padding:5px 6px">${joinDate}</td>
+              <td style="padding:5px 6px;font-weight:700;color:#4b5563">Payment Status:</td>
+              <td style="padding:5px 6px">
+                ${isReleased ? '<span style="background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:12px;font-weight:700;font-size:11px">CONFIRMED PAID ✅</span>'
+                             : '<span style="background:#fef3c7;color:#d97706;padding:2px 8px;border-radius:12px;font-weight:700;font-size:11px">⏳ PENDING HR RELEASE</span>'}
+              </td>
             </tr>
             <tr>
-              <td style="padding:6px;font-weight:700;color:#4b5563">Leaves Taken:</td>
-              <td style="padding:6px">${leaveData.leavesTakenInMonth} Days (${leaveData.totalLeavesTaken} Total)</td>
-              <td style="padding:6px;font-weight:700;color:#4b5563">Earned Leave Credit:</td>
-              <td style="padding:6px"><span style="background:#e0f2fe;color:#0284c7;padding:2px 8px;border-radius:12px;font-weight:700;font-size:11px">+${leaveData.balance} Days Balance 🎁</span></td>
+              <td style="padding:5px 6px;font-weight:700;color:#4b5563">Leaves Taken:</td>
+              <td style="padding:5px 6px">${leaveData.leavesTakenInMonth} Days (${leaveData.totalLeavesTaken} Total)</td>
+              <td style="padding:5px 6px;font-weight:700;color:#4b5563">Earned Leave Credit:</td>
+              <td style="padding:5px 6px"><span style="background:#e0f2fe;color:#0284c7;padding:2px 8px;border-radius:12px;font-weight:700;font-size:11px">+${leaveData.balance} Days Balance 🎁</span></td>
             </tr>
           </table>
 
-          <!-- Earnings Breakdown Table -->
-          <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px;color:#111827">
+          <!-- Days Breakdown Table -->
+          <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:11px;text-align:center;color:#111827;table-layout:fixed;word-wrap:break-word">
             <thead>
               <tr style="background:#f9fafb">
-                <th style="border:1px solid #e5e7eb;padding:8px;text-align:left;color:#374151">Earnings Breakdown</th>
-                <th style="border:1px solid #e5e7eb;padding:8px;text-align:right;color:#374151">Amount (₹)</th>
-                <th style="border:1px solid #e5e7eb;padding:8px;text-align:left;color:#374151">Deductions</th>
-                <th style="border:1px solid #e5e7eb;padding:8px;text-align:right;color:#374151">Amount (₹)</th>
+                <th style="border:1px solid #e5e7eb;padding:6px 3px;color:#374151;width:16%">Total Calendar Days</th>
+                <th style="border:1px solid #e5e7eb;padding:6px 3px;color:#374151;width:16%">Sundays (Paid Off)</th>
+                <th style="border:1px solid #e5e7eb;padding:6px 3px;color:#374151;width:17%">Working Days Worked</th>
+                <th style="border:1px solid #e5e7eb;padding:6px 3px;color:#374151;width:17%">Leaves Taken (Month)</th>
+                <th style="border:1px solid #e5e7eb;padding:6px 3px;color:#374151;width:17%">Cumulative Leave Balance</th>
+                <th style="border:1px solid #e5e7eb;padding:6px 3px;color:#374151;width:17%">Net Payable Days</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td style="border:1px solid #e5e7eb;padding:8px">Basic Pay (60%)</td>
-                <td style="border:1px solid #e5e7eb;padding:8px;text-align:right">${money(basic)}</td>
-                <td style="border:1px solid #e5e7eb;padding:8px;color:#dc2626">Advance / Statutory Deduction</td>
-                <td style="border:1px solid #e5e7eb;padding:8px;text-align:right;color:#dc2626">-${money(advanceDeduction)}</td>
+                <td style="border:1px solid #e5e7eb;padding:6px 3px">${daysDetails.workedCalendarDays} Days</td>
+                <td style="border:1px solid #e5e7eb;padding:6px 3px;color:#dc2626">${daysDetails.sundays} Sundays</td>
+                <td style="border:1px solid #e5e7eb;padding:6px 3px;font-weight:700;color:#0284c7">${daysDetails.workedWorkingDays} Days</td>
+                <td style="border:1px solid #e5e7eb;padding:6px 3px;color:${leaveData.leavesTakenInMonth > 0 ? '#dc2626' : '#16a34a'}">${leaveData.leavesTakenInMonth} Days</td>
+                <td style="border:1px solid #e5e7eb;padding:6px 3px;font-weight:700;color:#16a34a">+${leaveData.balance} Days (${leaveData.monthsWorked} Mos)</td>
+                <td style="border:1px solid #e5e7eb;padding:6px 3px;font-weight:700;color:#16a34a">${daysDetails.workedCalendarDays} Paid Days</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Earnings & Deductions Table -->
+          <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12.5px;color:#111827;table-layout:fixed;word-wrap:break-word">
+            <thead>
+              <tr style="background:#f9fafb">
+                <th style="border:1px solid #e5e7eb;padding:7px;text-align:left;color:#374151;width:33%">Earnings Breakdown</th>
+                <th style="border:1px solid #e5e7eb;padding:7px;text-align:right;color:#374151;width:17%">Amount (₹)</th>
+                <th style="border:1px solid #e5e7eb;padding:7px;text-align:left;color:#374151;width:33%">Deductions</th>
+                <th style="border:1px solid #e5e7eb;padding:7px;text-align:right;color:#374151;width:17%">Amount (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="border:1px solid #e5e7eb;padding:7px">Basic Pay (60%)</td>
+                <td style="border:1px solid #e5e7eb;padding:7px;text-align:right">${money(basic)}</td>
+                <td style="border:1px solid #e5e7eb;padding:7px;color:#dc2626">Advance / Statutory Deduction</td>
+                <td style="border:1px solid #e5e7eb;padding:7px;text-align:right;color:#dc2626">-${money(advanceDeduction)}</td>
               </tr>
               <tr>
-                <td style="border:1px solid #e5e7eb;padding:8px">House Rent Allowance (HRA 30%)</td>
-                <td style="border:1px solid #e5e7eb;padding:8px;text-align:right">${money(hra)}</td>
-                <td style="border:1px solid #e5e7eb;padding:8px">PF / ESI Deduction</td>
-                <td style="border:1px solid #e5e7eb;padding:8px;text-align:right;color:#16a34a">₹0 (Nil)</td>
+                <td style="border:1px solid #e5e7eb;padding:7px">House Rent Allowance (HRA 30%)</td>
+                <td style="border:1px solid #e5e7eb;padding:7px;text-align:right">${money(hra)}</td>
+                <td style="border:1px solid #e5e7eb;padding:7px">PF / ESI Deduction</td>
+                <td style="border:1px solid #e5e7eb;padding:7px;text-align:right;color:#16a34a">₹0 (Nil)</td>
               </tr>
               <tr>
-                <td style="border:1px solid #e5e7eb;padding:8px">Special Allowance</td>
-                <td style="border:1px solid #e5e7eb;padding:8px;text-align:right">${money(special)}</td>
-                <td style="border:1px solid #e5e7eb;padding:8px;font-weight:700">Total Deductions</td>
-                <td style="border:1px solid #e5e7eb;padding:8px;text-align:right;font-weight:700;color:#dc2626">-${money(advanceDeduction)}</td>
+                <td style="border:1px solid #e5e7eb;padding:7px">Special / Performance Allowance</td>
+                <td style="border:1px solid #e5e7eb;padding:7px;text-align:right">${money(special)}</td>
+                <td style="border:1px solid #e5e7eb;padding:7px;font-weight:700">Total Deductions</td>
+                <td style="border:1px solid #e5e7eb;padding:7px;text-align:right;font-weight:700;color:#dc2626">-${money(advanceDeduction)}</td>
               </tr>
               <tr style="background:#f0fdf4;font-weight:700">
-                <td style="border:1px solid #e5e7eb;padding:10px;color:#166534">Gross Earnings</td>
-                <td style="border:1px solid #e5e7eb;padding:10px;text-align:right;color:#166534">${money(earnedSalary)}</td>
+                <td style="border:1px solid #e5e7eb;padding:9px;color:#166534">Gross Earnings</td>
+                <td style="border:1px solid #e5e7eb;padding:9px;text-align:right;color:#166534">${money(earnedSalary)}</td>
+                <td style="border:1px solid #e5e7eb;padding:9px;color:#166534">Net Salary Payable</td>
+                <td style="border:1px solid #e5e7eb;padding:9px;text-align:right;color:#166534;font-size:14px">${money(netPayable)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Amount In Words -->
+          <div style="background:#f9fafb;padding:10px;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:12px;font-size:12.5px">
+            <b>Amount in Words:</b> <span style="color:#0284c7;font-weight:600">${numberToWords(netPayable)}</span>
+          </div>
+        </div>`;
+    } catch (err) {
+      console.error('Error fetching released salary slips:', err);
+      container.innerHTML = `<div style="color:var(--danger);padding:20px;text-align:center">Error retrieving salary release status. Please try again.</div>`;
+    }
+  }:right;color:#166534">${money(earnedSalary)}</td>
                 <td style="border:1px solid #e5e7eb;padding:10px;color:#166534">Net Salary Payable</td>
                 <td style="border:1px solid #e5e7eb;padding:10px;text-align:right;color:#166534;font-size:15px">${money(netPayable)}</td>
               </tr>
