@@ -392,8 +392,8 @@
     <div class="section-card">
       <h3>📅 Today's Attendance</h3>
       <div class="att-row">
-        <button class="btn btn-green" onclick="markAtt('present')">✅ Mark Check-In</button>
-        <button class="btn btn-red"   onclick="markAtt('absent')">❌ Mark Check-Out</button>
+        <button class="btn btn-green" id="btn-checkin-action" onclick="markAtt('present')">✅ Mark Check-In</button>
+        <button class="btn btn-red"   id="btn-checkout-action" onclick="markAtt('absent')">❌ Mark Check-Out</button>
         <div id="today-att-status"></div>
         <div id="live-pulse-badge"></div>
       </div>
@@ -1021,8 +1021,12 @@
     }
   }
 
-  function startLiveTimerWidget(checkInStr, dateStr) {
-    stopLiveTimerWidget();
+  function startLiveTimerWidget(checkInStr, dateStr, triggerPopout = false) {
+    if (liveTimerInterval) {
+      clearInterval(liveTimerInterval);
+      liveTimerInterval = null;
+    }
+
     const widget = document.getElementById('floating-work-timer');
     if (widget) widget.style.display = 'block';
 
@@ -1032,8 +1036,10 @@
     const checkinEl = document.getElementById('timer-checkin-val');
     if (checkinEl) checkinEl.textContent = displayCheckIn;
 
-    // Launch Always On Top PiP Popout window
-    openLiveTimerWindow(displayCheckIn).catch(() => {});
+    // Launch Always On Top PiP Popout window ONLY on direct click gesture!
+    if (triggerPopout) {
+      openLiveTimerWindow(displayCheckIn).catch(() => {});
+    }
 
     const updateTimer = () => {
       const now = new Date();
@@ -1065,7 +1071,7 @@
         }
       }
 
-      // 2. Update PiP / Popout window
+      // 2. Update PiP / Popout window if open
       if (timerPopoutWindow && timerPopoutWindow.document) {
         try {
           const pClock = timerPopoutWindow.document.getElementById('pip-clock');
@@ -1152,10 +1158,46 @@
       ? `<strong>Check-In:</strong> ${todayRec.checkIn||'—'} &nbsp;|&nbsp; <strong>Check-Out:</strong> ${todayRec.checkOut||'—'}`
       : '';
     
+    const btnCheckIn = document.getElementById('btn-checkin-action');
+    const btnCheckOut = document.getElementById('btn-checkout-action');
+
     if (todayRec && todayRec.checkIn && (!todayRec.checkOut || todayRec.checkOut === '—')) {
+      // Active working state
+      if (btnCheckIn) { 
+        btnCheckIn.disabled = true; 
+        btnCheckIn.innerHTML = '✅ Checked In (Working)'; 
+        btnCheckIn.style.background = '#16a34a';
+      }
+      if (btnCheckOut) { 
+        btnCheckOut.disabled = false; 
+        btnCheckOut.innerHTML = '❌ Mark Check-Out'; 
+      }
       startHeartbeatEngine();
-      startLiveTimerWidget(todayRec.checkIn, todayRec.date);
+      startLiveTimerWidget(todayRec.checkIn, todayRec.date, false);
+    } else if (todayRec && todayRec.checkIn && todayRec.checkOut && todayRec.checkOut !== '—') {
+      // Checked out earlier today -> Allow Resume Work (Re-Check-In)!
+      if (btnCheckIn) { 
+        btnCheckIn.disabled = false; 
+        btnCheckIn.innerHTML = '▶️ Resume Work (Re-Check-In)'; 
+        btnCheckIn.style.background = '#0284c7';
+      }
+      if (btnCheckOut) { 
+        btnCheckOut.disabled = true; 
+        btnCheckOut.innerHTML = '⏹️ Checked Out'; 
+      }
+      stopHeartbeatEngine();
+      stopLiveTimerWidget();
     } else {
+      // Not marked yet today
+      if (btnCheckIn) { 
+        btnCheckIn.disabled = false; 
+        btnCheckIn.innerHTML = '✅ Mark Check-In'; 
+        btnCheckIn.style.background = '#16a34a';
+      }
+      if (btnCheckOut) { 
+        btnCheckOut.disabled = true; 
+        btnCheckOut.innerHTML = '❌ Mark Check-Out'; 
+      }
       stopHeartbeatEngine();
       stopLiveTimerWidget();
     }
@@ -1183,14 +1225,31 @@
     const rec   = await EMS_DB.getTodayAttendance(empId);
     
     if (type === 'present') {
-        if(rec && rec.checkIn) { toast('Check-in already marked for today', 'info'); return; }
-        await EMS_DB.markAttendance({ empId, date:today, status:'present', checkIn:time, lastHeartbeat: new Date().toISOString() });
-        toast('Checked in successfully. Active live timer & tracking started! 🟢', 'success');
+        if (rec && rec.checkIn && (!rec.checkOut || rec.checkOut === '—')) { 
+          toast('You are currently checked in and active! 🟢', 'info'); 
+          return; 
+        }
+
+        // Re-check-in / Resume work if checked out earlier today
+        const isReCheckIn = (rec && rec.checkIn && rec.checkOut && rec.checkOut !== '—');
+        const checkInTime = isReCheckIn ? rec.checkIn : time;
+
+        await EMS_DB.markAttendance({ 
+          empId, 
+          date: today, 
+          status: 'present', 
+          checkIn: checkInTime, 
+          checkOut: '—',
+          checkoutReason: '',
+          lastHeartbeat: new Date().toISOString() 
+        });
+
+        toast(isReCheckIn ? 'Resumed work & re-checked in successfully! Live timer restarted. 🟢' : 'Checked in successfully. Active live timer & tracking started! 🟢', 'success');
         startHeartbeatEngine();
-        startLiveTimerWidget(time, today);
+        startLiveTimerWidget(checkInTime, today, true);
     } else {
-        if(!rec || !rec.checkIn) { toast('You must check in first', 'error'); return; }
-        if(rec.checkOut) { toast('Check-out already marked for today', 'info'); return; }
+        if (!rec || !rec.checkIn) { toast('You must check in first', 'error'); return; }
+        if (rec.checkOut && rec.checkOut !== '—') { toast('Check-out already marked for today', 'info'); return; }
         await EMS_DB.markAttendance({ empId, date:today, status:rec.status, checkIn:rec.checkIn, checkOut:time });
         toast('Checked out successfully. Live timer stopped.', 'success');
         stopHeartbeatEngine();
