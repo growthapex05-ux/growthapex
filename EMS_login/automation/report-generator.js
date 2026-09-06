@@ -173,46 +173,54 @@ async function generateDailyReport(db, targetDateStr = null) {
     }
   });
 
-  // Format Daily Report
-  let report = `📢 *GROWTHAPEX EMS - DAILY REPORT* 📢\n`;
-  report += `📅 *Date:* ${todayStr}\n`;
-  report += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+  const FUNNY_ABSENT_ROASTS = [
+    "👻 Ghost Mode Active (Lagta hai sapno ki duniya me busy hain! 😴💤)",
+    "🛋️ Couch Potato Alert (Bed se rishta bohot gehra chal raha hai! 🛏️✨)",
+    "⏰ Snooze Button Victim (Mummy ne bhi uthane se manaa kar diya! 🛑)",
+    "🏖️ Secret Goa Trip? (Bina bataye chutti? Party chal rahi hai! 🍹🔥)",
+    "🛌 Work From Pillow Mode (Attendance? Vo kya hota hai bhai? 🤔)"
+  ];
 
-  report += `👥 *Attendance Summary:*\n`;
-  report += `• Total Strength: ${employees.length}\n`;
-  report += `• Present: ${presentList.length + lateList.length}\n`;
-  report += `• Absent: ${absentList.length}\n`;
+  // Format Daily Report
+  let report = `🚀 *GROWTHAPEX EMS - DAILY VIBE CHECK* ⚡\n`;
+  report += `📅 *Date:* ${todayStr} | *Gen-Z Mode Active* 🔥\n`;
+  report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+  report += `👥 *SQUAD ATTENDANCE BREAKDOWN:*\n`;
+  report += `• Total Squad Strength: ${employees.length} 💼\n`;
+  report += `• Present & Grinding: ${presentList.length + lateList.length} ⚡\n`;
+  report += `• Absent / Ghosting: ${absentList.length} 👻\n`;
   if (onLeaveList.length > 0) {
-    report += `• On Leave: ${onLeaveList.length}\n`;
+    report += `• On Approved Leave: ${onLeaveList.length} 🌴\n`;
   }
   report += `\n`;
 
   if (presentList.length > 0) {
-    report += `✅ *On-Time:* \n${presentList.map(name => ` - ${name}`).join('\n')}\n\n`;
+    report += `👑 *ON-TIME CHAMPIONS (Slayed Punctuality)*: \n${presentList.map(name => ` - ${name} ✨`).join('\n')}\n\n`;
   }
 
   if (lateList.length > 0) {
-    report += `⏰ *Late Check-ins:* \n${lateList.map(name => ` - ${name}`).join('\n')}\n\n`;
+    report += `⏰ *LATE COMERS (Traffic Ko Blame Mat Karna 🚗💨)*: \n${lateList.map(name => ` - ${name} ⚠️`).join('\n')}\n\n`;
   }
 
   if (onLeaveList.length > 0) {
-    report += `🌴 *On Leave:* \n${onLeaveList.map(name => ` - ${name}`).join('\n')}\n\n`;
+    report += `🌴 *APPROVED CHUTTI VIBES (Enjoying Leave 😎)*: \n${onLeaveList.map(name => ` - ${name} 🍹`).join('\n')}\n\n`;
   }
 
   if (absentList.length > 0) {
-    report += `❌ *Absent:* \n${absentList.map(name => ` - ${name}`).join('\n')}\n\n`;
+    report += `👻 *ABSENT / GHOST MODE (Funny Roast Corner 🛋️)*: \n${absentList.map((name, idx) => ` - *${name}*: ${FUNNY_ABSENT_ROASTS[idx % FUNNY_ABSENT_ROASTS.length]}`).join('\n')}\n\n`;
   }
 
-  report += `📝 *Task Updates & Ongoing Work:*\n`;
+  report += `📝 *TASK SLAYS & ONGOING GRIND:*\n`;
   if (doneTodayTasks.length > 0) {
-    report += `✅ *Completed Today (${doneTodayTasks.length}):*\n`;
+    report += `✅ *Slayed Today (${doneTodayTasks.length}):*\n`;
     doneTodayTasks.forEach(t => {
       const empName = employeeMap[t.empId]?.name || t.empId;
       report += ` - ${t.title} (by ${empName})\n`;
     });
   }
   if (todoTasks.length > 0) {
-    report += `${doneTodayTasks.length > 0 ? '\n' : ''}📌 *Active / In-Progress Tasks (${todoTasks.length}):*\n`;
+    report += `${doneTodayTasks.length > 0 ? '\n' : ''}📌 *Active Grind (${todoTasks.length}):*\n`;
     todoTasks.forEach(t => {
       const empName = employeeMap[t.empId]?.name || t.empId;
       const dueStr = t.deadline ? ` | Due: ${t.deadline}` : '';
@@ -220,11 +228,11 @@ async function generateDailyReport(db, targetDateStr = null) {
     });
   }
   if (doneTodayTasks.length === 0 && todoTasks.length === 0) {
-    report += `• No active or completed tasks recorded.`;
+    report += `• No active or completed tasks recorded today.`;
   }
   report += `\n\n`;
 
-  report += `📊 *Task Completion % by Employee:*\n`;
+  report += `📊 *SQUAD EFFICIENCY SCOREBAR:*\n`;
   employees.forEach(emp => {
     const stats = empTaskStats[emp.id];
     if (!stats || stats.total === 0) {
@@ -234,11 +242,13 @@ async function generateDailyReport(db, targetDateStr = null) {
       const blocks = Math.round(pct / 10);
       const filled = '█'.repeat(blocks);
       const empty = '░'.repeat(10 - blocks);
-      const star = pct === 100 ? ' ⭐' : '';
+      const star = pct === 100 ? ' ⭐ [Pro Player 👑]' : '';
       report += ` • *${emp.name}*: ${filled}${empty} ${pct}% (${stats.completed}/${stats.total})${star}\n`;
     }
   });
 
+  report += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  report += `🔥 _GrowthApex Gen-Z Automation Engine • Stay Grinding!_ 🔥`;
   return report;
 }
 

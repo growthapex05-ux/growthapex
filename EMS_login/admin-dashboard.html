@@ -3211,24 +3211,35 @@ async function generateReportText(type) {
     const todoTasks   = tasks.filter(t => t.status === 'todo' || t.status === 'doing' || t.status === 'in-progress');
     const doneToday   = tasks.filter(t => (t.status === 'done' || t.status === 'completed') && ((t.updatedAt && t.updatedAt.startsWith(today)) || (t.createdAt && t.createdAt.startsWith(today))));
 
-    let msg = `📢 *GROWTHAPEX EMS - DAILY REPORT* 📢\n`;
-    msg += `📅 *Date:* ${today}\n`;
-    msg += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
-    msg += `👥 *Attendance Summary:*\n`;
-    msg += `• Total Strength: ${active.length}\n`;
-    msg += `• Present: ${presentIds.length}\n`;
-    msg += `• Absent: ${absentList.length}\n`;
-    if (absentList.length) msg += `\n❌ *Absent:* \n${absentList.map(n => ` - ${n}`).join('\n')}\n`;
-    msg += `\n📝 *Task Updates & Ongoing Work:*\n`;
+    const FUNNY_ABSENT_ROASTS = [
+      "👻 Ghost Mode Active (Lagta hai sapno ki duniya me busy hain! 😴💤)",
+      "🛋️ Couch Potato Alert (Bed se rishta bohot gehra chal raha hai! 🛏️✨)",
+      "⏰ Snooze Button Victim (Mummy ne bhi uthane se manaa kar diya! 🛑)",
+      "🏖️ Secret Goa Trip? (Bina bataye chutti? Party chal rahi hai! 🍹🔥)",
+      "🛌 Work From Pillow Mode (Attendance? Vo kya hota hai bhai? 🤔)"
+    ];
+
+    let msg = `🚀 *GROWTHAPEX EMS - DAILY VIBE CHECK* ⚡\n`;
+    msg += `📅 *Date:* ${today} | *Gen-Z Mode Active* 🔥\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    msg += `👥 *SQUAD ATTENDANCE BREAKDOWN:*\n`;
+    msg += `• Total Squad Strength: ${active.length} 💼\n`;
+    msg += `• Present & Grinding: ${presentIds.length} ⚡\n`;
+    msg += `• Absent / Ghosting: ${absentList.length} 👻\n`;
+    if (absentList.length) {
+      msg += `\n👻 *ABSENT / GHOST MODE (Funny Roast Corner 🛋️):*\n`;
+      msg += absentList.map((n, idx) => ` - *${n}*: ${FUNNY_ABSENT_ROASTS[idx % FUNNY_ABSENT_ROASTS.length]}`).join('\n') + `\n`;
+    }
+    msg += `\n📝 *TASK SLAYS & ONGOING GRIND:*\n`;
     if (doneToday.length > 0) {
-      msg += `✅ *Completed Today (${doneToday.length}):*\n`;
+      msg += `✅ *Slayed Today (${doneToday.length}):*\n`;
       doneToday.forEach(t => {
         const empName = active.find(e => e.id === t.empId)?.name || t.empId;
         msg += ` - ${t.title} (by ${empName})\n`;
       });
     }
     if (todoTasks.length > 0) {
-      msg += `${doneToday.length > 0 ? '\n' : ''}📌 *Active / In-Progress Tasks (${todoTasks.length}):*\n`;
+      msg += `${doneToday.length > 0 ? '\n' : ''}📌 *Active Grind (${todoTasks.length}):*\n`;
       todoTasks.forEach(t => {
         const empName = active.find(e => e.id === t.empId)?.name || t.empId;
         const dueStr = t.deadline ? ` | Due: ${t.deadline}` : '';
@@ -3236,9 +3247,9 @@ async function generateReportText(type) {
       });
     }
     if (doneToday.length === 0 && todoTasks.length === 0) {
-      msg += `• No active or completed tasks recorded.\n`;
+      msg += `• No active or completed tasks recorded today.\n`;
     }
-    msg += `\n📊 *Task Completion % by Employee:*\n`;
+    msg += `\n📊 *SQUAD EFFICIENCY SCOREBAR:*\n`;
     active.forEach(e => {
       const empTasks = tasks.filter(t => t.empId === e.id);
       const done     = empTasks.filter(t => t.status === 'done' || t.status === 'completed').length;
@@ -3249,11 +3260,12 @@ async function generateReportText(type) {
         const pct      = Math.round(done / total * 100);
         const filled   = Math.round(pct / 10);
         const bar      = '█'.repeat(filled) + '░'.repeat(10 - filled);
-        const star     = pct === 100 ? ' ⭐' : '';
+        const star     = pct === 100 ? ' ⭐ [Pro Player 👑]' : '';
         msg += ` • *${e.name}*: ${bar} ${pct}% (${done}/${total})${star}\n`;
       }
     });
-    msg += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+    msg += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `🔥 _GrowthApex Gen-Z Automation Engine • Stay Grinding!_ 🔥`;
     return msg;
   }
 
