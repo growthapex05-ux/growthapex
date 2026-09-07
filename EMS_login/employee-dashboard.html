@@ -1643,7 +1643,19 @@
       const releaseRecord = (releasedList || []).find(r => r.monthVal === monthVal);
       const isReleased = (releaseRecord && releaseRecord.status === 'released');
 
-      const releasedDateStr = (isReleased && releaseRecord.releasedAt) 
+      if (!isReleased) {
+        container.innerHTML = `
+          <div style="padding:48px 24px;text-align:center;background:#fff;border:1px solid #e5e7eb;border-radius:12px;max-width:600px;margin:20px auto;box-shadow:0 4px 15px rgba(0,0,0,0.03)">
+            <div style="font-size:44px;margin-bottom:12px">🔒</div>
+            <h3 style="font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;margin:0 0 8px 0;color:#111827">Salary Slip Not Released Yet</h3>
+            <p style="font-size:13.5px;color:#6b7280;line-height:1.6;margin:0 auto">
+              The salary payslip for <strong>${monthName}</strong> has not been released by Admin / HR yet. Once your payslip is reviewed and officially released, it will automatically appear here.
+            </p>
+          </div>`;
+        return;
+      }
+
+      const releasedDateStr = (releaseRecord && releaseRecord.releasedAt) 
         ? new Date(releaseRecord.releasedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) 
         : 'Recently';
 
