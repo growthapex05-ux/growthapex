@@ -446,58 +446,6 @@
 
   <!-- Leaves -->
   <div class="page" id="page-leaves">
-    <div class="section-card">
-      <h3>🌴 Apply for Leave</h3>
-      <div style="max-width:500px">
-        <div class="form-row">
-          <div class="form-group">
-            <label>From Date</label>
-            <input type="date" id="leave-from">
-          </div>
-          <div class="form-group">
-            <label>To Date</label>
-            <input type="date" id="leave-to">
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Leave Type</label>
-          <select id="leave-type">
-            <option value="casual">Casual Leave</option>
-            <option value="sick">Sick Leave</option>
-            <option value="earned">Earned Leave</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Reason</label>
-          <textarea id="leave-reason" rows="3" placeholder="Reason for leave…"></textarea>
-        </div>
-        <button class="btn btn-primary" onclick="applyLeave()">Submit Leave Request</button>
-      </div>
-    </div>
-    <div class="section-card">
-      <div class="section-head"><h3>📋 My Leave History</h3>
-         <div class="toolbar">
-           <select class="filter-select" id="my-leave-status" onchange="renderLeavesTable()">
-             <option value="">All Statuses</option>
-             <option value="pending">Pending</option>
-             <option value="approved">Approved</option>
-             <option value="rejected">Rejected</option>
-           </select>
-         </div>
-      </div>
-      <div class="table-wrap" id="leave-history-table"></div>
-    </div>
-
-    <!-- Holidays Card -->
-    <div class="section-card" id="holidays-card">
-      <div class="section-head">
-        <h3>🗓️ Holidays &amp; Festivals This Month</h3>
-      </div>
-      <div id="holidays-list"></div>
-    </div>
-  <!-- Leaves Application Page -->
-  <div class="page" id="page-leaves">
     <div class="section-card" style="margin-bottom:20px">
       <div class="section-head">
         <h3>🌴 Submit Leave Application</h3>
@@ -525,14 +473,30 @@
         <label>Reason for Leave *</label>
         <textarea id="leave-reason" class="search-input" rows="3" placeholder="Specify reason for leave..." style="width:100%;font-family:inherit"></textarea>
       </div>
-      <button class="btn btn-primary" onclick="submitEmpLeave()" style="background:#0284c7;color:#fff;border:none">📤 Submit Leave Application</button>
+      <button class="btn btn-primary" onclick="applyLeave()" style="background:#0284c7;color:#fff;border:none">📤 Submit Leave Application</button>
     </div>
 
     <div class="section-card">
       <div class="section-head">
         <h3>📜 My Leave Application History</h3>
+        <div class="toolbar">
+          <select class="filter-select" id="my-leave-status" onchange="renderLeavesTable()">
+            <option value="">All Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
       </div>
       <div class="table-wrap" id="emp-leaves-history"></div>
+    </div>
+
+    <!-- Holidays Card -->
+    <div class="section-card" id="holidays-card">
+      <div class="section-head">
+        <h3>🗓️ Holidays &amp; Festivals This Month</h3>
+      </div>
+      <div id="holidays-list"></div>
     </div>
   </div>
 
