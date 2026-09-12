@@ -3759,9 +3759,12 @@ async function renderWorkLogs() {
             ${linksHtml}
           </div>
 
-          <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+          <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-space-between;align-items:center;flex-wrap:wrap;gap:8px">
             <span style="font-size:11px;color:var(--muted)">🕒 ${l.submittedAt ? new Date(l.submittedAt).toLocaleTimeString('en-IN') : '—'}</span>
-            <button class="btn btn-sm btn-edit" onclick="copyWorkLogWhatsAppReport('${l.id}')" title="Copy WhatsApp Report Text">📋 Copy WhatsApp Format</button>
+            <div style="display:flex;gap:6px;align-items:center">
+              <button class="btn btn-sm btn-edit" onclick="copyWorkLogWhatsAppReport('${l.id}')" title="Copy WhatsApp Report Text">📋 Copy WhatsApp Format</button>
+              <button class="btn btn-sm" onclick="deleteAdminWorkLog('${l.id}')" style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);cursor:pointer" title="Delete Report Entry">🗑️ Delete</button>
+            </div>
           </div>
         </div>`;
     });
@@ -3771,6 +3774,18 @@ async function renderWorkLogs() {
   } catch (err) {
     console.error('renderWorkLogs error:', err);
     container.innerHTML = `<div class="empty-state red">Failed to load work logs.</div>`;
+  }
+}
+
+async function deleteAdminWorkLog(logId) {
+  if (!logId) return;
+  if (!confirm('Are you sure you want to delete this employee work log report?')) return;
+  try {
+    await EMS_DB.deleteWorkLog(logId);
+    toast('Work log report deleted successfully! 🗑️', 'info');
+    renderWorkLogs();
+  } catch (err) {
+    toast('Error deleting work log: ' + err.message, 'error');
   }
 }
 

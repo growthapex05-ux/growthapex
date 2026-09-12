@@ -2210,6 +2210,18 @@ function sendReportToWhatsAppGroup() {
   window.open(waUrl, '_blank');
 }
 
+async function deleteEmpWorkLog(logId) {
+  if (!logId) return;
+  if (!confirm('Are you sure you want to delete this work log report entry?')) return;
+  try {
+    await EMS_DB.deleteWorkLog(logId);
+    toast('Work log report deleted successfully! 🗑️', 'info');
+    renderEmpWorkLogs();
+  } catch (err) {
+    toast('Error deleting work log: ' + err.message, 'error');
+  }
+}
+
 async function renderEmpWorkLogs() {
   const container = document.getElementById('emp-worklogs-history');
   if (!container) return;
@@ -2239,6 +2251,7 @@ async function renderEmpWorkLogs() {
             <th>Checklist &amp; Completion</th>
             <th>Proof Links &amp; Notes</th>
             <th>Submitted At</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody>`;
@@ -2273,6 +2286,9 @@ async function renderEmpWorkLogs() {
             ${noteStr}
           </td>
           <td style="font-size:11.5px;color:var(--muted)">${l.submittedAt ? new Date(l.submittedAt).toLocaleTimeString('en-IN') : '—'}</td>
+          <td>
+            <button class="btn btn-sm" onclick="deleteEmpWorkLog('${l.id}')" style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);cursor:pointer" title="Delete Report Entry">🗑️ Delete</button>
+          </td>
         </tr>`;
     });
     html += `</tbody></table>`;

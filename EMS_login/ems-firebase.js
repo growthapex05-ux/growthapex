@@ -275,6 +275,12 @@ const EMS_DB = {
     return { id: ref.id, ...log };
   },
 
+  async deleteWorkLog(logId) {
+    if (!logId) return { success: false };
+    await this._col('worklogs').doc(logId).delete();
+    return { success: true };
+  },
+
   // ── Expenses & Reimbursements ─────────────────────────────
 
   async getExpenses(empId) {
