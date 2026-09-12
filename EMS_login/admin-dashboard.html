@@ -610,15 +610,24 @@
 
   <!-- ── EOD Work Logs Page ── -->
   <div class="page" id="page-worklogs">
-    <div class="section-card">
-      <div class="section-head">
-        <h3>📝 Employee Daily EOD Work Logs</h3>
+    <div class="section-card" style="border-radius:14px">
+      <div class="section-head" style="border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:16px">
+        <div>
+          <h3 style="font-size:18px;font-weight:800;display:flex;align-items:center;gap:8px">
+            📝 Employee Daily EOD Work Logs Store &amp; Port Reports
+            <span class="live-pulse-badge"><span class="live-pulse-dot"></span>GEN-Z STORE</span>
+          </h3>
+          <p style="font-size:12.5px;color:var(--muted);margin-top:4px">View daily checklist completions, proof links (Drive / Insta), work hours, and notes per employee.</p>
+        </div>
         <div class="toolbar">
-          <input type="date" id="worklog-date-filter" class="search-input" onchange="renderWorkLogs()">
+          <select id="worklog-emp-filter" class="filter-select" onchange="renderWorkLogs()">
+            <option value="">All Employees</option>
+          </select>
+          <input type="date" id="worklog-date-filter" class="search-input" style="width:auto" onchange="renderWorkLogs()">
           <button class="btn btn-secondary" onclick="renderWorkLogs()">🔄 Refresh</button>
         </div>
       </div>
-      <div class="table-wrap" id="admin-worklogs-table"></div>
+      <div id="admin-worklogs-table"></div>
     </div>
   </div>
 
@@ -3648,16 +3657,30 @@ async function sendBulkSalarySlipsWhatsApp() {
   toast(`Initiated ${count} WhatsApp salary slips!`, 'success');
 }
 
-// ─── EOD Work Logs Renderer ──────────────────────────────────
+// ─── EOD Work Logs & Daily Reports Store Renderer ──────────────
 async function renderWorkLogs() {
   const container = document.getElementById('admin-worklogs-table');
   if (!container) return;
-  container.innerHTML = `<div class="empty-state">⏳ Loading EOD Work Logs…</div>`;
+  
+  // Populate employee filter if options list is default
+  const empFilterEl = document.getElementById('worklog-emp-filter');
+  if (empFilterEl && empFilterEl.options.length <= 1) {
+    const emps = cache.employees || [];
+    empFilterEl.innerHTML = '<option value="">All Employees</option>' +
+      emps.map(e => `<option value="${e.id}">${e.name} (${e.id})</option>`).join('');
+  }
+
+  container.innerHTML = `<div class="empty-state">⏳ Loading EOD Work Logs &amp; Reports Store…</div>`;
+  
   try {
     const logs = await EMS_DB.getWorkLogs();
     const filterDate = document.getElementById('worklog-date-filter')?.value;
-    const filtered = filterDate ? logs.filter(l => l.date === filterDate) : logs;
-    
+    const filterEmp = document.getElementById('worklog-emp-filter')?.value;
+
+    let filtered = logs;
+    if (filterDate) filtered = filtered.filter(l => l.date === filterDate);
+    if (filterEmp)  filtered = filtered.filter(l => l.empId === filterEmp);
+
     if (!filtered.length) {
       container.innerHTML = `<div class="empty-state"><div>📝</div>No EOD Work Logs submitted for this selection.</div>`;
       return;
@@ -3665,33 +3688,113 @@ async function renderWorkLogs() {
 
     filtered.sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
 
-    let html = `
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Employee</th>
-            <th>Hours Worked</th>
-            <th>Tasks Completed &amp; EOD Summary</th>
-            <th>Submitted At</th>
-          </tr>
-        </thead>
-        <tbody>`;
+    let html = `<div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(360px, 1fr));gap:16px;margin-top:14px">`;
+    
     filtered.forEach(l => {
+      const compRate = l.completionRate !== undefined ? l.completionRate : 100;
+      const compBadgeClass = compRate >= 80 ? 'badge-green' : (compRate >= 50 ? 'badge-amber' : 'badge-red');
+      const compIcon = compRate >= 80 ? '🔥' : (compRate >= 50 ? '⚡' : '⏳');
+
+      let tasksHtml = '';
+      if (Array.isArray(l.tasks) && l.tasks.length) {
+        tasksHtml = `<div style="margin:10px 0;display:flex;flex-direction:column;gap:6px">`;
+        l.tasks.forEach(t => {
+          const icon = t.done ? '✅' : '❌';
+          const linkBtn = t.link ? `<a href="${t.link}" target="_blank" style="margin-left:6px;color:var(--cyan);font-weight:600;font-size:11px;text-decoration:none">🔗 Link</a>` : '';
+          tasksHtml += `<div style="font-size:12.5px;color:var(--text);display:flex;align-items:flex-start;gap:6px"><span>${icon}</span><span style="flex:1">${t.text}${linkBtn}</span></div>`;
+        });
+        tasksHtml += `</div>`;
+      } else if (l.summary) {
+        tasksHtml = `<div style="font-size:12.5px;color:var(--text);white-space:pre-wrap;margin:10px 0;background:rgba(0,0,0,0.02);padding:8px 10px;border-radius:6px">${l.summary}</div>`;
+      }
+
+      let linksHtml = '';
+      if (l.driveLink || l.instaLink) {
+        linksHtml = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border)">`;
+        if (l.driveLink) {
+          linksHtml += `<a href="${l.driveLink}" target="_blank" class="btn btn-sm" style="background:rgba(6,182,212,0.12);color:var(--cyan);border:1px solid rgba(6,182,212,0.3);text-decoration:none">📁 Drive Folder</a>`;
+        }
+        if (l.instaLink) {
+          linksHtml += `<a href="${l.instaLink}" target="_blank" class="btn btn-sm" style="background:rgba(124,58,237,0.12);color:var(--purple);border:1px solid rgba(124,58,237,0.3);text-decoration:none">📸 Instagram Reel/Media</a>`;
+        }
+        linksHtml += `</div>`;
+      }
+
+      const notesHtml = (l.summary && Array.isArray(l.tasks) && l.tasks.length) ? `
+        <div style="margin-top:8px;font-size:12px;color:var(--muted);background:rgba(0,0,0,0.02);padding:8px;border-radius:6px">
+          <strong style="color:var(--text)">💬 Notes:</strong> ${l.summary}
+        </div>` : '';
+
       html += `
-        <tr>
-          <td><b>${l.date || '—'}</b></td>
-          <td><b>${l.empName || l.empId || 'Employee'}</b></td>
-          <td><span class="badge badge-purple">${l.hours || 8} Hours</span></td>
-          <td style="max-width:350px;white-space:pre-wrap;font-size:12.5px">${l.summary || 'N/A'}</td>
-          <td style="font-size:11.5px;color:#64748b">${l.submittedAt ? new Date(l.submittedAt).toLocaleTimeString('en-IN') : '—'}</td>
-        </tr>`;
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 2px 10px rgba(0,0,0,0.03);display:flex;flex-direction:column;justify-content:space-between">
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+              <div>
+                <h4 style="font-size:15px;font-weight:700;margin:0;color:var(--text);font-family:'Space Grotesk',sans-serif">${l.empName || l.empId || 'Employee'}</h4>
+                <div style="font-size:11px;color:var(--muted)">ID: ${l.empId || 'N/A'} • Date: ${l.date || '—'}</div>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+                <span class="badge ${compBadgeClass}">${compIcon} ${compRate}% Done</span>
+                <span class="badge badge-blue" style="font-size:10px">${l.hours || 8} Hours</span>
+              </div>
+            </div>
+
+            ${tasksHtml}
+            ${notesHtml}
+            ${linksHtml}
+          </div>
+
+          <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:11px;color:var(--muted)">🕒 ${l.submittedAt ? new Date(l.submittedAt).toLocaleTimeString('en-IN') : '—'}</span>
+            <button class="btn btn-sm btn-edit" onclick="copyWorkLogWhatsAppReport('${l.id}')" title="Copy WhatsApp Report Text">📋 Copy WhatsApp Format</button>
+          </div>
+        </div>`;
     });
-    html += `</tbody></table>`;
+
+    html += `</div>`;
     container.innerHTML = html;
   } catch (err) {
     console.error('renderWorkLogs error:', err);
     container.innerHTML = `<div class="empty-state red">Failed to load work logs.</div>`;
+  }
+}
+
+async function copyWorkLogWhatsAppReport(logId) {
+  try {
+    const logs = await EMS_DB.getWorkLogs();
+    const l = logs.find(item => item.id === logId);
+    if (!l) return;
+
+    let msg = `📝 *DAILY EOD WORK REPORT*\n`;
+    msg += `👤 *Employee:* ${l.empName} (${l.empId})\n`;
+    msg += `📅 *Date:* ${l.date}\n`;
+    msg += `⏰ *Hours Worked:* ${l.hours || 8} Hours\n`;
+    msg += `🔥 *Task Completion:* ${l.completionRate !== undefined ? l.completionRate : 100}%\n\n`;
+
+    if (Array.isArray(l.tasks) && l.tasks.length) {
+      msg += `✅ *TASKS CHECKLIST:*\n`;
+      l.tasks.forEach(t => {
+        const icon = t.done ? '✅' : '❌';
+        let line = `${icon} ${t.text}`;
+        if (t.link) line += ` (🔗 ${t.link})`;
+        msg += `${line}\n`;
+      });
+    }
+
+    if (l.driveLink || l.instaLink) {
+      msg += `\n🔗 *WORK PROOF LINKS:*\n`;
+      if (l.driveLink) msg += `• *Drive Folder:* ${l.driveLink}\n`;
+      if (l.instaLink) msg += `• *Instagram Link:* ${l.instaLink}\n`;
+    }
+
+    if (l.summary) {
+      msg += `\n💬 *ADDITIONAL NOTES:*\n${l.summary}\n`;
+    }
+
+    await navigator.clipboard.writeText(msg);
+    toast('WhatsApp report format copied to clipboard! 📋', 'success');
+  } catch (e) {
+    toast('Could not copy report: ' + e.message, 'error');
   }
 }
 

@@ -522,30 +522,79 @@
 
   <!-- Daily EOD Work Log -->
   <div class="page" id="page-worklog">
-    <div class="section-card" style="margin-bottom:20px">
-      <div class="section-head">
-        <h3>📝 Submit Daily End of Day (EOD) Work Log</h3>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-        <div class="form-group">
-          <label>Work Date *</label>
-          <input type="date" id="wl-date" class="search-input" style="width:100%">
-        </div>
-        <div class="form-group">
-          <label>Hours Worked *</label>
-          <input type="number" id="wl-hours" class="search-input" value="8" min="1" max="16" style="width:100%">
+    <div class="section-card" style="margin-bottom:20px;border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,0.04)">
+      <div class="section-head" style="border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:16px">
+        <div>
+          <h3 style="font-size:18px;font-weight:800;display:flex;align-items:center;gap:8px">
+            📝 Daily EOD Work Log &amp; Tasks Checklist
+            <span class="badge badge-purple" style="font-size:11px">GEN-Z TRACKER</span>
+          </h3>
+          <p style="font-size:12.5px;color:var(--muted);margin-top:4px">Tick off your completed tasks today, paste proof links (Drive / Insta), and share directly to your team WhatsApp group!</p>
         </div>
       </div>
-      <div class="form-group" style="margin-bottom:14px">
-        <label>Tasks Completed &amp; EOD Summary *</label>
-        <textarea id="wl-summary" class="search-input" rows="4" placeholder="Detail your tasks completed today, project updates, and blockers if any..." style="width:100%;font-family:inherit"></textarea>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
+        <div class="form-group">
+          <label style="font-weight:700">📅 Work Date *</label>
+          <input type="date" id="wl-date" class="search-input" style="width:100%;border-radius:8px;padding:10px">
+        </div>
+        <div class="form-group">
+          <label style="font-weight:700">⏰ Hours Worked Today *</label>
+          <input type="number" id="wl-hours" class="search-input" value="8" min="1" max="16" style="width:100%;border-radius:8px;padding:10px">
+        </div>
       </div>
-      <button class="btn btn-primary" onclick="submitEmpWorkLog()" style="background:#0284c7;color:#fff;border:none">💾 Submit EOD Work Log</button>
+
+      <!-- Interactive Daily Tasks Checklist Section -->
+      <div style="background:rgba(255,255,255,0.7);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:18px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+          <label style="font-weight:800;font-size:14px;color:var(--text)">☑️ Assigned Daily Tasks Checklist</label>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span id="wl-progress-text" style="font-size:12px;font-weight:700;color:var(--cyan)">🔥 0% Completed (0/0)</span>
+            <button type="button" class="btn btn-sm btn-edit" onclick="addCustomTaskInput()" style="background:rgba(0,212,255,0.1);color:var(--cyan);border:1px solid rgba(0,212,255,0.3)">+ Add Extra Task</button>
+          </div>
+        </div>
+
+        <div id="wl-tasks-checklist-container" style="display:flex;flex-direction:column;gap:10px">
+          <!-- Dynamic Task Checkboxes populated by JS -->
+        </div>
+
+        <div style="margin-top:14px;background:rgba(0,0,0,0.04);border-radius:8px;height:8px;overflow:hidden">
+          <div id="wl-progress-bar" style="width:0%;height:100%;background:linear-gradient(90deg,#00D4FF,#26CF4B);transition:width 0.3s ease"></div>
+        </div>
+      </div>
+
+      <!-- Work Proof Links Section -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">
+        <div class="form-group">
+          <label style="font-weight:700">📁 Google Drive / Folder Link</label>
+          <input type="url" id="wl-drive-link" class="search-input" placeholder="https://drive.google.com/folder..." style="width:100%;border-radius:8px;padding:10px">
+        </div>
+        <div class="form-group">
+          <label style="font-weight:700">📸 Instagram Reel / Post / Media Link</label>
+          <input type="url" id="wl-insta-link" class="search-input" placeholder="https://instagram.com/reel/..." style="width:100%;border-radius:8px;padding:10px">
+        </div>
+      </div>
+
+      <!-- Additional Notes & Summary -->
+      <div class="form-group" style="margin-bottom:18px">
+        <label style="font-weight:700">💬 Additional Notes, Blockers &amp; EOD Summary</label>
+        <textarea id="wl-summary" class="search-input" rows="3" placeholder="Add additional comments, client updates, or notes..." style="width:100%;font-family:inherit;border-radius:8px;padding:10px"></textarea>
+      </div>
+
+      <!-- Action Buttons: Save & Share to WhatsApp -->
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="submitEmpWorkLog()" style="background:#0284c7;color:#fff;border:none;padding:12px 24px;border-radius:8px;font-weight:700;display:inline-flex;align-items:center;gap:6px;cursor:pointer">
+          💾 Save EOD Work Log
+        </button>
+        <button class="btn btn-green" onclick="sendReportToWhatsAppGroup()" style="background:#16a34a;color:#fff;border:none;padding:12px 24px;border-radius:8px;font-weight:700;display:inline-flex;align-items:center;gap:6px;cursor:pointer">
+          📱 Send Report to WhatsApp Group
+        </button>
+      </div>
     </div>
 
     <div class="section-card">
       <div class="section-head">
-        <h3>📜 My Submitted Work Logs</h3>
+        <h3>📜 My Submitted Work Logs History</h3>
       </div>
       <div class="table-wrap" id="emp-worklogs-history"></div>
     </div>
@@ -1953,13 +2002,169 @@ function downloadEmpSalarySlipPDF() {
       </div>`;
   }
 
-// ─── Employee EOD Work Log Handlers ───────────────────────────
-// ─── Employee EOD Work Log Handlers ───────────────────────────
+// ─── Employee EOD Work Log & Assigned Tasks Handlers ──────────────
+const EMPLOYEE_DAILY_TASKS = {
+  // Jayati Goyal (EMP001)
+  'EMP001': [
+    { text: 'Manage Team Members: Raj, Rajeev, Riitu, Sunitta & Urja Wellness Centre' },
+    { text: 'Daily Content Creation: 2 Reels' },
+    { text: 'Daily Content Creation: 1 Carousel (or B-roll)' }
+  ],
+  
+  // Dheeraj Kumar (EMP003)
+  'EMP003': [
+    { text: 'Daily reporting in each WhatsApp group' },
+    { text: 'Timely reminders in WhatsApp groups + community' },
+    { text: 'Roshan interaction: timely, regular interaction & efficient work (not VIP/payment)' },
+    { text: 'WhatsApp API: Proper setup & maintenance (Grok Bot integration)' },
+    { text: 'Zoom Availability (7–9 PM) — join 1 hour late next day to compensate' },
+    { text: 'Learn Excel with Surya: Data filtration & audience prep for next webinar' }
+  ],
+  
+  // Janvi Menghani (EMP004)
+  'EMP004': [
+    { text: 'Graphic Design: Social media post creatives & Reel covers' },
+    { text: 'Brand Assets & Marketing B-roll curation' },
+    { text: 'Google Drive Asset Upload & Client Folders Sync' }
+  ],
+
+  // Default fallback for any other employee
+  'default': [
+    { text: 'Daily Operations & Client Tasks Execution' },
+    { text: 'Group Updates & Progress Reporting' },
+    { text: 'Work Proof Files & Media Link Archiving' }
+  ]
+};
+
+function getAssignedTasksForEmployee(id) {
+  if (!id) return EMPLOYEE_DAILY_TASKS['default'];
+  const cleanId = String(id).toUpperCase().trim();
+  return EMPLOYEE_DAILY_TASKS[cleanId] || EMPLOYEE_DAILY_TASKS['default'];
+}
+
+function initTasksChecklistUI() {
+  const container = document.getElementById('wl-tasks-checklist-container');
+  if (!container) return;
+
+  const targetId = empId || (emp && emp.id) || '';
+  const assigned = getAssignedTasksForEmployee(targetId);
+
+  let html = '';
+  assigned.forEach((t, idx) => {
+    html += `
+      <div class="wl-task-item" style="background:rgba(243,244,246,0.6);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <input type="checkbox" class="wl-task-cb" id="task-cb-${idx}" onchange="updateTaskProgressUI()" style="width:18px;height:18px;cursor:pointer;accent-color:#0284c7">
+        <label for="task-cb-${idx}" class="wl-task-label" style="font-size:13.5px;font-weight:600;color:var(--text);flex:1;cursor:pointer">${t.text}</label>
+        <input type="url" class="wl-task-link search-input" placeholder="🔗 Optional Proof Link (Drive/Insta)" style="width:240px;font-size:11.5px;padding:6px 10px;border-radius:6px">
+      </div>`;
+  });
+  container.innerHTML = html;
+  updateTaskProgressUI();
+}
+
+function addCustomTaskInput() {
+  const container = document.getElementById('wl-tasks-checklist-container');
+  if (!container) return;
+  const idx = container.children.length;
+  
+  const div = document.createElement('div');
+  div.className = 'wl-task-item';
+  div.style.cssText = 'background:rgba(243,244,246,0.6);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap';
+  div.innerHTML = `
+    <input type="checkbox" class="wl-task-cb" id="task-cb-${idx}" checked onchange="updateTaskProgressUI()" style="width:18px;height:18px;cursor:pointer;accent-color:#0284c7">
+    <input type="text" class="wl-task-txt search-input" placeholder="Type extra daily task here..." style="flex:1;font-size:13px;padding:6px 10px;border-radius:6px" oninput="updateTaskProgressUI()">
+    <input type="url" class="wl-task-link search-input" placeholder="🔗 Optional Proof Link" style="width:220px;font-size:11.5px;padding:6px 10px;border-radius:6px">
+  `;
+  container.appendChild(div);
+  updateTaskProgressUI();
+}
+
+function updateTaskProgressUI() {
+  const items = document.querySelectorAll('.wl-task-item');
+  if (!items.length) return;
+  let done = 0;
+  items.forEach(el => {
+    const cb = el.querySelector('.wl-task-cb');
+    if (cb && cb.checked) done++;
+  });
+  const total = items.length;
+  const pct = Math.round((done / total) * 100);
+
+  const txtEl = document.getElementById('wl-progress-text');
+  if (txtEl) txtEl.textContent = `🔥 ${pct}% Completed (${done}/${total})`;
+
+  const barEl = document.getElementById('wl-progress-bar');
+  if (barEl) barEl.style.width = `${pct}%`;
+}
+
+function sendReportToWhatsAppGroup() {
+  const targetId = empId || (emp && emp.id) || '';
+  const empNameStr = (emp && emp.name) || 'Employee';
+  const dateVal = document.getElementById('wl-date')?.value || new Date().toISOString().split('T')[0];
+  const hoursVal = document.getElementById('wl-hours')?.value || '8';
+  const driveLinkVal = (document.getElementById('wl-drive-link')?.value || '').trim();
+  const instaLinkVal = (document.getElementById('wl-insta-link')?.value || '').trim();
+  const summaryVal = (document.getElementById('wl-summary')?.value || '').trim();
+
+  // Gather tasks checklist states
+  const taskEls = document.querySelectorAll('.wl-task-item');
+  let tasksList = [];
+  let doneCount = 0;
+  
+  taskEls.forEach(el => {
+    const cb = el.querySelector('.wl-task-cb');
+    const txtInput = el.querySelector('.wl-task-txt');
+    const txtLabel = el.querySelector('.wl-task-label');
+    const txt = txtInput ? txtInput.value : (txtLabel ? txtLabel.textContent : '');
+    const taskLink = el.querySelector('.wl-task-link')?.value || '';
+    const isDone = cb ? cb.checked : false;
+    if (isDone) doneCount++;
+    if (txt.trim()) {
+      tasksList.push({ text: txt.trim(), done: isDone, link: taskLink.trim() });
+    }
+  });
+
+  const totalTasks = tasksList.length;
+  const compRate = totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : 100;
+
+  let msg = `📝 *DAILY EOD WORK REPORT*\n`;
+  msg += `👤 *Employee:* ${empNameStr} (${targetId})\n`;
+  msg += `📅 *Date:* ${dateVal}\n`;
+  msg += `⏰ *Hours Worked:* ${hoursVal} Hours\n`;
+  msg += `🔥 *Task Completion:* ${compRate}% (${doneCount}/${totalTasks})\n\n`;
+
+  msg += `✅ *TASKS CHECKLIST:*\n`;
+  tasksList.forEach(t => {
+    const icon = t.done ? '✅' : '❌';
+    let line = `${icon} ${t.text}`;
+    if (t.link) line += ` (🔗 ${t.link})`;
+    msg += `${line}\n`;
+  });
+
+  if (driveLinkVal || instaLinkVal) {
+    msg += `\n🔗 *WORK PROOF LINKS:*\n`;
+    if (driveLinkVal) msg += `• *Drive Folder:* ${driveLinkVal}\n`;
+    if (instaLinkVal) msg += `• *Instagram Link:* ${instaLinkVal}\n`;
+  }
+
+  if (summaryVal) {
+    msg += `\n💬 *ADDITIONAL NOTES / SUMMARY:*\n${summaryVal}\n`;
+  }
+
+  msg += `\n✨ _Submitted via GrowthApex EMS Portal_`;
+
+  const encodedMsg = encodeURIComponent(msg);
+  const waUrl = `https://api.whatsapp.com/send?text=${encodedMsg}`;
+  window.open(waUrl, '_blank');
+}
+
 async function renderEmpWorkLogs() {
   const container = document.getElementById('emp-worklogs-history');
   if (!container) return;
   const targetId = empId || (emp && emp.id) || '';
   if (document.getElementById('wl-date')) document.getElementById('wl-date').value = new Date().toISOString().split('T')[0];
+
+  initTasksChecklistUI();
 
   try {
     let logs = [];
@@ -1978,18 +2183,43 @@ async function renderEmpWorkLogs() {
         <thead>
           <tr>
             <th>Date</th>
-            <th>Hours Worked</th>
-            <th>Tasks Completed &amp; EOD Summary</th>
+            <th>Hours</th>
+            <th>Checklist &amp; Completion</th>
+            <th>Proof Links &amp; Notes</th>
             <th>Submitted At</th>
           </tr>
         </thead>
         <tbody>`;
     logs.forEach(l => {
+      const compRate = l.completionRate !== undefined ? l.completionRate : 100;
+      const badgeCls = compRate >= 80 ? 'badge-green' : (compRate >= 50 ? 'badge-amber' : 'badge-red');
+
+      let tasksSummary = '';
+      if (Array.isArray(l.tasks) && l.tasks.length) {
+        tasksSummary = l.tasks.map(t => `${t.done ? '✅' : '❌'} ${t.text}`).join('<br>');
+      } else {
+        tasksSummary = l.summary || 'N/A';
+      }
+
+      let proofLinks = [];
+      if (l.driveLink) proofLinks.push(`<a href="${l.driveLink}" target="_blank" style="color:var(--cyan);font-weight:600;font-size:11.5px">📁 Drive Link</a>`);
+      if (l.instaLink) proofLinks.push(`<a href="${l.instaLink}" target="_blank" style="color:var(--purple);font-weight:600;font-size:11.5px">📸 Insta Link</a>`);
+      
+      const proofStr = proofLinks.length ? proofLinks.join(' | ') : '—';
+      const noteStr = (l.summary && Array.isArray(l.tasks) && l.tasks.length) ? `<div style="font-size:11px;color:var(--muted);margin-top:4px">💬 ${l.summary}</div>` : '';
+
       html += `
         <tr>
           <td><b>${l.date || '—'}</b></td>
-          <td><span class="badge badge-purple">${l.hours || 8} Hours</span></td>
-          <td style="max-width:380px;white-space:pre-wrap;font-size:12.5px;color:var(--text)">${l.summary || 'N/A'}</td>
+          <td><span class="badge badge-purple">${l.hours || 8}h</span></td>
+          <td style="max-width:320px;font-size:12.5px">
+            <span class="badge ${badgeCls}" style="margin-bottom:6px">🔥 ${compRate}% Done</span>
+            <div>${tasksSummary}</div>
+          </td>
+          <td style="font-size:12px">
+            <div>${proofStr}</div>
+            ${noteStr}
+          </td>
           <td style="font-size:11.5px;color:var(--muted)">${l.submittedAt ? new Date(l.submittedAt).toLocaleTimeString('en-IN') : '—'}</td>
         </tr>`;
     });
@@ -1997,20 +2227,38 @@ async function renderEmpWorkLogs() {
     container.innerHTML = html;
   } catch (err) {
     console.error('renderEmpWorkLogs error:', err);
-    container.innerHTML = `<div class="empty-state"><div>📝</div>No work log records found. Fill out the form above to submit your first EOD log.</div>`;
+    container.innerHTML = `<div class="empty-state"><div>📝</div>No work log records found.</div>`;
   }
 }
 
 async function submitEmpWorkLog() {
   const targetId = empId || (emp && emp.id) || '';
-  const date = document.getElementById('wl-date')?.value;
+  const date = document.getElementById('wl-date')?.value || new Date().toISOString().split('T')[0];
   const hours = Number(document.getElementById('wl-hours')?.value || 8);
+  const driveLink = (document.getElementById('wl-drive-link')?.value || '').trim();
+  const instaLink = (document.getElementById('wl-insta-link')?.value || '').trim();
   const summary = (document.getElementById('wl-summary')?.value || '').trim();
 
-  if (!date || !summary) {
-    toast('Please select a date and enter your tasks summary', 'warning');
-    return;
-  }
+  // Gather tasks checklist
+  const taskEls = document.querySelectorAll('.wl-task-item');
+  let tasksList = [];
+  let doneCount = 0;
+  
+  taskEls.forEach(el => {
+    const cb = el.querySelector('.wl-task-cb');
+    const txtInput = el.querySelector('.wl-task-txt');
+    const txtLabel = el.querySelector('.wl-task-label');
+    const txt = txtInput ? txtInput.value : (txtLabel ? txtLabel.textContent : '');
+    const taskLink = el.querySelector('.wl-task-link')?.value || '';
+    const isDone = cb ? cb.checked : false;
+    if (isDone) doneCount++;
+    if (txt.trim()) {
+      tasksList.push({ text: txt.trim(), done: isDone, link: taskLink.trim() });
+    }
+  });
+
+  const totalTasks = tasksList.length;
+  const completionRate = totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : 100;
 
   try {
     await EMS_DB.addWorkLog({
@@ -2018,10 +2266,14 @@ async function submitEmpWorkLog() {
       empName: (emp && emp.name) || 'Employee',
       date,
       hours,
+      tasks: tasksList,
+      completionRate,
+      driveLink,
+      instaLink,
       summary
     });
-    toast('EOD Work Log submitted successfully! 📝', 'success');
-    if (document.getElementById('wl-summary')) document.getElementById('wl-summary').value = '';
+
+    toast('Daily EOD Work Log & Tasks saved successfully! 📝', 'success');
     renderEmpWorkLogs();
   } catch (err) {
     toast('Error submitting work log: ' + err.message, 'error');
