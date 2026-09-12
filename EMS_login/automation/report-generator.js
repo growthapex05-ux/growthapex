@@ -21,9 +21,11 @@ function isCheckInLate(checkInTime) {
   return checkInTime > '10:00:00';
 }
 
-// Helper: Format date to YYYY-MM-DD
+// Helper: Format date to YYYY-MM-DD (Asia/Kolkata timezone)
 function formatDateString(date) {
-  return date.toISOString().split('T')[0];
+  if (typeof date === 'string') return date;
+  if (!date) date = new Date();
+  return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 }
 
 // Helper: Get Indian public holidays & festivals for a given month (1-indexed) and year
@@ -117,11 +119,13 @@ async function generateDailyReport(db, targetDateStr = null) {
   const leavesActiveToday = [];
   leavesSnap.forEach(doc => {
     const data = doc.data();
-    if (todayStr >= data.from && todayStr <= data.to) {
+    const lFrom = data.startDate || data.from || data.fromDate || '';
+    const lTo = data.endDate || data.to || data.toDate || lFrom;
+    if (lFrom && lTo && todayStr >= lFrom && todayStr <= lTo) {
       leavesActiveToday.push(data);
     }
   });
-  const leaveEmpIds = new Set(leavesActiveToday.map(l => l.empId));
+  const leaveEmpIds = new Set(leavesActiveToday.map(l => (l.empId || '').trim().toUpperCase()));
 
   // 4. Fetch all tasks (open/pending tasks + tasks created/completed today)
   const tasksSnap = await db.collection('tasks').get();
@@ -157,19 +161,19 @@ async function generateDailyReport(db, targetDateStr = null) {
   const onLeaveList = [];
 
   employees.forEach(emp => {
-    if (leaveEmpIds.has(emp.id)) {
+    const empIdNorm = (emp.id || '').trim().toUpperCase();
+    const att = attendanceMap[emp.id] || attendanceMap[empIdNorm];
+
+    if (att && (att.status === 'present' || att.checkIn)) {
+      if (isCheckInLate(att.checkIn)) {
+        lateList.push(`${emp.name} (Late: ${att.checkIn})`);
+      } else {
+        presentList.push(`${emp.name} (In: ${att.checkIn})`);
+      }
+    } else if (leaveEmpIds.has(empIdNorm)) {
       onLeaveList.push(emp.name);
     } else {
-      const att = attendanceMap[emp.id];
-      if (att && (att.status === 'present' || att.checkIn)) {
-        if (isCheckInLate(att.checkIn)) {
-          lateList.push(`${emp.name} (Late: ${att.checkIn})`);
-        } else {
-          presentList.push(`${emp.name} (In: ${att.checkIn})`);
-        }
-      } else {
-        absentList.push(emp.name);
-      }
+      absentList.push(emp.name);
     }
   });
 
@@ -329,11 +333,11 @@ async function generateWeeklyReport(db) {
   leavesSnap.forEach(doc => {
     const data = doc.data();
     // Check if overlap exists with the week range
-    const lFrom = data.from;
-    const lTo = data.to;
-    if (lTo >= startStr && lFrom <= endStr) {
+    const lFrom = data.startDate || data.from || data.fromDate || '';
+    const lTo = data.endDate || data.to || data.toDate || lFrom;
+    if (lFrom && lTo && lTo >= startStr && lFrom <= endStr) {
       const empName = employeeMap[data.empId]?.name || data.empId;
-      leaveLog.push(`${empName} (${data.type}: ${data.from} to ${data.to})`);
+      leaveLog.push(`${empName} (${data.type || 'Leave'}: ${lFrom} to ${lTo})`);
       totalLeavesApprovedDays++;
 
       // Count overlap days for this employee (excluding Sundays)
@@ -541,9 +545,9 @@ async function generateMonthlyReport(db) {
   let monthlyLeavesDays = 0;
   leavesSnap.forEach(doc => {
     const data = doc.data();
-    const lFrom = data.from;
-    const lTo = data.to;
-    if (lTo >= startStr && lFrom <= endStr) {
+    const lFrom = data.startDate || data.from || data.fromDate || '';
+    const lTo = data.endDate || data.to || data.toDate || lFrom;
+    if (lFrom && lTo && lTo >= startStr && lFrom <= endStr) {
       // Calculate overlap days (excluding Sundays) in current month
       try {
         let current = new Date(lFrom > startStr ? lFrom : startStr);
@@ -663,59 +667,178 @@ async function generateMonthlyReport(db) {
 async function generateLoginReport(db, targetDateStr = null) {
   const dateStr = targetDateStr || formatDateString(new Date());
 
-  const [loginsSnap, attSnap, empSnap] = await Promise.all([
+  const [loginsSnap, attSnap, empSnap, leavesSnap] = await Promise.all([
     db.collection('logins').where('date', '==', dateStr).get(),
     db.collection('attendance').where('date', '==', dateStr).get(),
-    db.collection('employees').get()
+    db.collection('employees').get(),
+    db.collection('leaves').where('status', '==', 'approved').get()
   ]);
 
   const empMap = {};
-  empSnap.forEach(doc => { empMap[doc.id] = doc.data(); });
-
-  const entriesMap = new Map();
-
-  // 1. Add web logins
-  loginsSnap.forEach(doc => {
-    const data = doc.data();
-    const key = (data.empId || data.name || doc.id).toUpperCase();
-    entriesMap.set(key, {
-      name: data.name || empMap[data.empId]?.name || key,
-      empId: data.empId || 'USER',
-      role: data.role || 'employee',
-      time: data.loginTime || 'Logged in'
-    });
+  empSnap.forEach(doc => {
+    const empData = doc.data();
+    const id = doc.id;
+    empMap[id] = empData;
+    empMap[id.trim().toUpperCase()] = empData;
   });
 
-  // 2. Add attendance check-ins
-  attSnap.forEach(doc => {
+  // Approved leaves active on target date
+  const leavesActiveToday = new Set();
+  leavesSnap.forEach(doc => {
     const data = doc.data();
-    const key = (data.empId || doc.id).toUpperCase();
-    if (!entriesMap.has(key)) {
-      const emp = empMap[key] || {};
-      entriesMap.set(key, {
-        name: emp.name || key,
-        empId: key,
-        role: 'employee',
-        time: data.checkIn ? `${data.checkIn} (Check-in)` : 'Checked in'
+    const lFrom = data.startDate || data.from || data.fromDate || '';
+    const lTo = data.endDate || data.to || data.toDate || lFrom;
+    if (lFrom && lTo && dateStr >= lFrom && dateStr <= lTo && data.empId) {
+      leavesActiveToday.add(String(data.empId).trim().toUpperCase());
+    }
+  });
+
+  const adminLogins = [];
+  const empLoginsMap = new Map();
+
+  // Populate active employees in map
+  empSnap.forEach(doc => {
+    const empData = doc.data();
+    if (empData.status === 'active') {
+      const empIdNorm = doc.id.trim().toUpperCase();
+      empLoginsMap.set(empIdNorm, {
+        id: doc.id,
+        name: empData.name || doc.id,
+        department: empData.department || '',
+        designation: empData.designation || '',
+        logins: [],
+        attendance: null,
+        isOnLeave: leavesActiveToday.has(empIdNorm)
       });
     }
   });
 
-  const entries = Array.from(entriesMap.values());
+  // Process logins records
+  loginsSnap.forEach(doc => {
+    const data = doc.data();
+    const role = (data.role || 'employee').toLowerCase();
+    const time = data.loginTime || (data.timestamp ? new Date(data.timestamp).toLocaleTimeString('en-IN', { hour12: true }) : 'Logged in');
+    
+    if (role === 'admin' || data.empId === 'ADMIN') {
+      adminLogins.push({
+        name: data.name || 'GrowthApex Admin',
+        email: data.email || '',
+        time: time
+      });
+    } else if (data.empId) {
+      const empIdNorm = String(data.empId).trim().toUpperCase();
+      if (!empLoginsMap.has(empIdNorm)) {
+        const empInfo = empMap[empIdNorm] || {};
+        empLoginsMap.set(empIdNorm, {
+          id: data.empId,
+          name: data.name || empInfo.name || data.empId,
+          department: empInfo.department || '',
+          designation: empInfo.designation || '',
+          logins: [],
+          attendance: null,
+          isOnLeave: leavesActiveToday.has(empIdNorm)
+        });
+      }
+      empLoginsMap.get(empIdNorm).logins.push(time);
+    }
+  });
 
-  let report = `🔑 *GROWTHAPEX EMS - LOGIN REPORT* 🔑\n`;
+  // Process attendance records
+  attSnap.forEach(doc => {
+    const data = doc.data();
+    if (data.empId) {
+      const empIdNorm = String(data.empId).trim().toUpperCase();
+      if (!empLoginsMap.has(empIdNorm)) {
+        const empInfo = empMap[empIdNorm] || {};
+        empLoginsMap.set(empIdNorm, {
+          id: data.empId,
+          name: empInfo.name || data.empId,
+          department: empInfo.department || '',
+          designation: empInfo.designation || '',
+          logins: [],
+          attendance: null,
+          isOnLeave: leavesActiveToday.has(empIdNorm)
+        });
+      }
+      empLoginsMap.get(empIdNorm).attendance = data;
+    }
+  });
+
+  let report = `🔑 *GROWTHAPEX EMS - LOGIN & SESSION REPORT* 🔑\n`;
   report += `📅 *Date:* ${dateStr}\n`;
   report += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
-  if (entries.length === 0) {
-    report += `ℹ️ No system logins or check-ins recorded for this date.`;
+  const totalWebLogins = loginsSnap.size;
+  let activeUsersCount = 0;
+  empLoginsMap.forEach(record => {
+    if (record.logins.length > 0 || (record.attendance && record.attendance.checkIn)) {
+      activeUsersCount++;
+    }
+  });
+
+  report += `📊 *SESSION SUMMARY:*\n`;
+  report += `• Total Web Logins: ${totalWebLogins} 🌐\n`;
+  report += `• Staff Active Today: ${activeUsersCount} / ${empLoginsMap.size} 👥\n`;
+  if (adminLogins.length > 0) {
+    report += `• Admin Logins: ${adminLogins.length} 👑\n`;
+  }
+  report += `\n`;
+
+  if (adminLogins.length > 0) {
+    report += `👑 *ADMIN LOGINS:*\n`;
+    adminLogins.forEach(adm => {
+      report += ` • *${adm.name}* [ADMIN] — ⏰ ${adm.time}\n`;
+    });
+    report += `\n`;
+  }
+
+  report += `👥 *STAFF LOGINS & CHECK-INS:*\n`;
+
+  const employeeEntries = Array.from(empLoginsMap.values());
+
+  // Sort employees: logged in / checked in first, then on leave, then others
+  employeeEntries.sort((a, b) => {
+    const aActive = a.logins.length > 0 || (a.attendance && a.attendance.checkIn);
+    const bActive = b.logins.length > 0 || (b.attendance && b.attendance.checkIn);
+    if (aActive && !bActive) return -1;
+    if (!aActive && bActive) return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  if (employeeEntries.length === 0) {
+    report += `ℹ️ No employee records found.`;
   } else {
-    report += `👤 *Staff Logins & Check-ins (${entries.length}):*\n`;
-    entries.forEach(e => {
-      const roleStr = e.role ? ` (${e.role.toUpperCase()})` : '';
-      report += ` • *${e.name}* [${e.empId}]${roleStr} — ⏰ ${e.time}\n`;
+    employeeEntries.forEach(rec => {
+      const desigStr = rec.designation ? ` (${rec.designation})` : '';
+      const hasWebLogin = rec.logins.length > 0;
+      const hasCheckIn = rec.attendance && rec.attendance.checkIn;
+
+      report += `• *${rec.name}* [${rec.id}]${desigStr}:\n`;
+
+      if (hasWebLogin) {
+        report += `   └ 🌐 *Web Login:* ${rec.logins.join(', ')}\n`;
+      } else {
+        report += `   └ 🌐 *Web Login:* No web login\n`;
+      }
+
+      if (hasCheckIn) {
+        const att = rec.attendance;
+        const isLate = isCheckInLate(att.checkIn);
+        const lateTag = isLate ? ' ⚠️ (Late)' : ' ✨ (On Time)';
+        const checkOutStr = (att.checkOut && att.checkOut !== '—') ? ` | Out: ${att.checkOut}` : '';
+        report += `   └ 📍 *Attendance Check-In:* ${att.checkIn}${lateTag}${checkOutStr}\n`;
+      } else if (rec.isOnLeave) {
+        report += `   └ 🌴 *Status:* On Approved Leave 😎\n`;
+      } else {
+        report += `   └ 📍 *Attendance:* No check-in recorded\n`;
+      }
+
+      report += `\n`;
     });
   }
+
+  report += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  report += `🔥 _GrowthApex EMS Automated System Logging_ 🔥`;
 
   return report;
 }

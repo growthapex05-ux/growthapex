@@ -1036,65 +1036,96 @@ const sBadge = s => {
   return `<span class="badge badge-${m[s]||'blue'}">${s}</span>`;
 };
 
-const calcHours = (dateStr, checkIn, checkOut) => {
-  if (!checkIn) return '—';
+const parseTimeString = (timeStr) => {
+  if (!timeStr || typeof timeStr !== 'string' || timeStr === '—' || timeStr.trim() === '') return null;
+  const clean = timeStr.replace(/[\u202f\u00a0]/g, ' ').trim();
+  const match = clean.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM|am|pm)?$/i);
+  if (!match) return null;
   
-  const today = new Date().toISOString().split('T')[0];
-  let endTime = checkOut;
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const seconds = match[3] ? parseInt(match[3], 10) : 0;
+  const ampm = match[4] ? match[4].toUpperCase() : null;
+  
+  if (ampm) {
+    if (ampm === 'PM' && hours < 12) hours += 12;
+    if (ampm === 'AM' && hours === 12) hours = 0;
+  }
+  
+  if (isNaN(hours) || isNaN(minutes) || isNaN(seconds)) return null;
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59) return null;
+  
+  return { hours, minutes, seconds, totalSeconds: hours * 3600 + minutes * 60 + seconds };
+};
+
+const calcHours = (dateStr, checkIn, checkOut) => {
+  if (!checkIn || checkIn === '—') return '—';
+  
+  const t1 = parseTimeString(checkIn);
+  if (!t1) return '—';
+
+  const d = new Date();
+  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const recDate = dateStr ? dateStr.split('T')[0] : '';
+  
+  let t2 = null;
   let isCurrent = false;
 
-  if (!checkOut) {
-    if (dateStr === today) {
-      const now = new Date();
-      endTime = now.toLocaleTimeString('en-IN', { hour12: false });
+  if (!checkOut || checkOut === '—') {
+    if (recDate === today || dateStr === today || !dateStr) {
+      t2 = {
+        totalSeconds: d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds()
+      };
       isCurrent = true;
     } else {
       return '—';
     }
+  } else {
+    t2 = parseTimeString(checkOut);
   }
 
-  try {
-    const [h1, m1, s1] = checkIn.split(':').map(Number);
-    const [h2, m2, s2] = endTime.split(':').map(Number);
-    const t1 = new Date(2000, 0, 1, h1, m1, s1 || 0);
-    const t2 = new Date(2000, 0, 1, h2, m2, s2 || 0);
-    let diffMs = t2 - t1;
-    if (diffMs < 0) return '—';
-    const hrs = Math.floor(diffMs / 3600000);
-    const mins = Math.floor((diffMs % 3600000) / 60000);
-    
-    const formatted = `${hrs}h ${mins}m`;
-    return isCurrent ? `<span style="color:var(--green);font-weight:600">⚡ Working (${formatted})</span>` : formatted;
-  } catch (e) {
-    return '—';
-  }
+  if (!t2) return '—';
+
+  let diffSecs = t2.totalSeconds - t1.totalSeconds;
+  if (diffSecs < 0) return '—';
+
+  const hrs = Math.floor(diffSecs / 3600);
+  const mins = Math.floor((diffSecs % 3600) / 60);
+  
+  const formatted = `${hrs}h ${mins}m`;
+  return isCurrent ? `<span style="color:var(--green);font-weight:600">⚡ Working (${formatted})</span>` : formatted;
 };
 
 const calcTotalHours = (attList) => {
   let totalMs = 0;
-  const today = new Date().toISOString().split('T')[0];
+  const d = new Date();
+  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   
-  attList.forEach(a => {
-    if (!a.checkIn) return;
-    let endTime = a.checkOut;
-    if (!a.checkOut) {
-      if (a.date === today) {
-        endTime = new Date().toLocaleTimeString('en-IN', { hour12: false });
+  (attList || []).forEach(a => {
+    if (!a || !a.checkIn || a.checkIn === '—') return;
+    const t1 = parseTimeString(a.checkIn);
+    if (!t1) return;
+
+    const recDate = a.date ? a.date.split('T')[0] : '';
+    let t2 = null;
+    if (!a.checkOut || a.checkOut === '—') {
+      if (recDate === today || a.date === today) {
+        t2 = {
+          totalSeconds: d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds()
+        };
       } else {
         return;
       }
+    } else {
+      t2 = parseTimeString(a.checkOut);
     }
     
-    try {
-      const [h1, m1, s1] = a.checkIn.split(':').map(Number);
-      const [h2, m2, s2] = endTime.split(':').map(Number);
-      const t1 = new Date(2000, 0, 1, h1, m1, s1 || 0);
-      const t2 = new Date(2000, 0, 1, h2, m2, s2 || 0);
-      let diffMs = t2 - t1;
-      if (diffMs > 0) {
-        totalMs += diffMs;
-      }
-    } catch (_) {}
+    if (!t2) return;
+
+    let diffSecs = t2.totalSeconds - t1.totalSeconds;
+    if (diffSecs > 0) {
+      totalMs += diffSecs * 1000;
+    }
   });
   
   return totalMs / 3600000;

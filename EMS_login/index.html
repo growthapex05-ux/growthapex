@@ -355,7 +355,7 @@
             role: 'admin',
             email: cred.user.email,
             loginTime: new Date().toLocaleTimeString('en-IN', { hour12: true }),
-            date: new Date().toISOString().split('T')[0],
+            date: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
             timestamp: new Date().toISOString()
           });
         } catch (_) {}
@@ -441,7 +441,7 @@
             role: 'employee',
             email: emp.email,
             loginTime: new Date().toLocaleTimeString('en-IN', { hour12: true }),
-            date: new Date().toISOString().split('T')[0],
+            date: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
             timestamp: new Date().toISOString()
           });
         } catch (_) {}
