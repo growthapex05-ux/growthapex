@@ -2045,12 +2045,37 @@ function getAssignedTasksForEmployee(id) {
   return EMPLOYEE_DAILY_TASKS[cleanId] || EMPLOYEE_DAILY_TASKS['default'];
 }
 
-function initTasksChecklistUI() {
+async function initTasksChecklistUI() {
   const container = document.getElementById('wl-tasks-checklist-container');
   if (!container) return;
 
   const targetId = empId || (emp && emp.id) || '';
-  const assigned = getAssignedTasksForEmployee(targetId);
+  let assigned = [];
+
+  // 1. Dynamically fetch assigned tasks from Firestore / EMS_DB
+  try {
+    const dbTasks = await EMS_DB.getTasks(targetId);
+    if (Array.isArray(dbTasks) && dbTasks.length) {
+      const activeDbTasks = dbTasks.filter(t => t.status !== 'done');
+      if (activeDbTasks.length) {
+        assigned = activeDbTasks.map(t => ({ text: t.title + (t.description ? ` (${t.description})` : '') }));
+      }
+    }
+  } catch (e) {
+    console.warn('Could not load dynamic Firestore tasks:', e);
+  }
+
+  // 2. Merge with employee pre-configured templates
+  const templateTasks = getAssignedTasksForEmployee(targetId);
+  if (!assigned.length) {
+    assigned = templateTasks;
+  } else {
+    templateTasks.forEach(t => {
+      if (!assigned.some(a => a.text.toLowerCase().includes(t.text.toLowerCase()))) {
+        assigned.push(t);
+      }
+    });
+  }
 
   let html = '';
   assigned.forEach((t, idx) => {
