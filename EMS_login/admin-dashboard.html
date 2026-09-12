@@ -88,6 +88,9 @@
     .badge-green{background:rgba(16,185,129,.15);color:#34d399}.badge-amber{background:rgba(245,158,11,.15);color:#fbbf24}
     .badge-red{background:rgba(239,68,68,.15);color:#f87171}.badge-purple{background:rgba(124,58,237,.15);color:#a78bfa}
     .badge-blue{background:rgba(59,130,246,.15);color:#93c5fd}.badge-cyan{background:rgba(6,182,212,.15);color:#67e8f9}
+    @keyframes pulseGlow { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.05); } 100% { opacity: 1; transform: scale(1); } }
+    .live-pulse-badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; background: rgba(16,185,129,.15); color: #34d399; border: 1px solid rgba(16,185,129,.3); }
+    .live-pulse-dot { width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981; animation: pulseGlow 1.5s infinite ease-in-out; }
 
     /* Buttons */
     .btn{padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;font-family:'Inter',sans-serif;transition:all .2s;white-space:nowrap}
@@ -391,7 +394,7 @@
   <!-- ── Attendance ── -->
   <div class="page" id="page-attendance">
     <div class="section-card">
-      <div class="section-head"><h3>📅 Attendance Manager</h3>
+      <div class="section-head"><h3>📅 Attendance Manager <span class="live-pulse-badge" style="margin-left:8px"><span class="live-pulse-dot"></span>LIVE TRACKING ACTIVE</span></h3>
         <div class="toolbar">
           <input type="date" id="att-date-filter" style="width:auto;padding:8px 12px" onchange="renderAdminAtt()">
           <select class="filter-select" id="att-emp-filter" onchange="renderAdminAtt()"><option value="">All Employees</option></select>
@@ -1016,6 +1019,14 @@ function updateClock() {
 }
 updateClock(); setInterval(updateClock, 1000);
 
+// Live Attendance & Live Pulse Auto-Tracker Interval (Refreshes working hours & pulse every 5 seconds)
+setInterval(() => {
+  const activePage = document.querySelector('.page.active');
+  if (activePage && activePage.id === 'page-attendance') {
+    renderAdminAtt();
+  }
+}, 5000);
+
 // ─── Toast ────────────────────────────────────────────────────
 function toast(msg, type='info') {
   const icons = { success:'✅', error:'❌', info:'ℹ️', warning:'⚠️' };
@@ -1432,8 +1443,11 @@ async function saveEmployee() {
 }
 
 // ─── ATTENDANCE ───────────────────────────────────────────────
+// ─── ATTENDANCE ───────────────────────────────────────────────
 async function initAtt() {
-  document.getElementById('att-date-filter').value = new Date().toISOString().split('T')[0];
+  const d = new Date();
+  const todayLocal = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  document.getElementById('att-date-filter').value = todayLocal;
   const emps = cache.employees;
   document.getElementById('att-emp-filter').innerHTML = '<option value="">All Employees</option>' +
     emps.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
@@ -1477,7 +1491,19 @@ async function renderAdminAtt() {
   const empId  = document.getElementById('att-emp-filter')?.value||'';
   const status = document.getElementById('att-status-filter')?.value||'';
   let att = cache.attendance;
-  if (date)   att = att.filter(a=>a.date===date);
+  
+  if (date) {
+    att = att.filter(a => {
+      if (!a || !a.date) return false;
+      const aDateClean = String(a.date).split('T')[0];
+      if (aDateClean === date || a.date === date) return true;
+      try {
+        const d1 = new Date(a.date).toISOString().split('T')[0];
+        if (d1 === date) return true;
+      } catch (e) {}
+      return false;
+    });
+  }
   if (empId)  att = att.filter(a=>a.empId===empId);
   if (status) att = att.filter(a=>a.status===status);
 

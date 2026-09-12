@@ -933,7 +933,20 @@
   let heartbeatInterval = null;
   let lastUserActivityTime = Date.now();
   let currentActivityState = 'active'; // 'active' | 'idle'
-  const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes of no input = Idle
+  const IDLE_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes of no user input = Idle
+
+  function markUserActive() {
+    lastUserActivityTime = Date.now();
+    if (currentActivityState === 'idle') {
+      currentActivityState = 'active';
+      updateLiveStatusBadgeUI('active');
+      EMS_DB.updateHeartbeat(empId, 'active').catch(() => {});
+    }
+  }
+
+  ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(evt => {
+    window.addEventListener(evt, markUserActive, { passive: true });
+  });
 
   function startHeartbeatEngine() {
     stopHeartbeatEngine();
@@ -945,7 +958,7 @@
       currentActivityState = isIdle ? 'idle' : 'active';
       updateLiveStatusBadgeUI(currentActivityState);
       await EMS_DB.updateHeartbeat(empId, currentActivityState).catch(() => {});
-    }, 30000);
+    }, 15000);
   }
 
   function stopHeartbeatEngine() {
