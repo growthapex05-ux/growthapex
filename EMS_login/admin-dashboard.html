@@ -3692,12 +3692,9 @@ async function renderWorkLogs() {
     
     filtered.forEach(l => {
       const compRate = l.completionRate !== undefined ? l.completionRate : 100;
-      const isIncomplete = compRate < 100;
-      const compBadgeClass = compRate >= 80 ? (compRate === 100 ? 'badge-green' : 'badge-amber') : 'badge-red';
-      const compIcon = compRate === 100 ? '🔥' : '⚠️';
-
-      // Red line card border and warning styling if tasks not completed
-      const cardBorderStyle = isIncomplete ? 'border: 2px solid #ef4444; background: rgba(239, 68, 68, 0.03)' : 'border: 1px solid var(--border); background: var(--card)';
+      const compBadgeClass = compRate >= 80 ? 'badge-green' : (compRate >= 50 ? 'badge-amber' : 'badge-red');
+      const compIcon = compRate >= 80 ? '🎉' : (compRate >= 50 ? '🟡' : '⚠️');
+      const cardBorderStyle = compRate >= 80 ? 'border: 1px solid rgba(34,197,94,0.4); background: var(--card)' : (compRate >= 50 ? 'border: 1px solid rgba(245,158,11,0.4); background: var(--card)' : 'border: 2px solid #ef4444; background: rgba(239, 68, 68, 0.03)');
 
       let tasksHtml = '';
       if (Array.isArray(l.tasks) && l.tasks.length) {
@@ -3717,10 +3714,23 @@ async function renderWorkLogs() {
         tasksHtml = `<div style="font-size:12.5px;color:var(--text);white-space:pre-wrap;margin:10px 0;background:rgba(0,0,0,0.02);padding:8px 10px;border-radius:6px">${l.summary}</div>`;
       }
 
-      const warningBanner = isIncomplete ? `
+      let warningBanner = '';
+      if (compRate < 50) {
+        warningBanner = `
         <div style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);border-radius:6px;padding:8px 10px;font-size:11.5px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px">
-          ⚠️ <span>Not good! Assigned tasks were NOT completed today (${compRate}% Done).</span>
-        </div>` : '';
+          ⚠️ <span>Not good! Assigned tasks completion is below 50% (${compRate}% Done). Focus and complete pending work!</span>
+        </div>`;
+      } else if (compRate <= 79) {
+        warningBanner = `
+        <div style="background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.3);border-radius:6px;padding:8px 10px;font-size:11.5px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+          🟡 <span>Good effort! Task completion is ${compRate}% Done. A little more push to reach 100%! 💪</span>
+        </div>`;
+      } else {
+        warningBanner = `
+        <div style="background:rgba(34,197,94,0.15);color:#4ade80;border:1px solid rgba(34,197,94,0.3);border-radius:6px;padding:8px 10px;font-size:11.5px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+          🎉 <span>Great work & Well done! Task completion is ${compRate}% Done. Keep up the stellar performance! 🚀🔥</span>
+        </div>`;
+      }
 
       let linksHtml = '';
       if (l.driveLink || l.instaLink) {
@@ -3804,8 +3814,12 @@ async function copyWorkLogWhatsAppReport(logId) {
     msg += `⏰ *Hours Worked:* ${l.hours || 8} Hours\n`;
     msg += `🔥 *Task Completion:* ${compRate}%\n\n`;
 
-    if (isIncomplete) {
-      msg += `⚠️ *ALERT / WARNING:* 🔴 Not good! Your task has not been completed today! Please complete your pending assigned work.\n\n`;
+    if (compRate < 50) {
+      msg += `⚠️ *ALERT / WARNING:* 🔴 Not good! Task completion is below 50% (${compRate}%). Please gear up, focus, and complete your pending assigned work!\n\n`;
+    } else if (compRate <= 79) {
+      msg += `🟡 *GOOD EFFORT:* Good progress! You completed ${compRate}% of your tasks today. A little more push and you will reach 100%. Keep going! 💪\n\n`;
+    } else {
+      msg += `🎉 *GREAT WORK & WELL DONE:* Outstanding job today! You achieved ${compRate}% completion rate! Keep up the amazing stellar performance! 🚀🔥\n\n`;
     }
 
     if (Array.isArray(l.tasks) && l.tasks.length) {

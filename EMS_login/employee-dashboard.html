@@ -2004,13 +2004,13 @@ function downloadEmpSalarySlipPDF() {
 
 // ─── Employee EOD Work Log & Assigned Tasks Handlers ──────────────
 const EMPLOYEE_DAILY_TASKS = {
-  // Jayati Goyal (EMP001)
+  // Jayati / Jayanti Goyal (EMP001)
   'EMP001': [
-    { text: 'Manage Team Member: Raj' },
-    { text: 'Manage Team Member: Rajeev' },
-    { text: 'Manage Team Member: Riitu' },
-    { text: 'Manage Team Member: Sunitta' },
-    { text: 'Manage Account: Urja Wellness Centre' }
+    { text: 'Client / Team: Raj' },
+    { text: 'Client / Team: Rajeev' },
+    { text: 'Client / Team: Riitu' },
+    { text: 'Client / Team: Sunitta' },
+    { text: 'Client / Account: Urja Wellness Centre' }
   ],
   
   // Dheeraj Kumar (EMP003)
@@ -2040,8 +2040,24 @@ const EMPLOYEE_DAILY_TASKS = {
 };
 
 function getAssignedTasksForEmployee(id) {
-  if (!id) return EMPLOYEE_DAILY_TASKS['default'];
-  const cleanId = String(id).toUpperCase().trim();
+  const cleanId = String(id || '').toUpperCase().trim();
+  const nameStr = (typeof emp !== 'undefined' && emp && emp.name ? emp.name : '').toLowerCase();
+
+  // Match Jayati / Jayanti (EMP001 or by name)
+  if (cleanId === 'EMP001' || nameStr.includes('jayati') || nameStr.includes('jayanti')) {
+    return EMPLOYEE_DAILY_TASKS['EMP001'];
+  }
+
+  // Match Dheeraj (EMP003 or by name)
+  if (cleanId === 'EMP003' || nameStr.includes('dheeraj')) {
+    return EMPLOYEE_DAILY_TASKS['EMP003'];
+  }
+
+  // Match Janvi (EMP004 or by name)
+  if (cleanId === 'EMP004' || nameStr.includes('janvi')) {
+    return EMPLOYEE_DAILY_TASKS['EMP004'];
+  }
+
   return EMPLOYEE_DAILY_TASKS[cleanId] || EMPLOYEE_DAILY_TASKS['default'];
 }
 
@@ -2176,8 +2192,12 @@ function sendReportToWhatsAppGroup() {
   msg += `⏰ *Hours Worked:* ${hoursVal} Hours\n`;
   msg += `🔥 *Task Completion:* ${compRate}% (${doneCount}/${totalTasks})\n\n`;
 
-  if (hasPending || compRate < 100) {
-    msg += `⚠️ *ALERT / WARNING:* 🔴 Not good! Your task has not been completed today! Please complete your pending assigned work.\n\n`;
+  if (compRate < 50) {
+    msg += `⚠️ *ALERT / WARNING:* 🔴 Not good! Task completion is below 50% (${compRate}%). Please gear up, focus, and complete your pending assigned work!\n\n`;
+  } else if (compRate <= 79) {
+    msg += `🟡 *GOOD EFFORT:* Good progress! You completed ${compRate}% of your tasks today. A little more push and you will reach 100%. Keep going! 💪\n\n`;
+  } else {
+    msg += `🎉 *GREAT WORK & WELL DONE:* Outstanding job today! You achieved ${compRate}% completion rate! Keep up the amazing stellar performance! 🚀🔥\n\n`;
   }
 
   msg += `✅ *TASKS CHECKLIST:*\n`;
