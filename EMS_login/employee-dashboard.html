@@ -2123,6 +2123,7 @@ function sendReportToWhatsAppGroup() {
   const taskEls = document.querySelectorAll('.wl-task-item');
   let tasksList = [];
   let doneCount = 0;
+  let hasPending = false;
   
   taskEls.forEach(el => {
     const cb = el.querySelector('.wl-task-cb');
@@ -2131,7 +2132,11 @@ function sendReportToWhatsAppGroup() {
     const txt = txtInput ? txtInput.value : (txtLabel ? txtLabel.textContent : '');
     const taskLink = el.querySelector('.wl-task-link')?.value || '';
     const isDone = cb ? cb.checked : false;
-    if (isDone) doneCount++;
+    if (isDone) {
+      doneCount++;
+    } else {
+      hasPending = true;
+    }
     if (txt.trim()) {
       tasksList.push({ text: txt.trim(), done: isDone, link: taskLink.trim() });
     }
@@ -2146,12 +2151,21 @@ function sendReportToWhatsAppGroup() {
   msg += `⏰ *Hours Worked:* ${hoursVal} Hours\n`;
   msg += `🔥 *Task Completion:* ${compRate}% (${doneCount}/${totalTasks})\n\n`;
 
+  if (hasPending || compRate < 100) {
+    msg += `⚠️ *ALERT / WARNING:* 🔴 Not good! Your task has not been completed today! Please complete your pending assigned work.\n\n`;
+  }
+
   msg += `✅ *TASKS CHECKLIST:*\n`;
   tasksList.forEach(t => {
-    const icon = t.done ? '✅' : '❌';
-    let line = `${icon} ${t.text}`;
-    if (t.link) line += ` (🔗 ${t.link})`;
-    msg += `${line}\n`;
+    if (t.done) {
+      let line = `🟢 [DONE] ${t.text}`;
+      if (t.link) line += ` (🔗 ${t.link})`;
+      msg += `${line}\n`;
+    } else {
+      let line = `🔴 [NOT COMPLETED] ${t.text}`;
+      if (t.link) line += ` (🔗 ${t.link})`;
+      msg += `${line}\n`;
+    }
   });
 
   if (driveLinkVal || instaLinkVal) {

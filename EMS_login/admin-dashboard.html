@@ -3692,21 +3692,35 @@ async function renderWorkLogs() {
     
     filtered.forEach(l => {
       const compRate = l.completionRate !== undefined ? l.completionRate : 100;
-      const compBadgeClass = compRate >= 80 ? 'badge-green' : (compRate >= 50 ? 'badge-amber' : 'badge-red');
-      const compIcon = compRate >= 80 ? '🔥' : (compRate >= 50 ? '⚡' : '⏳');
+      const isIncomplete = compRate < 100;
+      const compBadgeClass = compRate >= 80 ? (compRate === 100 ? 'badge-green' : 'badge-amber') : 'badge-red';
+      const compIcon = compRate === 100 ? '🔥' : '⚠️';
+
+      // Red line card border and warning styling if tasks not completed
+      const cardBorderStyle = isIncomplete ? 'border: 2px solid #ef4444; background: rgba(239, 68, 68, 0.03)' : 'border: 1px solid var(--border); background: var(--card)';
 
       let tasksHtml = '';
       if (Array.isArray(l.tasks) && l.tasks.length) {
         tasksHtml = `<div style="margin:10px 0;display:flex;flex-direction:column;gap:6px">`;
         l.tasks.forEach(t => {
-          const icon = t.done ? '✅' : '❌';
-          const linkBtn = t.link ? `<a href="${t.link}" target="_blank" style="margin-left:6px;color:var(--cyan);font-weight:600;font-size:11px;text-decoration:none">🔗 Link</a>` : '';
-          tasksHtml += `<div style="font-size:12.5px;color:var(--text);display:flex;align-items:flex-start;gap:6px"><span>${icon}</span><span style="flex:1">${t.text}${linkBtn}</span></div>`;
+          if (t.done) {
+            const linkBtn = t.link ? `<a href="${t.link}" target="_blank" style="margin-left:6px;color:var(--cyan);font-weight:600;font-size:11px;text-decoration:none">🔗 Link</a>` : '';
+            tasksHtml += `<div style="font-size:12.5px;color:var(--text);display:flex;align-items:flex-start;gap:6px"><span>✅</span><span style="flex:1">${t.text}${linkBtn}</span></div>`;
+          } else {
+            // RED HIGHLIGHT LINE FOR UNCHECKED / INCOMPLETE TASK
+            const linkBtn = t.link ? `<a href="${t.link}" target="_blank" style="margin-left:6px;color:#f87171;font-weight:600;font-size:11px;text-decoration:underline">🔗 Link</a>` : '';
+            tasksHtml += `<div style="font-size:12.5px;color:#ef4444;background:rgba(239,68,68,0.12);padding:6px 10px;border-left:3px solid #ef4444;border-radius:4px;display:flex;align-items:flex-start;gap:6px"><span>🔴</span><span style="flex:1;font-weight:700">${t.text} (NOT COMPLETED)${linkBtn}</span></div>`;
+          }
         });
         tasksHtml += `</div>`;
       } else if (l.summary) {
         tasksHtml = `<div style="font-size:12.5px;color:var(--text);white-space:pre-wrap;margin:10px 0;background:rgba(0,0,0,0.02);padding:8px 10px;border-radius:6px">${l.summary}</div>`;
       }
+
+      const warningBanner = isIncomplete ? `
+        <div style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);border-radius:6px;padding:8px 10px;font-size:11.5px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+          ⚠️ <span>Not good! Assigned tasks were NOT completed today (${compRate}% Done).</span>
+        </div>` : '';
 
       let linksHtml = '';
       if (l.driveLink || l.instaLink) {
@@ -3726,7 +3740,7 @@ async function renderWorkLogs() {
         </div>` : '';
 
       html += `
-        <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 2px 10px rgba(0,0,0,0.03);display:flex;flex-direction:column;justify-content:space-between">
+        <div style="${cardBorderStyle};border-radius:12px;padding:16px;box-shadow:0 2px 10px rgba(0,0,0,0.03);display:flex;flex-direction:column;justify-content:space-between">
           <div>
             <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
               <div>
@@ -3739,6 +3753,7 @@ async function renderWorkLogs() {
               </div>
             </div>
 
+            ${warningBanner}
             ${tasksHtml}
             ${notesHtml}
             ${linksHtml}
@@ -3765,16 +3780,23 @@ async function copyWorkLogWhatsAppReport(logId) {
     const l = logs.find(item => item.id === logId);
     if (!l) return;
 
+    const compRate = l.completionRate !== undefined ? l.completionRate : 100;
+    const isIncomplete = compRate < 100;
+
     let msg = `📝 *DAILY EOD WORK REPORT*\n`;
     msg += `👤 *Employee:* ${l.empName} (${l.empId})\n`;
     msg += `📅 *Date:* ${l.date}\n`;
     msg += `⏰ *Hours Worked:* ${l.hours || 8} Hours\n`;
-    msg += `🔥 *Task Completion:* ${l.completionRate !== undefined ? l.completionRate : 100}%\n\n`;
+    msg += `🔥 *Task Completion:* ${compRate}%\n\n`;
+
+    if (isIncomplete) {
+      msg += `⚠️ *ALERT / WARNING:* 🔴 Not good! Your task has not been completed today! Please complete your pending assigned work.\n\n`;
+    }
 
     if (Array.isArray(l.tasks) && l.tasks.length) {
       msg += `✅ *TASKS CHECKLIST:*\n`;
       l.tasks.forEach(t => {
-        const icon = t.done ? '✅' : '❌';
+        const icon = t.done ? '🟢 [DONE]' : '🔴 [NOT COMPLETED]';
         let line = `${icon} ${t.text}`;
         if (t.link) line += ` (🔗 ${t.link})`;
         msg += `${line}\n`;
