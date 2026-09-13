@@ -1265,8 +1265,40 @@
         att = att.filter(a => new Date(a.date).getMonth() === month);
     }
     
-    const html = att.length ? `<table><thead><tr><th>Date</th><th>Status</th><th>Check-In</th><th>Check-Out</th></tr></thead><tbody>
-      ${att.slice().reverse().map(a=>`<tr><td>${fmt(a.date)}</td><td>${sBadge(a.status)}</td><td>${a.checkIn||'—'}</td><td>${a.checkOut||'—'}${a.checkoutReason ? ' (' + a.checkoutReason + ')' : ''}</td></tr>`).join('')}
+    let worklogs = [];
+    try { worklogs = (await EMS_DB.getWorkLogs(empId)) || []; } catch(e) {}
+    const worklogMap = {};
+    worklogs.forEach(w => {
+      if (w.date) {
+        const cleanD = String(w.date).split('T')[0];
+        worklogMap[cleanD] = w;
+      }
+    });
+
+    const html = att.length ? `<table><thead><tr><th>Date</th><th>Status</th><th>Check-In</th><th>Check-Out</th><th>📝 Daily EOD Report</th></tr></thead><tbody>
+      ${att.slice().reverse().map(a => {
+        const cleanADate = String(a.date).split('T')[0];
+        const wl = worklogMap[cleanADate];
+        let reportHtml = '<span style="color:var(--muted);font-size:12px">⏳ No EOD Report</span>';
+        if (wl) {
+          const compRate = wl.completionRate !== undefined ? wl.completionRate : 100;
+          const badgeCls = compRate >= 80 ? 'badge-green' : (compRate >= 50 ? 'badge-amber' : 'badge-red');
+          const icon = compRate >= 80 ? '🎉' : (compRate >= 50 ? '🟡' : '⚠️');
+          const tasksDoneStr = Array.isArray(wl.tasks) && wl.tasks.length ? ` (${wl.tasks.filter(t=>t.done).length}/${wl.tasks.length} Tasks)` : '';
+          reportHtml = `
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+              <span class="badge ${badgeCls}" style="font-size:11px">${icon} ${compRate}% Done${tasksDoneStr}</span>
+              <button type="button" class="btn btn-sm btn-edit" onclick="showPage('worklog')" style="padding:2px 8px;font-size:11px" title="View EOD Work Log">📋 View</button>
+            </div>`;
+        }
+        return `<tr>
+          <td>${fmt(a.date)}</td>
+          <td>${sBadge(a.status)}</td>
+          <td>${a.checkIn||'—'}</td>
+          <td>${a.checkOut||'—'}${a.checkoutReason ? ' (' + a.checkoutReason + ')' : ''}</td>
+          <td>${reportHtml}</td>
+        </tr>`;
+      }).join('')}
     </tbody></table>` : '<div class="empty-state"><div>📅</div>No attendance records found</div>';
     document.getElementById('att-history-table').innerHTML = html;
   }

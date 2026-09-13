@@ -1536,18 +1536,46 @@ async function renderAdminAtt() {
   const emps2 = cache.employees;
   const empMap2 = Object.fromEntries(emps2.map(e => [e.id, e]));
 
+  let worklogs = [];
+  try { worklogs = (await EMS_DB.getWorkLogs()) || cache.worklogs || []; } catch(e) {}
+  const worklogMap = {};
+  worklogs.forEach(w => {
+    if (w.empId && w.date) {
+      const cleanD = String(w.date).split('T')[0];
+      worklogMap[`${w.empId}_${cleanD}`] = w;
+    }
+  });
+
   document.getElementById('admin-att-table').innerHTML = att.length ? `
-    <table><thead><tr><th>Employee</th><th>Date</th><th>Status</th><th>Live Working Pulse</th><th>Check-In</th><th>Check-Out</th><th>Working Hours</th><th>Action</th></tr></thead>
-    <tbody>${att.slice().reverse().map(a=>{ const emp=empMap2[a.empId]||{}; return `<tr>
-      <td><div style="font-weight:600">${emp.name||a.empId}</div><div style="font-size:11px;color:var(--muted)">${a.empId}</div></td>
-      <td>${fmt(a.date)}</td>
-      <td>${sBadge(a.status)}</td>
-      <td>${getLivePulseBadge(a)}</td>
-      <td>${a.checkIn||'—'}</td>
-      <td>${a.checkOut||'—'}</td>
-      <td>${calcHours(a.date, a.checkIn, a.checkOut)}</td>
-      <td><button class="btn btn-sm btn-edit" onclick="editAtt('${a.empId}','${a.date}')">✏</button></td>
-    </tr>`;}).join('')}</tbody></table>`
+    <table><thead><tr><th>Employee</th><th>Date</th><th>Status</th><th>Live Working Pulse</th><th>Check-In</th><th>Check-Out</th><th>Working Hours</th><th>📝 Daily EOD Report</th><th>Action</th></tr></thead>
+    <tbody>${att.slice().reverse().map(a => {
+      const emp = empMap2[a.empId] || {};
+      const cleanADate = String(a.date).split('T')[0];
+      const wl = worklogMap[`${a.empId}_${cleanADate}`];
+      let reportHtml = '<span style="color:var(--muted);font-size:12px">⏳ No EOD Report</span>';
+      if (wl) {
+        const compRate = wl.completionRate !== undefined ? wl.completionRate : 100;
+        const badgeCls = compRate >= 80 ? 'badge-green' : (compRate >= 50 ? 'badge-amber' : 'badge-red');
+        const icon = compRate >= 80 ? '🎉' : (compRate >= 50 ? '🟡' : '⚠️');
+        const tasksDoneStr = Array.isArray(wl.tasks) && wl.tasks.length ? ` (${wl.tasks.filter(t=>t.done).length}/${wl.tasks.length})` : '';
+        reportHtml = `
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <span class="badge ${badgeCls}" style="font-size:11px" title="${wl.summary || 'EOD Work Log'}">${icon} ${compRate}% Done${tasksDoneStr}</span>
+            <button class="btn btn-sm btn-edit" onclick="copyWorkLogWhatsAppReport('${wl.id}')" style="padding:2px 8px;font-size:11px" title="Copy WhatsApp Format">📋 Copy</button>
+          </div>`;
+      }
+      return `<tr>
+        <td><div style="font-weight:600">${emp.name||a.empId}</div><div style="font-size:11px;color:var(--muted)">${a.empId}</div></td>
+        <td>${fmt(a.date)}</td>
+        <td>${sBadge(a.status)}</td>
+        <td>${getLivePulseBadge(a)}</td>
+        <td>${a.checkIn||'—'}</td>
+        <td>${a.checkOut||'—'}</td>
+        <td>${calcHours(a.date, a.checkIn, a.checkOut)}</td>
+        <td>${reportHtml}</td>
+        <td><button class="btn btn-sm btn-edit" onclick="editAtt('${a.empId}','${a.date}')">✏</button></td>
+      </tr>`;
+    }).join('')}</tbody></table>`
   : '<div class="empty-state"><div>📅</div>No attendance records for selected filters</div>';
 }
 async function editAtt(empId, date) {
