@@ -335,3 +335,86 @@ Sending report to WhatsApp...
 Sending message to group 120363412057920447@g.us via Green-API...
 🎉 Report sent successfully via Green-API! Message ID: 3EB0A86BAF6154CA367AAE
 🚀 Report automation run completed successfully!
+🤖 Starting EMS Report Automation
+📊 Report Type: DAILY
+⚙️  Dry Run: DISABLED (Will send to WhatsApp)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Connecting to Firebase...
+✅ Connected to Firebase successfully!
+Generating daily report data...
+✅ Report generated successfully!
+
+📄 Generated Message content:
+
+🚀 *GROWTHAPEX EMS - DAILY VIBE CHECK* ⚡
+📅 *Date:* 2026-09-12 | *Gen-Z Mode Active* 🔥
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+👥 *SQUAD ATTENDANCE BREAKDOWN:*
+• Total Squad Strength: 3 💼
+• Present & Grinding: 3 ⚡
+• Absent / Ghosting: 0 👻
+
+⏰ *LATE COMERS (Traffic Ko Blame Mat Karna 🚗💨)*: 
+ - Jayati Goyal (Late: 10:29:43) ⚠️
+ - Dhiraj Kumar (Late: 10:20:59) ⚠️
+ - Janvi  Menghani (Late: 10:25:28) ⚠️
+
+📝 *TASK SLAYS & ONGOING GRIND:*
+• No active or completed tasks recorded today.
+
+📊 *SQUAD EFFICIENCY SCOREBAR:*
+ • *Jayati Goyal*: ➖ *N/A* (No tasks assigned)
+ • *Dhiraj Kumar*: ➖ *N/A* (No tasks assigned)
+ • *Janvi  Menghani*: ➖ *N/A* (No tasks assigned)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔥 _GrowthApex Gen-Z Automation Engine • Stay Grinding!_ 🔥
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Sending report to WhatsApp...
+Sending message to group 120363412057920447@g.us via Green-API...
+🎉 Report sent successfully via Green-API! Message ID: 3EB0FC027DE9647B212246
+🚀 Report automation run completed successfully!
+📅 Today is Sunday. Exclude Sunday from working days. Skipping daily report.
+^C🤖 Starting EMS Report Automation
+📊 Report Type: DAILY
+⚙️  Dry Run: DISABLED (Will send to WhatsApp)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Connecting to Firebase...
+✅ Connected to Firebase successfully!
+Generating daily report data...
+✅ Report generated successfully!
+
+📄 Generated Message content:
+
+🚀 *GROWTHAPEX EMS - DAILY VIBE CHECK* ⚡
+📅 *Date:* 2026-09-15 | *Gen-Z Mode Active* 🔥
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+👥 *SQUAD ATTENDANCE BREAKDOWN:*
+• Total Squad Strength: 3 💼
+• Present & Grinding: 3 ⚡
+• Absent / Ghosting: 0 👻
+
+⏰ *LATE COMERS (Traffic Ko Blame Mat Karna 🚗💨)*: 
+ - Jayati Goyal (Late: 10:03:15) ⚠️
+ - Dhiraj Kumar (Late: 10:24:58) ⚠️
+ - Janvi  Menghani (Late: 10:26:52) ⚠️
+
+📝 *TASK SLAYS & ONGOING GRIND:*
+• No active or completed tasks recorded today.
+
+📊 *SQUAD EFFICIENCY SCOREBAR:*
+ • *Jayati Goyal*: ➖ *N/A* (No tasks assigned)
+ • *Dhiraj Kumar*: ➖ *N/A* (No tasks assigned)
+ • *Janvi  Menghani*: ➖ *N/A* (No tasks assigned)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔥 _GrowthApex Gen-Z Automation Engine • Stay Grinding!_ 🔥
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Sending report to WhatsApp...
+Sending message to group 120363412057920447@g.us via Green-API...
+🎉 Report sent successfully via Green-API! Message ID: 3EB0A93A93876A4FCF97A1
+🚀 Report automation run completed successfully!

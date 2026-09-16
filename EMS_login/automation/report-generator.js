@@ -85,6 +85,39 @@ async function getActiveEmployees(db) {
     .filter(emp => emp.status === 'active');
 }
 
+// Helper: Check if an employee is on approved leave on a given date
+function isEmployeeOnLeave(emp, leavesList, dateStr) {
+  if (!leavesList || !leavesList.length) return false;
+  const empIdNorm = (emp.id || '').toString().trim().toUpperCase();
+  const empNameNorm = (emp.name || '').toString().trim().toLowerCase();
+  const empEmailNorm = (emp.email || '').toString().trim().toLowerCase();
+
+  return leavesList.some(l => {
+    const st = (l.status || '').toString().toLowerCase().trim();
+    if (st !== 'approved') return false;
+
+    let lFrom = l.startDate || l.from || l.fromDate || l.date || '';
+    let lTo = l.endDate || l.to || l.toDate || lFrom;
+    if (typeof lFrom === 'object' && lFrom && typeof lFrom.toDate === 'function') lFrom = formatDateString(lFrom.toDate());
+    if (typeof lTo === 'object' && lTo && typeof lTo.toDate === 'function') lTo = formatDateString(lTo.toDate());
+    if (typeof lFrom === 'string' && lFrom.includes('T')) lFrom = lFrom.split('T')[0];
+    if (typeof lTo === 'string' && lTo.includes('T')) lTo = lTo.split('T')[0];
+
+    if (!lFrom || !lTo) return false;
+    if (dateStr < lFrom || dateStr > lTo) return false;
+
+    const lEmpId = (l.empId || '').toString().trim().toUpperCase();
+    const lEmpName = (l.empName || l.employeeName || l.name || '').toString().trim().toLowerCase();
+    const lEmail = (l.email || '').toString().trim().toLowerCase();
+
+    if (empIdNorm && lEmpId && empIdNorm === lEmpId) return true;
+    if (empEmailNorm && lEmail && empEmailNorm === lEmail) return true;
+    if (empNameNorm && lEmpName && (empNameNorm === lEmpName || empNameNorm.includes(lEmpName) || lEmpName.includes(empNameNorm))) return true;
+
+    return false;
+  });
+}
+
 // Generate DAILY Report
 async function generateDailyReport(db, targetDateStr = null) {
   const todayStr = targetDateStr || formatDateString(new Date());
@@ -112,20 +145,9 @@ async function generateDailyReport(db, targetDateStr = null) {
   });
 
   // 3. Fetch leaves active today
-  const leavesSnap = await db.collection('leaves')
-    .where('status', '==', 'approved')
-    .get();
-  
-  const leavesActiveToday = [];
-  leavesSnap.forEach(doc => {
-    const data = doc.data();
-    const lFrom = data.startDate || data.from || data.fromDate || '';
-    const lTo = data.endDate || data.to || data.toDate || lFrom;
-    if (lFrom && lTo && todayStr >= lFrom && todayStr <= lTo) {
-      leavesActiveToday.push(data);
-    }
-  });
-  const leaveEmpIds = new Set(leavesActiveToday.map(l => (l.empId || '').trim().toUpperCase()));
+  const leavesSnap = await db.collection('leaves').get();
+  const allLeaves = [];
+  leavesSnap.forEach(doc => allLeaves.push(doc.data()));
 
   // 4. Fetch all tasks (open/pending tasks + tasks created/completed today)
   const tasksSnap = await db.collection('tasks').get();
@@ -164,13 +186,17 @@ async function generateDailyReport(db, targetDateStr = null) {
     const empIdNorm = (emp.id || '').trim().toUpperCase();
     const att = attendanceMap[emp.id] || attendanceMap[empIdNorm];
 
-    if (att && (att.status === 'present' || att.checkIn)) {
+    const isPresent = att && (att.status === 'present' || att.checkIn);
+    const isAttLeave = att && (att.status === 'leave' || att.status === 'on-leave' || att.status === 'on_leave');
+    const isOnLeave = isAttLeave || isEmployeeOnLeave(emp, allLeaves, todayStr);
+
+    if (isPresent) {
       if (isCheckInLate(att.checkIn)) {
         lateList.push(`${emp.name} (Late: ${att.checkIn})`);
       } else {
         presentList.push(`${emp.name} (In: ${att.checkIn})`);
       }
-    } else if (leaveEmpIds.has(empIdNorm)) {
+    } else if (isOnLeave) {
       onLeaveList.push(emp.name);
     } else {
       absentList.push(emp.name);
@@ -671,7 +697,7 @@ async function generateLoginReport(db, targetDateStr = null) {
     db.collection('logins').where('date', '==', dateStr).get(),
     db.collection('attendance').where('date', '==', dateStr).get(),
     db.collection('employees').get(),
-    db.collection('leaves').where('status', '==', 'approved').get()
+    db.collection('leaves').get()
   ]);
 
   const empMap = {};
@@ -682,23 +708,15 @@ async function generateLoginReport(db, targetDateStr = null) {
     empMap[id.trim().toUpperCase()] = empData;
   });
 
-  // Approved leaves active on target date
-  const leavesActiveToday = new Set();
-  leavesSnap.forEach(doc => {
-    const data = doc.data();
-    const lFrom = data.startDate || data.from || data.fromDate || '';
-    const lTo = data.endDate || data.to || data.toDate || lFrom;
-    if (lFrom && lTo && dateStr >= lFrom && dateStr <= lTo && data.empId) {
-      leavesActiveToday.add(String(data.empId).trim().toUpperCase());
-    }
-  });
+  const allLeaves = [];
+  leavesSnap.forEach(doc => allLeaves.push(doc.data()));
 
   const adminLogins = [];
   const empLoginsMap = new Map();
 
   // Populate active employees in map
   empSnap.forEach(doc => {
-    const empData = doc.data();
+    const empData = { id: doc.id, ...doc.data() };
     if (empData.status === 'active') {
       const empIdNorm = doc.id.trim().toUpperCase();
       empLoginsMap.set(empIdNorm, {
@@ -708,7 +726,7 @@ async function generateLoginReport(db, targetDateStr = null) {
         designation: empData.designation || '',
         logins: [],
         attendance: null,
-        isOnLeave: leavesActiveToday.has(empIdNorm)
+        isOnLeave: isEmployeeOnLeave(empData, allLeaves, dateStr)
       });
     }
   });

@@ -3300,13 +3300,68 @@ async function generateReportText(type) {
     return d.toISOString().split('T')[0];
   };
 
+  const checkEmpOnLeave = (emp, leavesList, dateStr) => {
+    if (!leavesList || !leavesList.length) return false;
+    const empIdNorm = (emp.id || '').toString().trim().toUpperCase();
+    const empNameNorm = (emp.name || '').toString().trim().toLowerCase();
+    const empEmailNorm = (emp.email || '').toString().trim().toLowerCase();
+
+    return leavesList.some(l => {
+      const st = (l.status || '').toString().toLowerCase().trim();
+      if (st !== 'approved') return false;
+
+      let lFrom = l.startDate || l.from || l.fromDate || l.date || '';
+      let lTo = l.endDate || l.to || l.toDate || lFrom;
+      if (typeof lFrom === 'object' && lFrom && typeof lFrom.toDate === 'function') lFrom = lFrom.toDate().toISOString().split('T')[0];
+      if (typeof lTo === 'object' && lTo && typeof lTo.toDate === 'function') lTo = lTo.toDate().toISOString().split('T')[0];
+      if (typeof lFrom === 'string' && lFrom.includes('T')) lFrom = lFrom.split('T')[0];
+      if (typeof lTo === 'string' && lTo.includes('T')) lTo = lTo.split('T')[0];
+
+      if (!lFrom || !lTo) return false;
+      if (dateStr < lFrom || dateStr > lTo) return false;
+
+      const lEmpId = (l.empId || '').toString().trim().toUpperCase();
+      const lEmpName = (l.empName || l.employeeName || l.name || '').toString().trim().toLowerCase();
+      const lEmail = (l.email || '').toString().trim().toLowerCase();
+
+      if (empIdNorm && lEmpId && empIdNorm === lEmpId) return true;
+      if (empEmailNorm && lEmail && empEmailNorm === lEmail) return true;
+      if (empNameNorm && lEmpName && (empNameNorm === lEmpName || empNameNorm.includes(lEmpName) || lEmpName.includes(empNameNorm))) return true;
+
+      return false;
+    });
+  };
+
   // ── DAILY ──────────────────────────────────────────────────
   if (type === 'daily') {
-    const presentRecs = att.filter(a => a.date === today && a.status === 'present');
-    const presentIds  = presentRecs.map(a => a.empId);
-    const absentList  = active.filter(e => !presentIds.includes(e.id)).map(e => e.name);
-    const todoTasks   = tasks.filter(t => t.status === 'todo' || t.status === 'doing' || t.status === 'in-progress');
-    const doneToday   = tasks.filter(t => (t.status === 'done' || t.status === 'completed') && ((t.updatedAt && t.updatedAt.startsWith(today)) || (t.createdAt && t.createdAt.startsWith(today))));
+    const presentList = [];
+    const lateList    = [];
+    const absentList  = [];
+    const onLeaveList = [];
+
+    active.forEach(e => {
+      const eIdNorm = (e.id || '').trim().toUpperCase();
+      const attRec  = att.find(a => a.date === today && ((a.empId || '').trim().toUpperCase() === eIdNorm || a.empId === e.id));
+      
+      const isPresent  = attRec && (attRec.status === 'present' || attRec.checkIn);
+      const isAttLeave = attRec && (attRec.status === 'leave' || attRec.status === 'on-leave' || attRec.status === 'on_leave');
+      const isOnLeave  = isAttLeave || checkEmpOnLeave(e, leaves, today);
+
+      if (isPresent) {
+        if (attRec.checkIn && attRec.checkIn > '10:00:00') {
+          lateList.push(`${e.name} (Late: ${attRec.checkIn})`);
+        } else {
+          presentList.push(`${e.name} (In: ${attRec.checkIn || 'Present'})`);
+        }
+      } else if (isOnLeave) {
+        onLeaveList.push(e.name);
+      } else {
+        absentList.push(e.name);
+      }
+    });
+
+    const todoTasks = tasks.filter(t => t.status === 'todo' || t.status === 'doing' || t.status === 'in-progress');
+    const doneToday = tasks.filter(t => (t.status === 'done' || t.status === 'completed') && ((t.updatedAt && t.updatedAt.startsWith(today)) || (t.createdAt && t.createdAt.startsWith(today))));
 
     const FUNNY_ABSENT_ROASTS = [
       "Lagta hai sapno ki duniya me busy hain! 😴💤",
@@ -3321,13 +3376,29 @@ async function generateReportText(type) {
     msg += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
     msg += `👥 *SQUAD ATTENDANCE BREAKDOWN:*\n`;
     msg += `• Total Squad Strength: ${active.length} 💼\n`;
-    msg += `• Present & Grinding: ${presentIds.length} ⚡\n`;
+    msg += `• Present & Grinding: ${presentList.length + lateList.length} ⚡\n`;
     msg += `• Absent / Ghosting: ${absentList.length} 👻\n`;
-    if (absentList.length) {
-      msg += `\n❌ *ABSENT:*\n`;
-      msg += absentList.map((n, idx) => ` - *${n}*: ${FUNNY_ABSENT_ROASTS[idx % FUNNY_ABSENT_ROASTS.length]}`).join('\n') + `\n`;
+    if (onLeaveList.length > 0) {
+      msg += `• On Approved Leave: ${onLeaveList.length} 🌴\n`;
     }
-    msg += `\n📝 *TASK SLAYS & ONGOING GRIND:*\n`;
+    msg += `\n`;
+
+    if (presentList.length > 0) {
+      msg += `👑 *ON-TIME CHAMPIONS (Slayed Punctuality)*: \n${presentList.map(n => ` - ${n} ✨`).join('\n')}\n\n`;
+    }
+
+    if (lateList.length > 0) {
+      msg += `⏰ *LATE COMERS (Traffic Ko Blame Mat Karna 🚗💨)*: \n${lateList.map(n => ` - ${n} ⚠️`).join('\n')}\n\n`;
+    }
+
+    if (onLeaveList.length > 0) {
+      msg += `🌴 *APPROVED CHUTTI VIBES (Enjoying Leave 😎)*: \n${onLeaveList.map(n => ` - ${n} 🍹`).join('\n')}\n\n`;
+    }
+
+    if (absentList.length > 0) {
+      msg += `❌ *ABSENT:*\n${absentList.map((n, idx) => ` - *${n}*: ${FUNNY_ABSENT_ROASTS[idx % FUNNY_ABSENT_ROASTS.length]}`).join('\n')}\n\n`;
+    }
+    msg += `📝 *TASK SLAYS & ONGOING GRIND:*\n`;
     if (doneToday.length > 0) {
       msg += `✅ *Slayed Today (${doneToday.length}):*\n`;
       doneToday.forEach(t => {
