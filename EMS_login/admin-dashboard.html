@@ -406,6 +406,8 @@
           </select>
           <button class="btn btn-export" onclick="exportCSV('attendance')">⬇ CSV</button>
           <button class="btn btn-primary" onclick="openMarkAttModal()">+ Mark Attendance</button>
+          <input type="month" id="auto-absent-month" class="search-input" style="width:140px" title="Month for auto-mark absent">
+          <button class="btn" style="background:#dc2626;color:#fff;font-weight:700;display:inline-flex;align-items:center;gap:6px" onclick="autoMarkAbsent()">🔴 Auto-Mark Absent</button>
         </div>
       </div>
       <div class="att-summary" id="att-summary"></div>
@@ -1609,6 +1611,75 @@ async function saveAttendance() {
   };
   await EMS_DB.markAttendance(rec); closeModal('att-modal');
   toast('Attendance saved!', 'success');
+  cache.attendance = await EMS_DB.getAttendance();
+  renderAdminAtt();
+}
+
+async function autoMarkAbsent() {
+  const monthInput = document.getElementById('auto-absent-month');
+  const monthVal = monthInput?.value;
+  if (!monthVal) {
+    toast('Pehle month select karo!', 'error');
+    return;
+  }
+
+  const [year, month] = monthVal.split('-').map(Number);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const activeEmps = (cache.employees || []).filter(e => e.status === 'active');
+
+  if (!activeEmps.length) { toast('No active employees found', 'error'); return; }
+
+  const today = new Date().toISOString().split('T')[0];
+
+  // Build set of existing attendance records for this month
+  const existingAtt = (cache.attendance || []).filter(a => a.date && a.date.startsWith(monthVal));
+  const attSet = new Set(existingAtt.map(a => `${a.empId}_${a.date}`));
+
+  let markedCount = 0;
+  let skippedCount = 0;
+
+  const confirmed = confirm(
+    `⚠️ Auto-Mark Absent\n\nMonth: ${monthVal}\nEmployees: ${activeEmps.length}\n\nJis din attendance record nahi hai (Sunday + future dates chhod ke), wahan ABSENT mark ho jayega.\n\nConfirm?`
+  );
+  if (!confirmed) return;
+
+  toast('Processing... please wait ⏳', 'info');
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay();
+
+    // Skip Sundays (0) and future dates
+    if (dayOfWeek === 0) continue;
+    if (dateStr > today) continue;
+
+    for (const emp of activeEmps) {
+      // Skip if employee hasn't joined yet
+      if (emp.joinDate && dateStr < emp.joinDate) continue;
+
+      const key = `${emp.id}_${dateStr}`;
+      if (!attSet.has(key)) {
+        // No attendance record → mark absent
+        await EMS_DB.markAttendance({
+          empId:    emp.id,
+          date:     dateStr,
+          status:   'absent',
+          checkIn:  '',
+          checkOut: '',
+          markedBy: 'auto'
+        });
+        attSet.add(key); // prevent duplicate
+        markedCount++;
+      } else {
+        skippedCount++;
+      }
+    }
+  }
+
+  // Refresh cache
+  cache.attendance = await EMS_DB.getAttendance();
+  renderAdminAtt();
+  toast(`✅ Done! ${markedCount} absent records added. ${skippedCount} already had records.`, 'success');
 }
 
 // ─── TASKS ────────────────────────────────────────────────────
