@@ -1962,13 +1962,9 @@ async function renderSalary() {
       }
     }
 
-    // Dynamic salary deduction for Janti (Janvi) and Dheerija based on absent days
-    const empNameLower = (e.name || '').toLowerCase();
-    const isDynamicDeduction = empNameLower.includes('janti') || empNameLower.includes('janvi') ||
-                               empNameLower.includes('dheerija') || empNameLower.includes('dhirija') ||
-                               empNameLower.includes('dheerya');
+    // Absent deduction for ALL employees based on attendance records
     let absentDeduction = 0;
-    if (isDynamicDeduction && absentDays > 0 && daysDetails.totalMonthWorkingDays > 0) {
+    if (absentDays > 0 && daysDetails.totalMonthWorkingDays > 0) {
       const perDaySalary = Math.round(baseSalary / daysDetails.totalMonthWorkingDays);
       absentDeduction = perDaySalary * absentDays;
       earnedSalary = Math.max(0, earnedSalary - absentDeduction);
@@ -1994,8 +1990,7 @@ async function renderSalary() {
       pf,
       absentDays,
       leaveDays,
-      absentDeduction,
-      isDynamicDeduction
+      absentDeduction
     };
   });
 
@@ -2040,7 +2035,7 @@ async function renderSalary() {
             <td><b style="color:#38bdf8">${e.daysDetails.workedCalendarDays} Paid Days</b> <span style="font-size:11px;color:var(--muted)">(${e.daysDetails.workedWorkingDays}w + ${e.daysDetails.sundays}s)</span></td>
             <td style="text-align:center">
               ${e.absentDays > 0
-                ? `<span class="badge badge-red" style="font-size:12px;font-weight:700">❌ ${e.absentDays} ${e.absentDays === 1 ? 'Day' : 'Days'}</span>${e.isDynamicDeduction ? `<div style="font-size:10px;color:#f87171;margin-top:2px">-${money(e.absentDeduction)} deducted</div>` : ''}`
+                ? `<span class="badge badge-red" style="font-size:12px;font-weight:700">❌ ${e.absentDays} ${e.absentDays === 1 ? 'Day' : 'Days'}</span><div style="font-size:10px;color:#f87171;margin-top:2px">-${money(e.absentDeduction)} deducted</div>`
                 : '<span class="badge badge-green" style="font-size:12px">✅ 0 Absent</span>'}
             </td>
             <td>
@@ -2226,14 +2221,10 @@ function openSalarySlipModal(empId, monthVal) {
   );
   const absentDaysSlip = empAttForMonth.filter(a => a.status === 'absent').length;
 
-  // Dynamic absent deduction for Janti/Janvi and Dheerija
-  const empNameLowerSlip = (emp.name || '').toLowerCase();
-  const isDynamicSlip = empNameLowerSlip.includes('janti') || empNameLowerSlip.includes('janvi') ||
-                        empNameLowerSlip.includes('dheerija') || empNameLowerSlip.includes('dhirija') ||
-                        empNameLowerSlip.includes('dheerya');
-  let grossEarned = earnedSalary; // salary before absent deduction (for display)
+  // Absent deduction for ALL employees
+  let grossEarned = earnedSalary; // gross before absent deduction
   let absentDeductionSlip = 0;
-  if (isDynamicSlip && absentDaysSlip > 0 && daysDetails.totalMonthWorkingDays > 0) {
+  if (absentDaysSlip > 0 && daysDetails.totalMonthWorkingDays > 0) {
     const perDaySalarySlip = Math.round(baseSalary / daysDetails.totalMonthWorkingDays);
     absentDeductionSlip = perDaySalarySlip * absentDaysSlip;
   }
@@ -2248,7 +2239,7 @@ function openSalarySlipModal(empId, monthVal) {
   const special = earnedSalary - (basic + hra);
 
   // Store active salary slip data for WhatsApp share & export
-  currentSalarySlipData = { emp, monthVal, monthName, earnedSalary: earnedAfterAbsent, grossEarned, advanceDeduction, netPayable, basic, hra, special, daysDetails, leaveData, absentDaysSlip, absentDeductionSlip, isDynamicSlip };
+  currentSalarySlipData = { emp, monthVal, monthName, earnedSalary: earnedAfterAbsent, grossEarned, advanceDeduction, netPayable, basic, hra, special, daysDetails, leaveData, absentDaysSlip, absentDeductionSlip };
 
   // Update release button state
   const btnRelease = document.getElementById('btn-release-slip');
