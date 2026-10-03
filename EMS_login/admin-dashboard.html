@@ -3189,13 +3189,20 @@ async function exportCSV(type) {
     rows = [h, ...allAtt.map(a=>{ const emp=empMap[a.empId]||{}; return [a.empId,emp.name||'',a.date,a.status,a.checkIn||'',a.checkOut||'']; })];
     filename = 'attendance.csv';
   } else {
-    const monthVal = document.getElementById('salary-month-select')?.value || '2026-08';
+    const monthVal = document.getElementById('salary-month-select')?.value || '2026-09';
     const calcMode = document.getElementById('salary-calc-mode')?.value || 'month';
-    const h = ['ID','Name','Joining Date','Department','Designation','Base Salary','Calendar Days','Sundays Off','Working Days Worked','Earned Salary'];
+    const h = ['ID','Name','Joining Date','Department','Designation','Base Salary','Calendar Days','Sundays Off','Working Days Worked','Absent Days','Absent Deduction (₹)','Earned Salary (₹)','Net Payable (₹)'];
     rows = [h, ...cache.employees.filter(e=>e.status==='active').map(e=>{
       const baseSalary = Number(e.salary||0);
       const joinDate = e.joinDate || 'N/A';
       const daysDetails = getWorkingDaysForMonth(joinDate, monthVal, calcMode);
+
+      // Count absent days from attendance
+      const empAttForMonth = (cache.attendance || []).filter(a =>
+        a.empId === e.id && a.date && a.date.startsWith(monthVal)
+      );
+      const absentDays = empAttForMonth.filter(a => a.status === 'absent').length;
+
       let earnedSalary = 0;
       if (daysDetails.isJoined && daysDetails.workedWorkingDays > 0) {
         if (calcMode === 'cumulative') {
@@ -3204,7 +3211,19 @@ async function exportCSV(type) {
           earnedSalary = Math.round((baseSalary * daysDetails.workedWorkingDays) / (daysDetails.totalMonthWorkingDays || 26));
         }
       }
-      return [e.id, `"${e.name}"`, joinDate, e.department, `"${e.designation||''}"`, baseSalary, daysDetails.workedCalendarDays, daysDetails.sundays, daysDetails.workedWorkingDays, earnedSalary];
+
+      // Absent deduction for all employees
+      let absentDeduction = 0;
+      if (absentDays > 0 && daysDetails.totalMonthWorkingDays > 0) {
+        const perDaySalary = Math.round(baseSalary / daysDetails.totalMonthWorkingDays);
+        absentDeduction = perDaySalary * absentDays;
+        earnedSalary = Math.max(0, earnedSalary - absentDeduction);
+      }
+
+      const advanceDeduction = e.advanceDeduction !== undefined ? Number(e.advanceDeduction) : 3000;
+      const netPayable = Math.max(0, earnedSalary - advanceDeduction);
+
+      return [e.id, `"${e.name}"`, joinDate, e.department, `"${e.designation||''}"`, baseSalary, daysDetails.workedCalendarDays, daysDetails.sundays, daysDetails.workedWorkingDays, absentDays, absentDeduction, earnedSalary, netPayable];
     })];
     filename = `payroll_${monthVal}.csv`;
   }
