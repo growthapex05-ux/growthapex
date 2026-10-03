@@ -4218,6 +4218,7 @@ async function renderAdminLeaves() {
           <th>Start Date</th>
           <th>End Date</th>
           <th>Reason</th>
+          <th>Applied On</th>
           <th>Status</th>
           <th style="text-align:center">Action</th>
         </tr>
@@ -4230,6 +4231,7 @@ async function renderAdminLeaves() {
             <td>${l.startDate || '—'}</td>
             <td>${l.endDate || '—'}</td>
             <td>${l.reason || '—'}</td>
+            <td>${l.appliedAt ? `<span style="font-size:12px;white-space:nowrap">${new Date(l.appliedAt).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</span><br><span style="font-size:11px;color:var(--muted)">${new Date(l.appliedAt).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})}</span>` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
             <td>${sBadge(l.status || 'pending')}</td>
             <td style="text-align:center">
               ${l.status === 'pending' ? `

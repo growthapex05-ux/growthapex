@@ -418,3 +418,120 @@ Sending report to WhatsApp...
 Sending message to group 120363412057920447@g.us via Green-API...
 🎉 Report sent successfully via Green-API! Message ID: 3EB0A93A93876A4FCF97A1
 🚀 Report automation run completed successfully!
+^C📅 Today is Sunday. Exclude Sunday from working days. Skipping daily report.
+🤖 Starting EMS Report Automation
+📊 Report Type: DAILY
+⚙️  Dry Run: DISABLED (Will send to WhatsApp)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Connecting to Firebase...
+✅ Connected to Firebase successfully!
+Generating daily report data...
+✅ Report generated successfully!
+
+📄 Generated Message content:
+
+🚀 *GROWTHAPEX EMS - DAILY VIBE CHECK* ⚡
+📅 *Date:* 2026-09-23 | *Gen-Z Mode Active* 🔥
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+👥 *SQUAD ATTENDANCE BREAKDOWN:*
+• Total Squad Strength: 2 💼
+• Present & Grinding: 2 ⚡
+• Absent / Ghosting: 0 👻
+
+⏰ *LATE COMERS (Traffic Ko Blame Mat Karna 🚗💨)*: 
+ - Jayanti Goyal (Late: 10:19:09) ⚠️
+ - Dhiraj Kumar (Late: 10:16:04) ⚠️
+
+📝 *TASK SLAYS & ONGOING GRIND:*
+• No active or completed tasks recorded today.
+
+📊 *SQUAD EFFICIENCY SCOREBAR:*
+ • *Jayanti Goyal*: ➖ *N/A* (No tasks assigned)
+ • *Dhiraj Kumar*: ➖ *N/A* (No tasks assigned)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔥 _GrowthApex Gen-Z Automation Engine • Stay Grinding!_ 🔥
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Sending report to WhatsApp...
+Sending message to group 120363412057920447@g.us via Green-API...
+🎉 Report sent successfully via Green-API! Message ID: 3EB0C3EB836B330A77237A
+🚀 Report automation run completed successfully!
+📅 Today is Sunday. Exclude Sunday from working days. Skipping daily report.
+🤖 Starting EMS Report Automation
+📊 Report Type: WEEKLY
+⚙️  Dry Run: DISABLED (Will send to WhatsApp)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Connecting to Firebase...
+✅ Connected to Firebase successfully!
+Generating weekly report data...
+✅ Report generated successfully!
+
+📄 Generated Message content:
+
+📊 *GROWTHAPEX EMS - WEEKLY REPORT* 📊
+📅 *Period:* 2026-09-21 to 2026-09-27
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+👥 *Team Engagement:*
+• Active Employees: 2
+• Total Present Check-ins: 11
+• Late Check-ins: 11 ⏰
+• Total Leaves Taken: 0 days
+
+👥 *Employee Attendance Summary:*
+ • *Jayanti Goyal*: Present: 5d | Absent: 1d | Leaves: 0d (⏰ 5 Late)
+ • *Dhiraj Kumar*: Present: 6d | Absent: 0d | Leaves: 0d (⏰ 6 Late)
+
+📝 *Task Execution summary:*
+• Total Tasks Logged: 0
+• Total Tasks Completed: 0
+• Completion Success Rate: 0%
+
+📌 *System Note:* Keep logging daily tasks and checking in before 10:00 AM.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Sending report to WhatsApp...
+Sending message to group 120363412057920447@g.us via Green-API...
+🎉 Report sent successfully via Green-API! Message ID: 3EB0DFCCF143685FD6C21A
+🚀 Report automation run completed successfully!
+🤖 Starting EMS Report Automation
+📊 Report Type: DAILY
+⚙️  Dry Run: DISABLED (Will send to WhatsApp)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Connecting to Firebase...
+✅ Connected to Firebase successfully!
+Generating daily report data...
+✅ Report generated successfully!
+
+📄 Generated Message content:
+
+🚀 *GROWTHAPEX EMS - DAILY VIBE CHECK* ⚡
+📅 *Date:* 2026-10-02 | *Gen-Z Mode Active* 🔥
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+👥 *SQUAD ATTENDANCE BREAKDOWN:*
+• Total Squad Strength: 2 💼
+• Present & Grinding: 0 ⚡
+• Absent / Ghosting: 2 👻
+
+❌ *ABSENT:*
+ - *Jayanti Goyal*: Lagta hai sapno ki duniya me busy hain! 😴💤
+ - *Dhiraj Kumar*: Bed se rishta bohot gehra chal raha hai! 🛏️✨
+
+📝 *TASK SLAYS & ONGOING GRIND:*
+• No active or completed tasks recorded today.
+
+📊 *SQUAD EFFICIENCY SCOREBAR:*
+ • *Jayanti Goyal*: ➖ *N/A* (No tasks assigned)
+ • *Dhiraj Kumar*: ➖ *N/A* (No tasks assigned)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔥 _GrowthApex Gen-Z Automation Engine • Stay Grinding!_ 🔥
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Sending report to WhatsApp...
+Sending message to group 120363412057920447@g.us via Green-API...
+🎉 Report sent successfully via Green-API! Message ID: 3EB0A9FA200D69F72184F7
+🚀 Report automation run completed successfully!
