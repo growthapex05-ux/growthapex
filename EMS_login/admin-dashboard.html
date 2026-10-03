@@ -2309,7 +2309,7 @@ function openSalarySlipModal(empId, monthVal) {
   const earnedAfterAbsent = Math.max(0, grossEarned - absentDeductionSlip);
 
   const leaveData = calculateCumulativeLeaves(emp, monthVal, cache.attendance);
-  const advanceDeduction = emp.advanceDeduction !== undefined ? Number(emp.advanceDeduction) : 3000;
+  const advanceDeduction = emp.advanceDeduction ? Number(emp.advanceDeduction) : 0;
   const netPayable = Math.max(0, earnedAfterAbsent - advanceDeduction);
 
   const basic = Math.round(earnedSalary * 0.60);
@@ -2387,7 +2387,7 @@ function openSalarySlipModal(empId, monthVal) {
             <th style="border:1px solid #e5e7eb;padding:6px 3px;color:#374151;width:14%;font-size:10.5px;line-height:1.2">Total Calendar Days</th>
             <th style="border:1px solid #e5e7eb;padding:6px 3px;color:#374151;width:14%;font-size:10.5px;line-height:1.2">Sundays (Week Off)</th>
             <th style="border:1px solid #e5e7eb;padding:6px 3px;color:#374151;width:14%;font-size:10.5px;line-height:1.2">Working Days Worked</th>
-            <th style="border:1px solid #e5e7eb;padding:6px 3px;color:#dc2626;width:14%;font-size:10.5px;line-height:1.2">❌ Leave/Absent Deductions</th>
+            <th style="border:1px solid #e5e7eb;padding:6px 3px;color:#dc2626;width:14%;font-size:10.5px;line-height:1.2">❌ Absent / LWP</th>
             <th style="border:1px solid #e5e7eb;padding:6px 3px;color:#374151;width:14%;font-size:10.5px;line-height:1.2">Leaves Taken (Month)</th>
             <th style="border:1px solid #e5e7eb;padding:6px 3px;color:#374151;width:15%;font-size:10.5px;line-height:1.2">Leave Balance</th>
             <th style="border:1px solid #e5e7eb;padding:6px 3px;color:#374151;width:15%;font-size:10.5px;line-height:1.2">Net Payable Days</th>
@@ -2420,8 +2420,8 @@ function openSalarySlipModal(empId, monthVal) {
           <tr>
             <td style="border:1px solid #e5e7eb;padding:7px">Basic Pay (60%)</td>
             <td style="border:1px solid #e5e7eb;padding:7px;text-align:right">${money(basic)}</td>
-            <td style="border:1px solid #e5e7eb;padding:7px;color:#dc2626">Raksha Bandhan Advance</td>
-            <td style="border:1px solid #e5e7eb;padding:7px;text-align:right;color:#dc2626">-${money(advanceDeduction)}</td>
+            <td style="border:1px solid #e5e7eb;padding:7px;color:#dc2626">Advance Deduction</td>
+            <td style="border:1px solid #e5e7eb;padding:7px;text-align:right;color:#dc2626">${advanceDeduction > 0 ? '-' + money(advanceDeduction) : '₹0 (Nil)'}</td>
           </tr>
           <tr>
             <td style="border:1px solid #e5e7eb;padding:7px">House Rent Allowance (HRA 30%)</td>
@@ -3275,11 +3275,14 @@ async function exportCSV(type) {
       const joinDate = e.joinDate || 'N/A';
       const daysDetails = getWorkingDaysForMonth(joinDate, monthVal, calcMode);
 
-      // Count absent days from attendance
+      // Count absent/leave days from attendance
       const empAttForMonth = (cache.attendance || []).filter(a =>
         a.empId === e.id && a.date && a.date.startsWith(monthVal)
       );
       const absentDays = empAttForMonth.filter(a => a.status === 'absent').length;
+      const leaveDays = empAttForMonth.filter(a => a.status === 'leave').length;
+      const halfDays = empAttForMonth.filter(a => a.status === 'half-day').length;
+      const totalDeductionDays = absentDays + leaveDays + (halfDays * 0.5);
 
       let earnedSalary = 0;
       if (daysDetails.isJoined && daysDetails.workedWorkingDays > 0) {
@@ -3290,18 +3293,18 @@ async function exportCSV(type) {
         }
       }
 
-      // Absent deduction for all employees
+      // Deduction for all employees
       let absentDeduction = 0;
-      if (absentDays > 0 && daysDetails.totalMonthWorkingDays > 0) {
+      if (totalDeductionDays > 0 && daysDetails.totalMonthWorkingDays > 0) {
         const perDaySalary = Math.round(baseSalary / daysDetails.totalMonthWorkingDays);
-        absentDeduction = perDaySalary * absentDays;
+        absentDeduction = perDaySalary * totalDeductionDays;
         earnedSalary = Math.max(0, earnedSalary - absentDeduction);
       }
 
-      const advanceDeduction = e.advanceDeduction !== undefined ? Number(e.advanceDeduction) : 3000;
+      const advanceDeduction = e.advanceDeduction ? Number(e.advanceDeduction) : 0;
       const netPayable = Math.max(0, earnedSalary - advanceDeduction);
 
-      return [e.id, `"${e.name}"`, joinDate, e.department, `"${e.designation||''}"`, baseSalary, daysDetails.workedCalendarDays, daysDetails.sundays, daysDetails.workedWorkingDays, absentDays, absentDeduction, earnedSalary, netPayable];
+      return [e.id, `"${e.name}"`, joinDate, e.department, `"${e.designation||''}"`, baseSalary, daysDetails.workedCalendarDays, daysDetails.sundays, daysDetails.workedWorkingDays, totalDeductionDays, absentDeduction, earnedSalary, netPayable];
     })];
     filename = `payroll_${monthVal}.csv`;
   }
