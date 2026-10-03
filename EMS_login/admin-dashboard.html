@@ -2022,7 +2022,9 @@ async function renderSalary() {
       a.empId === e.id && a.date && a.date.startsWith(monthVal)
     );
     const absentDays = empAttForMonth.filter(a => a.status === 'absent').length;
-    const leaveDays  = empAttForMonth.filter(a => a.status === 'leave' || a.status === 'half-day').length;
+    const leaveDays  = empAttForMonth.filter(a => a.status === 'leave').length;
+    const halfDays   = empAttForMonth.filter(a => a.status === 'half-day').length;
+    const totalDeductionDays = absentDays + leaveDays + (halfDays * 0.5);
 
     let earnedSalary = 0;
     if (daysDetails.isJoined && daysDetails.workedWorkingDays > 0) {
@@ -2033,11 +2035,11 @@ async function renderSalary() {
       }
     }
 
-    // Absent deduction for ALL employees based on attendance records
+    // Absent/Leave deduction for ALL employees based on attendance records
     let absentDeduction = 0;
-    if (absentDays > 0 && daysDetails.totalMonthWorkingDays > 0) {
+    if (totalDeductionDays > 0 && daysDetails.totalMonthWorkingDays > 0) {
       const perDaySalary = Math.round(baseSalary / daysDetails.totalMonthWorkingDays);
-      absentDeduction = perDaySalary * absentDays;
+      absentDeduction = perDaySalary * totalDeductionDays;
       earnedSalary = Math.max(0, earnedSalary - absentDeduction);
     }
 
@@ -2061,6 +2063,8 @@ async function renderSalary() {
       pf,
       absentDays,
       leaveDays,
+      halfDays,
+      totalDeductionDays,
       absentDeduction
     };
   });
@@ -2105,9 +2109,9 @@ async function renderSalary() {
             <td><span style="color:#10b981;font-weight:600">+${e.daysDetails.sundays} Sun (Paid) ✅</span></td>
             <td><b style="color:#38bdf8">${e.daysDetails.workedCalendarDays} Paid Days</b> <span style="font-size:11px;color:var(--muted)">(${e.daysDetails.workedWorkingDays}w + ${e.daysDetails.sundays}s)</span></td>
             <td style="text-align:center">
-              ${e.absentDays > 0
-                ? `<span class="badge badge-red" style="font-size:12px;font-weight:700">❌ ${e.absentDays} ${e.absentDays === 1 ? 'Day' : 'Days'}</span><div style="font-size:10px;color:#f87171;margin-top:2px">-${money(e.absentDeduction)} deducted</div>`
-                : '<span class="badge badge-green" style="font-size:12px">✅ 0 Absent</span>'}
+              ${e.totalDeductionDays > 0
+                ? `<span class="badge badge-red" style="font-size:12px;font-weight:700">❌ ${e.totalDeductionDays} ${e.totalDeductionDays === 1 ? 'Day' : 'Days'} Deducted</span><div style="font-size:10px;color:#f87171;margin-top:2px">-${money(e.absentDeduction)} deducted</div>`
+                : '<span class="badge badge-green" style="font-size:12px">✅ 0 Deductions</span>'}
             </td>
             <td>
               <div style="font-weight:800;color:#34d399;font-size:14px">${money(e.earnedSalary)}</div>
@@ -2286,18 +2290,21 @@ function openSalarySlipModal(empId, monthVal) {
     earnedSalary = Math.round((baseSalary * daysDetails.workedWorkingDays) / (daysDetails.totalMonthWorkingDays || 26));
   }
 
-  // Count absent days for this employee in selected month
+  // Count absent/leave days for this employee in selected month
   const empAttForMonth = (cache.attendance || []).filter(a =>
     a.empId === emp.id && a.date && a.date.startsWith(monthVal)
   );
   const absentDaysSlip = empAttForMonth.filter(a => a.status === 'absent').length;
+  const leaveDaysSlip  = empAttForMonth.filter(a => a.status === 'leave').length;
+  const halfDaysSlip   = empAttForMonth.filter(a => a.status === 'half-day').length;
+  const totalDeductionDaysSlip = absentDaysSlip + leaveDaysSlip + (halfDaysSlip * 0.5);
 
-  // Absent deduction for ALL employees
-  let grossEarned = earnedSalary; // gross before absent deduction
+  // Deduction for ALL employees
+  let grossEarned = earnedSalary; // gross before deduction
   let absentDeductionSlip = 0;
-  if (absentDaysSlip > 0 && daysDetails.totalMonthWorkingDays > 0) {
+  if (totalDeductionDaysSlip > 0 && daysDetails.totalMonthWorkingDays > 0) {
     const perDaySalarySlip = Math.round(baseSalary / daysDetails.totalMonthWorkingDays);
-    absentDeductionSlip = perDaySalarySlip * absentDaysSlip;
+    absentDeductionSlip = perDaySalarySlip * totalDeductionDaysSlip;
   }
   const earnedAfterAbsent = Math.max(0, grossEarned - absentDeductionSlip);
 
@@ -2310,7 +2317,7 @@ function openSalarySlipModal(empId, monthVal) {
   const special = earnedSalary - (basic + hra);
 
   // Store active salary slip data for WhatsApp share & export
-  currentSalarySlipData = { emp, monthVal, monthName, earnedSalary: earnedAfterAbsent, grossEarned, advanceDeduction, netPayable, basic, hra, special, daysDetails, leaveData, absentDaysSlip, absentDeductionSlip };
+  currentSalarySlipData = { emp, monthVal, monthName, earnedSalary: earnedAfterAbsent, grossEarned, advanceDeduction, netPayable, basic, hra, special, daysDetails, leaveData, absentDaysSlip, totalDeductionDaysSlip, absentDeductionSlip };
 
   // Update release button state
   const btnRelease = document.getElementById('btn-release-slip');
@@ -2380,7 +2387,7 @@ function openSalarySlipModal(empId, monthVal) {
             <th style="border:1px solid #e5e7eb;padding:6px 3px;color:#374151;width:14%;font-size:10.5px;line-height:1.2">Total Calendar Days</th>
             <th style="border:1px solid #e5e7eb;padding:6px 3px;color:#374151;width:14%;font-size:10.5px;line-height:1.2">Sundays (Week Off)</th>
             <th style="border:1px solid #e5e7eb;padding:6px 3px;color:#374151;width:14%;font-size:10.5px;line-height:1.2">Working Days Worked</th>
-            <th style="border:1px solid #e5e7eb;padding:6px 3px;color:#dc2626;width:14%;font-size:10.5px;line-height:1.2">❌ Absent Days</th>
+            <th style="border:1px solid #e5e7eb;padding:6px 3px;color:#dc2626;width:14%;font-size:10.5px;line-height:1.2">❌ Leave/Absent Deductions</th>
             <th style="border:1px solid #e5e7eb;padding:6px 3px;color:#374151;width:14%;font-size:10.5px;line-height:1.2">Leaves Taken (Month)</th>
             <th style="border:1px solid #e5e7eb;padding:6px 3px;color:#374151;width:15%;font-size:10.5px;line-height:1.2">Leave Balance</th>
             <th style="border:1px solid #e5e7eb;padding:6px 3px;color:#374151;width:15%;font-size:10.5px;line-height:1.2">Net Payable Days</th>
@@ -2391,10 +2398,10 @@ function openSalarySlipModal(empId, monthVal) {
             <td style="border:1px solid #e5e7eb;padding:6px 3px">${daysDetails.workedCalendarDays} Days</td>
             <td style="border:1px solid #e5e7eb;padding:6px 3px;color:#dc2626">${daysDetails.sundays} Sundays</td>
             <td style="border:1px solid #e5e7eb;padding:6px 3px;font-weight:700;color:#0284c7">${daysDetails.workedWorkingDays} Days</td>
-            <td style="border:1px solid #e5e7eb;padding:6px 3px;font-weight:700;color:${absentDaysSlip > 0 ? '#dc2626' : '#16a34a'}">${absentDaysSlip} ${absentDaysSlip === 1 ? 'Day' : 'Days'}</td>
+            <td style="border:1px solid #e5e7eb;padding:6px 3px;font-weight:700;color:${totalDeductionDaysSlip > 0 ? '#dc2626' : '#16a34a'}">${totalDeductionDaysSlip} ${totalDeductionDaysSlip === 1 ? 'Day' : 'Days'}</td>
             <td style="border:1px solid #e5e7eb;padding:6px 3px;color:${leaveData.leavesTakenInMonth > 0 ? '#dc2626' : '#16a34a'}">${leaveData.leavesTakenInMonth} Days</td>
             <td style="border:1px solid #e5e7eb;padding:6px 3px;font-weight:700;color:#16a34a">+${leaveData.balance} Days</td>
-            <td style="border:1px solid #e5e7eb;padding:6px 3px;font-weight:700;color:#16a34a">${daysDetails.workedWorkingDays - absentDaysSlip} Days</td>
+            <td style="border:1px solid #e5e7eb;padding:6px 3px;font-weight:700;color:#16a34a">${daysDetails.workedWorkingDays - totalDeductionDaysSlip} Days</td>
           </tr>
         </tbody>
       </table>
@@ -2425,7 +2432,7 @@ function openSalarySlipModal(empId, monthVal) {
           <tr>
             <td style="border:1px solid #e5e7eb;padding:7px">Special / Performance Allowance</td>
             <td style="border:1px solid #e5e7eb;padding:7px;text-align:right">${money(special)}</td>
-            <td style="border:1px solid #e5e7eb;padding:7px;color:#dc2626">${absentDaysSlip > 0 ? `❌ Absent Deduction (${absentDaysSlip} day${absentDaysSlip>1?'s':''})` : 'Absent Deduction'}</td>
+            <td style="border:1px solid #e5e7eb;padding:7px;color:#dc2626">${totalDeductionDaysSlip > 0 ? `❌ Leave/Absent Deduction (${totalDeductionDaysSlip} day${totalDeductionDaysSlip>1?'s':''})` : 'Leave/Absent Deduction'}</td>
             <td style="border:1px solid #e5e7eb;padding:7px;text-align:right;color:#dc2626">${absentDeductionSlip > 0 ? `-${money(absentDeductionSlip)}` : '₹0 (Nil)'}</td>
           </tr>
           <tr>
