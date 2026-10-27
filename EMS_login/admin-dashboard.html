@@ -292,6 +292,7 @@
     .ecc-bar { height:100%; border-radius:4px; transition:width .5s ease; }
     .ecc-label { font-size:11px; color:var(--muted); margin-top:5px; }
   </style>
+  <link rel="stylesheet" href="/EMS_login/ems-theme.css">
 </head>
 <body>
 
@@ -355,6 +356,17 @@
       <div class="stat-card cyan"><div class="stat-icon">📅</div><div class="stat-val" id="s-present">0</div><div class="stat-label">Present Today</div></div>
       <div class="stat-card amber"><div class="stat-icon">🌴</div><div class="stat-val" id="s-pending-leaves">0</div><div class="stat-label">Pending Leaves</div></div>
       <div class="stat-card red"><div class="stat-icon">📋</div><div class="stat-val" id="s-open-tasks">0</div><div class="stat-label">Open Tasks</div></div>
+    </div>
+    <div class="section-card">
+      <div class="section-head">
+        <h3>📊 Team ka Hisaab <span class="hx-live">LIVE</span></h3>
+        <div class="toolbar">
+          <select class="filter-select" id="hx-month" onchange="renderTeamHisaab()"></select>
+        </div>
+      </div>
+      <div class="hx-kpis" id="hx-kpis"></div>
+      <div class="hx-team" id="hx-team"></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:12px">Card par click karke poora hisaab dekhein. Absent = working din bina check-in aur bina approved leave · leave balance tak paid.</div>
     </div>
     <div class="charts-grid">
       <div class="chart-card"><h4>👥 Department Distribution</h4><div class="chart-wrap"><canvas id="deptChart"></canvas></div></div>
@@ -1193,7 +1205,62 @@ function showPage(id, el) {
 
 // ─── OVERVIEW ─────────────────────────────────────────────────
 let deptChart, attChart;
+// ── Live team summary (re-rendered on every Firestore change via renderOverview) ──
+let payrollHolidaysLoaded = false;
+async function renderTeamHisaab() {
+  const kpiEl = document.getElementById('hx-kpis');
+  const teamEl = document.getElementById('hx-team');
+  const sel = document.getElementById('hx-month');
+  if (!kpiEl || !teamEl || !sel) return;
+  if (!payrollHolidaysLoaded) { await loadPayrollHolidays(); payrollHolidaysLoaded = true; }
+
+  const today = emsToday();
+  if (!sel.options.length) {
+    let [y, m] = today.slice(0, 7).split('-').map(Number);
+    for (let i = 0; i < 12; i++) {
+      const val = `${y}-${String(m).padStart(2, '0')}`;
+      sel.add(new Option(new Date(`${val}-01T12:00:00`).toLocaleString('en-IN', { month: 'long', year: 'numeric' }), val));
+      if (--m === 0) { m = 12; y--; }
+    }
+  }
+  const monthVal = sel.value;
+  const isCurrent = monthVal === today.slice(0, 7);
+  const emps = cache.employees.filter(e => e.status === 'active');
+  const rows = emps.map(e => ({
+    emp: e,
+    s: payrollFor(e, monthVal).summary,
+    rec: cache.attendance.find(a => a.empId === e.id && a.date === today)
+  })).filter(r => r.s.joined);
+
+  const sum = (f) => rows.reduce((t, r) => t + f(r), 0);
+  const money = n => '₹' + Math.round(n).toLocaleString('en-IN');
+  const states = rows.map(r => EMS_PAYROLL.todayState(r.s, r.rec).label);
+  const working = states.filter(l => l.startsWith('Working')).length;
+  const out = states.filter(l => l.startsWith('Checked out')).length;
+  const onLeave = states.filter(l => l === 'Leave par').length;
+  const missing = states.filter(l => l === 'Check-in nahi').length;
+  const pending = cache.leaves.filter(l => l.status === 'pending').length;
+  const kpi = (k, v, s, color) => `<div class="hx-kpi"><div class="k">${k}</div><div class="v" style="color:${color || 'var(--text)'}">${v}</div>${s ? `<div class="s">${s}</div>` : ''}</div>`;
+
+  kpiEl.innerHTML = (isCurrent ? [
+      kpi('🟢 Abhi kaam par', working, `${out} checked out`, '#16a34a'),
+      kpi('❌ Aaj check-in nahi', missing, 'working day', missing ? '#dc2626' : ''),
+      kpi('🌴 Aaj leave par', onLeave, '', '#0891b2')
+    ] : []).concat([
+      kpi(isCurrent ? '💰 Payroll ab tak' : '💰 Payroll', money(sum(r => r.s.salary.earnedSoFar)), `${rows.length} employees`),
+      kpi('📉 Katauti', money(sum(r => r.s.salary.deduction)), `${sum(r => r.s.unpaidDays)} unpaid din`, '#dc2626'),
+      kpi('🧾 Net payable (est.)', money(sum(r => r.s.salary.netPayable)), 'advance ke baad', '#2563eb'),
+      kpi('⏳ Pending leaves', pending, pending ? 'approve karna baaki' : '', pending ? '#d97706' : '')
+    ]).join('');
+
+  teamEl.innerHTML = rows.length
+    ? rows.map(r => EMS_PAYROLL.teamCardHtml(r.emp, r.s, isCurrent ? r.rec : null,
+        `showEmpSummary('${r.emp.id}','${monthVal}')`)).join('')
+    : '<div class="empty-state"><div>👥</div>No active employees</div>';
+}
+
 async function renderOverview() {
+  renderTeamHisaab().catch(e => console.error('Team summary error:', e));
   const emps   = cache.employees;
   const today  = emsToday();
   const att    = cache.attendance;
@@ -2605,7 +2672,7 @@ function printSalarySlip() {
           .salary-slip-box { border: none; padding: 0; }
         }
       </style>
-    </head>
+</head>
     <body>
       ${content}
     </body>
@@ -3303,7 +3370,7 @@ function printLetterPad() {
         .letterpad-paper { border: none !important; padding: 20px !important; }
         @media print { body { margin: 0; } }
       </style>
-    </head>
+</head>
     <body>
       ${content}
     </body>

@@ -246,8 +246,8 @@
     absent:           ['#ef4444', 'Absent'],
     holiday:          ['#8b5cf6', 'Holiday'],
     sunday:           ['#475569', 'Sunday'],
-    pending:          ['#94a3b8', 'Today'],
-    upcoming:         ['#1e293b', 'Upcoming'],
+    pending:          ['#64748b', 'Today'],
+    upcoming:         ['#cbd5e1', 'Upcoming'],
     'upcoming-leave': ['#0e7490', 'Leave (upcoming)']
   };
 
@@ -259,13 +259,13 @@
     const monthName = new Date(`${r.monthVal}-01T12:00:00`).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
     const s = r.salary;
     const stat = (label, value, color, sub) => `
-      <div style="background:var(--card2,rgba(255,255,255,.04));border:1px solid var(--border,rgba(255,255,255,.08));border-radius:10px;padding:10px 12px;min-width:0">
+      <div style="background:var(--soft,#f8fafc);border:1px solid var(--border,#e6e9f0);border-radius:10px;padding:10px 12px;min-width:0">
         <div style="font-size:11px;color:var(--muted,#94a3b8)">${label}</div>
         <div style="font-size:20px;font-weight:800;color:${color || 'var(--text,#e2e8f0)'};line-height:1.3">${value}</div>
         ${sub ? `<div style="font-size:11px;color:var(--muted,#94a3b8)">${sub}</div>` : ''}
       </div>`;
     const row = (label, value, color, bold) => `
-      <div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px dashed var(--border,rgba(255,255,255,.08))${bold ? ';font-weight:800;font-size:15px' : ''}">
+      <div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px dashed var(--border,#e6e9f0)${bold ? ';font-weight:800;font-size:15px' : ''}">
         <span style="color:var(--muted,#94a3b8)">${label}</span><span style="color:${color || 'var(--text,#e2e8f0)'};white-space:nowrap">${value}</span>
       </div>`;
     const doneDays = r.eligibleWorkingDays - r.upcomingWorkingDays + (r.pendingToday ? 1 : 0);
@@ -275,7 +275,7 @@
       const [color, label] = DAY_STYLE[d.status] || ['#334155', d.status];
       const extra = d.unpaidLeave ? ' (unpaid)' : d.paidLeave ? ' (paid)' : '';
       const title = `${d.date} — ${label}${extra}${d.checkIn ? ` · In ${d.checkIn}` : ''}${d.checkOut && d.checkOut !== '—' ? ` · Out ${d.checkOut}` : ''}`;
-      return `<div title="${title}" style="width:26px;height:26px;border-radius:6px;background:${color};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;opacity:${d.status === 'upcoming' ? .5 : 1}">${Number(d.date.slice(8))}</div>`;
+      return `<div title="${title}" style="width:26px;height:26px;border-radius:6px;background:${color};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:${d.status === 'upcoming' ? '#475569' : '#fff'}">${Number(d.date.slice(8))}</div>`;
     }).join('');
     const legendKeys = ['present', 'half-day', 'leave', 'absent', 'holiday', 'sunday', 'upcoming'];
     const legend = legendKeys.map(k => `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:10px"><span style="width:10px;height:10px;border-radius:3px;background:${DAY_STYLE[k][0]}"></span>${DAY_STYLE[k][1]}</span>`).join('');
@@ -284,23 +284,23 @@
       <div style="font-size:13px">
         <div style="font-weight:700;margin-bottom:10px">📅 ${monthName} ${s.monthOver ? '' : `<span style="font-size:11px;color:var(--muted,#94a3b8);font-weight:400">(aaj tak ka hisaab · ${r.upcomingWorkingDays} working din baaki)</span>`}</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:12px">
-          ${stat('✅ Present', num(r.present), '#34d399', `${doneDays} working din mein`)}
-          ${stat('🌗 Half day', num(r.halfDays), '#fbbf24')}
-          ${stat('🌴 Leave', num(r.paidLeave + r.unpaidLeave), '#67e8f9', `${num(r.paidLeave)} paid · ${num(r.unpaidLeave)} unpaid`)}
-          ${stat('❌ Absent', num(r.absent), '#f87171', 'Check-in nahi, leave nahi')}
-          ${stat('⏰ Late', num(r.late), '#fbbf24', '10:00 ke baad')}
-          ${r.holidays ? stat('🎉 Holiday', num(r.holidays), '#a78bfa', 'Paid') : ''}
-          ${stat('🏦 Leave balance', num(r.leave.balance), '#38bdf8', `${num(r.leave.accrued)} mile · ${num(r.leave.used)} use`)}
+          ${stat('✅ Present', num(r.present), '#059669', `${doneDays} working din mein`)}
+          ${stat('🌗 Half day', num(r.halfDays), '#d97706')}
+          ${stat('🌴 Leave', num(r.paidLeave + r.unpaidLeave), '#0891b2', `${num(r.paidLeave)} paid · ${num(r.unpaidLeave)} unpaid`)}
+          ${stat('❌ Absent', num(r.absent), '#dc2626', 'Check-in nahi, leave nahi')}
+          ${stat('⏰ Late', num(r.late), '#d97706', '10:00 ke baad')}
+          ${r.holidays ? stat('🎉 Holiday', num(r.holidays), '#7c3aed', 'Paid') : ''}
+          ${stat('🏦 Leave balance', num(r.leave.balance), '#2563eb', `${num(r.leave.accrued)} mile · ${num(r.leave.used)} use`)}
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${strip}</div>
         <div style="font-size:11px;color:var(--muted,#94a3b8);margin-bottom:14px">${legend}${activeH ? ` · ⏱ ${activeH}` : ''}</div>
         <div style="max-width:480px">
           ${row('Monthly salary', money(r.baseSalary))}
           ${row(`Per day (${r.totalWorkingDays} working days)`, money(r.perDay))}
-          ${row(s.monthOver ? 'Earned this month' : 'Ab tak kamaya', money(s.earnedSoFar), '#34d399')}
-          ${row(`Katauti (${num(r.unpaidDays)} unpaid din)`, s.deduction ? '-' + money(s.deduction) : '₹0', s.deduction ? '#f87171' : '')}
-          ${row('Advance deduction', s.advance ? '-' + money(s.advance) : '₹0', s.advance ? '#f87171' : '')}
-          ${row(s.monthOver ? 'Net payable' : 'Net (ab tak)', money(s.netSoFar), '#34d399', true)}
+          ${row(s.monthOver ? 'Earned this month' : 'Ab tak kamaya', money(s.earnedSoFar), '#059669')}
+          ${row(`Katauti (${num(r.unpaidDays)} unpaid din)`, s.deduction ? '-' + money(s.deduction) : '₹0', s.deduction ? '#dc2626' : '')}
+          ${row('Advance deduction', s.advance ? '-' + money(s.advance) : '₹0', s.advance ? '#dc2626' : '')}
+          ${row(s.monthOver ? 'Net payable' : 'Net (ab tak)', money(s.netSoFar), '#059669', true)}
           ${s.monthOver ? '' : row('Poora mahina aaye to (estimate)', money(s.netPayable), 'var(--cyan,#22d3ee)')}
         </div>
         <div style="font-size:11px;color:var(--muted,#94a3b8);margin-top:10px;line-height:1.5">
@@ -310,7 +310,68 @@
       </div>`;
   }
 
-  const api = { monthSummary, summaryHtml, workingDaysInMonth, istToday, MONTHLY_LEAVE_CREDIT };
+  // Today's state from the attendance record (+ approved leave)
+  function todayState(r, todayRec) {
+    const d = r.days.find(x => x.date === r.today);
+    if (d && d.status === 'sunday') return { label: 'Sunday', color: '#64748b', bg: '#f1f5f9' };
+    if (d && d.status === 'holiday') return { label: 'Holiday', color: '#7c3aed', bg: '#ede9fe' };
+    if (d && (d.status === 'leave' || d.status === 'upcoming-leave')) return { label: 'Leave par', color: '#0891b2', bg: '#cffafe' };
+    if (todayRec && todayRec.checkIn && todayRec.checkIn !== '—') {
+      const out = todayRec.checkOut && todayRec.checkOut !== '—';
+      return out ? { label: `Checked out ${todayRec.checkOut}`, color: '#475569', bg: '#f1f5f9' }
+                 : { label: `Working · In ${todayRec.checkIn}`, color: '#16a34a', bg: '#dcfce7' };
+    }
+    return { label: 'Check-in nahi', color: '#dc2626', bg: '#fee2e2' };
+  }
+
+  // Compact card for the admin "Team ka Hisaab" grid
+  function teamCardHtml(emp, r, todayRec, onClick) {
+    const s = r.salary;
+    const st = todayState(r, todayRec);
+    const initials = (emp.name || emp.id || '?').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+    const pct = s.gross ? Math.min(100, Math.round(s.earnedSoFar / s.gross * 100)) : 0;
+    return `
+      <div class="hx-card" onclick="${onClick || ''}">
+        <div class="hx-head">
+          <div class="hx-avatar">${initials}</div>
+          <div style="flex:1;min-width:0">
+            <div class="hx-name">${emp.name || emp.id}</div>
+            <div class="hx-sub">${emp.id}${emp.designation ? ' · ' + emp.designation : ''}</div>
+          </div>
+          <span style="font-size:11px;font-weight:700;color:${st.color};background:${st.bg};padding:4px 10px;border-radius:999px;white-space:nowrap">${st.label}</span>
+        </div>
+        <div class="hx-mini">
+          <div><b style="color:#059669">${num(r.present + r.halfDays * 0.5)}</b><span>Present</span></div>
+          <div><b style="color:#dc2626">${num(r.absent)}</b><span>Absent</span></div>
+          <div><b style="color:#0891b2">${num(r.paidLeave + r.unpaidLeave)}</b><span>Leave</span></div>
+          <div><b style="color:#2563eb">${num(r.leave.balance)}</b><span>Balance</span></div>
+        </div>
+        <div class="hx-row"><span>Ab tak kamaya</span><b>${money(s.earnedSoFar)} <span style="font-weight:500;color:var(--muted)">/ ${money(s.gross)}</span></b></div>
+        <div class="hx-bar"><div style="width:${pct}%"></div></div>
+        <div class="hx-row"><span>Katauti ${s.deduction ? `<b style="color:#dc2626">-${money(s.deduction)}</b>` : '₹0'} · Late ${r.late}</span><span>Net (est.) <b>${money(s.netPayable)}</b></span></div>
+      </div>`;
+  }
+
+  // Employee dashboard banner: today + this month at a glance
+  function heroHtml(emp, r, todayRec) {
+    const st = todayState(r, todayRec);
+    const s = r.salary;
+    const hour = Number(new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'Asia/Kolkata' }));
+    const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    return `
+      <div class="hx-hero">
+        <div>
+          <h3>${greet}, ${(emp.name || '').split(' ')[0] || 'there'} 👋</h3>
+          <p>Aaj: <b>${st.label}</b> · Is mahine ${num(r.present + r.halfDays * 0.5)} din present · ${r.upcomingWorkingDays} working din baaki</p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <span class="hx-pill">🏦 ${num(r.leave.balance)} leave baaki</span>
+          <span class="hx-pill">💰 ${money(s.earnedSoFar)} kamaya</span>
+        </div>
+      </div>`;
+  }
+
+  const api = { monthSummary, summaryHtml, teamCardHtml, heroHtml, todayState, workingDaysInMonth, istToday, MONTHLY_LEAVE_CREDIT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.EMS_PAYROLL = api;
 })(typeof window !== 'undefined' ? window : this);

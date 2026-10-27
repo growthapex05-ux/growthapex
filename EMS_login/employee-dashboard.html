@@ -245,6 +245,7 @@
     .completion-pct.mid   { color:#f59e0b; }
     .completion-pct.low   { color:#ef4444; }
   </style>
+  <link rel="stylesheet" href="/EMS_login/ems-theme.css">
 </head>
 <body>
 
@@ -320,11 +321,12 @@
 
   <!-- Dashboard -->
   <div class="page active" id="page-dashboard">
+    <div id="emp-hero"></div>
     <div class="stats-grid">
       <div class="stat-card purple">
         <div class="stat-icon">📅</div>
         <div class="stat-val" id="stat-present">0</div>
-        <div class="stat-label">Days Present (Month)</div>
+        <div class="stat-label">Days Present (Is Mahine)</div>
       </div>
       <div class="stat-card cyan">
         <div class="stat-icon">✅</div>
@@ -334,12 +336,12 @@
       <div class="stat-card green">
         <div class="stat-icon">🌴</div>
         <div class="stat-val" id="stat-leaves">0</div>
-        <div class="stat-label">Leaves Approved</div>
+        <div class="stat-label">Leave Balance (din)</div>
       </div>
       <div class="stat-card amber">
         <div class="stat-icon">💰</div>
-        <div class="stat-val" id="stat-salary">—</div>
-        <div class="stat-label">Monthly Salary</div>
+        <div class="stat-val" id="stat-salary">₹0</div>
+        <div class="stat-label">Ab Tak Kamaya (Is Mahine)</div>
       </div>
     </div>
     
@@ -918,6 +920,12 @@
 
   // ── Dashboard ──────────────────────────────────────────────
   let taskChart, myAttChart;
+  // Keep the dashboard numbers live while it is on screen
+  setInterval(() => {
+    const page = document.getElementById('page-dashboard');
+    if (page && page.classList.contains('active') && document.visibilityState === 'visible') renderDashboard();
+  }, 60000);
+
   async function renderDashboard() {
     if (!emp) return;
     let att = [], tasks = [], leaves = [];
@@ -925,15 +933,21 @@
     try { tasks = (await EMS_DB.getTasks(empId)) || []; } catch(e) { console.warn('Tasks fetch:', e); }
     try { leaves = (await EMS_DB.getLeaves(empId)) || []; } catch(e) { console.warn('Leaves fetch:', e); }
 
-    const month  = new Date().getMonth();
-    const present = att.filter(a => a && a.date && new Date(a.date).getMonth()===month && a.status==='present').length;
-    const pendingTasks = tasks.filter(t => t && t.status !== 'done').length;
-    const approvedLeaves = leaves.filter(l => l && l.status==='approved').length;
+    // Live month numbers from the shared payroll rules (ems-payroll.js)
+    let cfg = {};
+    try { cfg = await EMS_DB.getAdmin(); } catch (_) {}
+    const today = emsToday();
+    const summary = EMS_PAYROLL.monthSummary(emp, today.slice(0, 7), att, leaves, today, { holidays: cfg.holidays || [] });
+    const todayRec = att.find(a => a && a.date === today);
+    const heroEl = document.getElementById('emp-hero');
+    if (heroEl) heroEl.innerHTML = EMS_PAYROLL.heroHtml(emp, summary, todayRec);
 
-    animateVal('stat-present', present);
+    const pendingTasks = tasks.filter(t => t && t.status !== 'done').length;
+
+    animateVal('stat-present', summary.present + summary.halfDays * 0.5);
     animateVal('stat-tasks', pendingTasks);
-    animateVal('stat-leaves', approvedLeaves);
-    animateVal('stat-salary', emp.salary || 0);
+    animateVal('stat-leaves', summary.leave.balance);
+    animateVal('stat-salary', summary.salary.earnedSoFar);
 
     const tHTML = tasks.length ? `<table><thead><tr><th>Task</th><th>Deadline</th><th>Status</th></tr></thead><tbody>
       ${tasks.slice(0,5).map(t=>`<tr><td><div style="font-weight:600">${t.title || 'Untitled'}</div><div style="font-size:11px;color:var(--muted)">${t.description||''}</div></td><td>${t.deadline ? fmt(t.deadline) : '—'}</td><td>${sBadge(t.status || 'todo')}</td></tr>`).join('')}
@@ -2041,7 +2055,7 @@ function downloadEmpSalarySlipPDF() {
           .btn { display: none !important; }
           @media print { body { margin: 0; } }
         </style>
-      </head>
+</head>
       <body>
         ${content}
       </body>
