@@ -12,6 +12,8 @@
 //   node setup-security.js --set-home=EMP001 --date=2026-10-28  (use that day's check-in location)
 //   node setup-security.js --set-home=EMP001 --lat=28.61 --lng=77.20
 //   node setup-security.js --list-locations=EMP001           -> recent check-in locations, to pick the right one
+//   node setup-security.js --holidays=2026-10-02,2026-11-08   -> paid office holidays (replaces the list)
+//   node setup-security.js --holidays=show                   -> show the current holiday list
 
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 
@@ -23,7 +25,7 @@ const { initializeFirebase } = require('./report-generator');
 
 const argv = parseArgs(process.argv.slice(2), {
   boolean: ['check', 'disable-resolver'],
-  string: ['office-ip', 'set-home', 'list-locations', 'date']
+  string: ['office-ip', 'set-home', 'list-locations', 'date', 'holidays']
 });
 const RESOLVER_EMAIL = 'ems-system-resolver@growthapex.com';
 
@@ -112,6 +114,21 @@ async function setHome(db, empId) {
   console.log(`✅ ${empId} home set to ${home.lat},${home.lng} — https://www.google.com/maps?q=${home.lat},${home.lng}`);
 }
 
+async function setHolidays(db, value) {
+  const ref = db.collection('admin').doc('config');
+  if (value === 'show') {
+    const cur = ((await ref.get()).data() || {}).holidays || [];
+    console.log(cur.length ? 'Paid holidays: ' + cur.join(', ') : 'No holidays set.');
+    return;
+  }
+  const dates = value.split(',').map(s => s.trim()).filter(Boolean);
+  const bad = dates.filter(d => !/^\d{4}-\d{2}-\d{2}$/.test(d));
+  if (bad.length) return console.log('❌ Use YYYY-MM-DD dates. Not valid: ' + bad.join(', '));
+  await ref.set({ holidays: [...new Set(dates)].sort() }, { merge: true });
+  console.log('✅ Paid holidays saved: ' + dates.join(', '));
+  console.log('   These days are never counted as absent and are paid.');
+}
+
 async function setOfficeIp(db, value) {
   let ips = value.split(',').map(s => s.trim()).filter(Boolean);
   if (ips.length === 1 && ips[0] === 'auto') {
@@ -130,6 +147,7 @@ async function setOfficeIp(db, value) {
   else if (argv['office-ip']) await setOfficeIp(db, argv['office-ip']);
   else if (argv['set-home']) await setHome(db, argv['set-home']);
   else if (argv['list-locations']) await listLocations(db, argv['list-locations']);
+  else if (argv.holidays) await setHolidays(db, argv.holidays);
   else await registerStaff(db);
   process.exit(0);
 })().catch(err => {

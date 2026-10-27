@@ -404,6 +404,13 @@
       <div style="font-size:11px;color:var(--muted);margin-top:8px">📍 Attendance ke liye sirf Check-In aur Check-Out ke time aapki location li jaati hai — din bhar tracking nahi hoti.</div>
     </div>
     <div class="section-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+        <h3 style="margin:0">📊 Mera Hisaab — Attendance, Leave &amp; Salary</h3>
+        <select id="month-summary-select" class="filter-select" onchange="renderMonthSummary()"></select>
+      </div>
+      <div id="month-summary-box"></div>
+    </div>
+    <div class="section-card">
       <div class="section-head"><h3>📊 Attendance History</h3>
         <div class="toolbar">
            <select class="filter-select" id="my-att-filter" onchange="renderAttendanceTable()">
@@ -745,6 +752,7 @@
   const auth = firebase.auth();
 </script>
 <script src="/EMS_login/ems-firebase.js"></script>
+<script src="/EMS_login/ems-payroll.js"></script>
 <script>
   // Auth guard
   const sess = JSON.parse(localStorage.getItem('ems_session'));
@@ -1296,6 +1304,39 @@
     const todayRec = await EMS_DB.getTodayAttendance(empId);
     updateAttendanceButtonsUI(todayRec);
     renderAttendanceTable();
+    renderMonthSummary();
+  }
+
+  // ── Monthly attendance / leave / salary summary (shared rules in ems-payroll.js) ──
+  async function renderMonthSummary() {
+    const box = document.getElementById('month-summary-box');
+    const sel = document.getElementById('month-summary-select');
+    if (!box || !sel || !empId) return;
+
+    if (!sel.options.length) {
+      const today = emsToday();
+      const start = (emp.joinDate && /^\d{4}-\d{2}/.test(emp.joinDate)) ? emp.joinDate.slice(0, 7) : today.slice(0, 7);
+      let [y, m] = today.slice(0, 7).split('-').map(Number);
+      for (let i = 0; i < 12; i++) {
+        const val = `${y}-${String(m).padStart(2, '0')}`;
+        if (val < start) break;
+        sel.add(new Option(new Date(`${val}-01T12:00:00`).toLocaleString('en-IN', { month: 'long', year: 'numeric' }), val));
+        if (--m === 0) { m = 12; y--; }
+      }
+    }
+
+    box.innerHTML = '<div style="color:var(--muted);padding:12px">⏳ Hisaab ban raha hai…</div>';
+    try {
+      const [att, leaves, cfg, fresh] = await Promise.all([
+        EMS_DB.getAttendance(empId), EMS_DB.getLeaves(empId),
+        EMS_DB.getAdmin().catch(() => ({})), EMS_DB.getEmployee(empId)
+      ]);
+      const summary = EMS_PAYROLL.monthSummary({ ...emp, ...(fresh || {}) }, sel.value, att, leaves, emsToday(),
+                                               { holidays: cfg.holidays || [] });
+      box.innerHTML = EMS_PAYROLL.summaryHtml(summary);
+    } catch (e) {
+      box.innerHTML = `<div style="color:var(--danger);padding:12px">Hisaab load nahi hua: ${e.message}</div>`;
+    }
   }
 
   async function renderAttendanceTable() {
@@ -1783,16 +1824,21 @@
       const joinDate = emp.joinDate || 'N/A';
       const daysDetails = getWorkingDaysForMonth(joinDate, monthVal, 'month');
 
-      let earnedSalary = 0;
-      if (daysDetails.isJoined && daysDetails.workedWorkingDays > 0) {
-        earnedSalary = Math.round((baseSalary * daysDetails.workedWorkingDays) / (daysDetails.totalMonthWorkingDays || 26));
-      } else {
-        earnedSalary = baseSalary;
-      }
-
-      const leaveData = calculateCumulativeLeaves(emp, monthVal, empAtt);
-      const advanceDeduction = emp.advanceDeduction !== undefined ? Number(emp.advanceDeduction) : 3000;
-      const netPayable = Math.max(0, earnedSalary - advanceDeduction);
+      // Same rules as the admin payroll and "Mera Hisaab" card (ems-payroll.js):
+      // absents and leave beyond the balance are deducted, advance defaults to ₹0.
+      const [empLeaves, adminCfg] = await Promise.all([
+        EMS_DB.getLeaves(emp.id).catch(() => []), EMS_DB.getAdmin().catch(() => ({}))
+      ]);
+      const pay = EMS_PAYROLL.monthSummary(emp, monthVal, empAtt, empLeaves, emsToday(), { holidays: adminCfg.holidays || [] });
+      const earnedSalary = pay.salary.monthTotal;
+      const leaveData = {
+        ...calculateCumulativeLeaves(emp, monthVal, empAtt),
+        leavesTakenInMonth: +(pay.paidLeave + pay.unpaidLeave + pay.absent).toFixed(1),
+        totalLeavesTaken: pay.leave.used,
+        balance: pay.leave.balance
+      };
+      const advanceDeduction = pay.salary.advance;
+      const netPayable = pay.salary.netPayable;
 
       const basic = Math.round(earnedSalary * 0.60);
       const hra = Math.round(earnedSalary * 0.30);

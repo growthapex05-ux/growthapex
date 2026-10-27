@@ -14,6 +14,7 @@ const {
 const { getGreenApiState } = require('./sender');
 const { deliver, flush, enqueue, listQueued, isOnline, waitForNetwork, todayIST } = require('./outbox');
 const { sendReminders } = require('./reminders');
+const { groupSection, sendPersonalSalarySummaries } = require('./month-summary');
 
 const REPORT_TYPES = ['daily', 'weekly', 'monthly', 'login'];
 const REMINDER_TYPES = ['remind-checkin', 'remind-checkout'];
@@ -130,7 +131,10 @@ async function main() {
       if (reportType === 'daily') reportText = await generateDailyReport(db, targetDate);
       else if (reportType === 'login') reportText = await generateLoginReport(db, targetDate);
       else if (reportType === 'weekly') reportText = await generateWeeklyReport(db);
-      else reportText = await generateMonthlyReport(db);
+      else {
+        reportText = (await generateMonthlyReport(db)) + (await groupSection(db));
+        await sendPersonalSalarySummaries(db, undefined, { dryRun: true });
+      }
     } catch (err) {
       console.error("❌ Error generating report content:", err);
       process.exit(1);
@@ -152,6 +156,9 @@ async function main() {
   }
 
   const result = await deliver(db, item, { force: !!argv.force });
+
+  // Monthly: each employee also gets their own attendance + salary breakdown, privately
+  if (reportType === 'monthly') await sendPersonalSalarySummaries(db);
   if (result === 'queued') {
     console.log("⏳ Report could not be sent now — it is queued and will go out automatically.");
   } else {

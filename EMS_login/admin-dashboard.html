@@ -961,6 +961,7 @@
   const auth = firebase.auth();
 </script>
 <script src="/EMS_login/ems-firebase.js"></script>
+<script src="/EMS_login/ems-payroll.js"></script>
 <script>
 // ─── Auth Guard ───────────────────────────────────────────────
 const sess = EMS_DB.getSession();
@@ -2043,6 +2044,7 @@ async function renderSalary() {
   const monthVal = document.getElementById('salary-month-select')?.value || '2026-08';
   const calcMode = document.getElementById('salary-calc-mode')?.value || 'month';
   const q = (document.getElementById('salary-search')?.value || '').toLowerCase();
+  await loadPayrollHolidays();
 
   let emps = cache.employees.filter(e => e.status === 'active');
   if (q) emps = emps.filter(e => (e.name + e.department + (e.designation||'')).toLowerCase().includes(q));
@@ -2066,30 +2068,13 @@ async function renderSalary() {
     const joinDate = e.joinDate || 'N/A';
     const daysDetails = getWorkingDaysForMonth(joinDate, monthVal, calcMode);
 
-    // Count absent days from attendance records for this month
-    const empAttForMonth = (cache.attendance || []).filter(a =>
-      a.empId === e.id && a.date && a.date.startsWith(monthVal)
-    );
-    const absentDays = empAttForMonth.filter(a => a.status === 'absent').length;
-    const leaveDays  = empAttForMonth.filter(a => a.status === 'leave').length;
-    const halfDays   = empAttForMonth.filter(a => a.status === 'half-day').length;
-    const totalDeductionDays = absentDays + leaveDays + (halfDays * 0.5);
+    // Absents (incl. days with no check-in) and leave beyond the balance — see payrollFor()
+    const pay = payrollFor(e, monthVal);
+    const { absentDays, leaveDays, halfDays, totalDeductionDays, absentDeduction } = pay;
 
-    let earnedSalary = 0;
-    if (daysDetails.isJoined && daysDetails.workedWorkingDays > 0) {
-      if (calcMode === 'cumulative') {
-        earnedSalary = calcCumulativeSalary(joinDate, monthVal, baseSalary);
-      } else {
-        earnedSalary = Math.round((baseSalary * daysDetails.workedWorkingDays) / (daysDetails.totalMonthWorkingDays || 26));
-      }
-    }
-
-    // Absent/Leave deduction for ALL employees based on attendance records
-    let absentDeduction = 0;
-    if (totalDeductionDays > 0 && daysDetails.totalMonthWorkingDays > 0) {
-      const perDaySalary = Math.round(baseSalary / daysDetails.totalMonthWorkingDays);
-      absentDeduction = perDaySalary * totalDeductionDays;
-      earnedSalary = Math.max(0, earnedSalary - absentDeduction);
+    let earnedSalary = pay.earnedSalary;
+    if (calcMode === 'cumulative' && daysDetails.isJoined && daysDetails.workedWorkingDays > 0) {
+      earnedSalary = Math.max(0, calcCumulativeSalary(joinDate, monthVal, baseSalary) - absentDeduction);
     }
 
     totalEarnedPayroll += earnedSalary;
@@ -2174,6 +2159,7 @@ async function renderSalary() {
                 : '<span class="badge badge-amber">⏳ Pending Release</span>'}
             </td>
             <td style="text-align:center;display:flex;gap:6px;justify-content:center;align-items:center">
+              <button class="btn btn-sm btn-edit" onclick="showEmpSummary('${e.id}', '${monthVal}')" title="Attendance, leave & salary breakdown">📊 Hisaab</button>
               <button class="btn btn-sm btn-primary" onclick="openSalarySlipModal('${e.id}', '${monthVal}')">📄 View</button>
               ${e.isReleased 
                 ? '<button class="btn btn-sm" style="background:#15803d;color:#fff;border:none" disabled>✅ Released</button>' 
@@ -2277,6 +2263,64 @@ function numberToWords(num) {
   return inWords(Math.round(num)).trim() + ' Rupees Only';
 }
 
+// ── One payroll calculation for table, slip, release, CSV and WhatsApp (rules in ems-payroll.js) ──
+let PAYROLL_HOLIDAYS = [];
+async function loadPayrollHolidays() {
+  try { PAYROLL_HOLIDAYS = (await EMS_DB.getAdmin()).holidays || []; } catch (_) {}
+}
+
+function payrollFor(emp, monthVal) {
+  const att = (cache.attendance || []).filter(a => a.empId === emp.id);
+  const leaves = (cache.leaves || []).filter(l => l.empId === emp.id);
+  const s = EMS_PAYROLL.monthSummary(emp, monthVal, att, leaves, emsToday(), { holidays: PAYROLL_HOLIDAYS });
+  const earnedSalary = s.salary.monthTotal;
+  const basic = Math.round(earnedSalary * 0.60);
+  const hra = Math.round(earnedSalary * 0.30);
+  return {
+    summary: s,
+    daysDetails: getWorkingDaysForMonth(emp.joinDate || 'N/A', monthVal, 'month'),
+    grossEarned: s.salary.gross,
+    earnedSalary,
+    absentDays: s.absent,
+    leaveDays: s.unpaidLeave,           // only leave beyond the balance is deducted
+    halfDays: s.halfDays,
+    totalDeductionDays: s.unpaidDays,
+    absentDeduction: s.salary.deduction,
+    advanceDeduction: s.salary.advance,
+    netPayable: s.salary.netPayable,
+    basic, hra, special: earnedSalary - (basic + hra),
+    leaveData: {
+      ...calculateCumulativeLeaves(emp, monthVal, cache.attendance),
+      leavesTakenInMonth: +(s.paidLeave + s.unpaidLeave + s.absent).toFixed(1),
+      totalLeavesTaken: s.leave.used,
+      balance: s.leave.balance
+    }
+  };
+}
+
+// Popup with the same "Mera Hisaab" card the employee sees
+function showEmpSummary(empId, monthVal) {
+  const emp = cache.employees.find(e => e.id === empId);
+  if (!emp) return;
+  const { summary } = payrollFor(emp, monthVal);
+  let overlay = document.getElementById('emp-summary-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'emp-summary-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto';
+    overlay.addEventListener('click', ev => { if (ev.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML = `
+    <div style="background:var(--card,#0f172a);border:1px solid var(--border,rgba(255,255,255,.1));border-radius:14px;padding:20px;max-width:760px;width:100%">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h3 style="margin:0">📊 ${emp.name} <span style="font-size:12px;color:var(--muted)">(${emp.id})</span></h3>
+        <button class="btn btn-sm" onclick="document.getElementById('emp-summary-overlay').remove()">✕</button>
+      </div>
+      ${EMS_PAYROLL.summaryHtml(summary)}
+    </div>`;
+}
+
 function calculateCumulativeLeaves(emp, targetMonthVal, allAttendance) {
   if (!emp) {
     return { monthsWorked: 1, totalAccrued: 1.5, leavesTakenInMonth: 0, totalLeavesTaken: 0, balance: 1.5 };
@@ -2333,33 +2377,18 @@ function openSalarySlipModal(empId, monthVal) {
   const baseSalary = Number(emp.salary || 0);
   const joinDate = emp.joinDate || 'N/A';
   
-  const daysDetails = getWorkingDaysForMonth(joinDate, monthVal, 'month');
-  let earnedSalary = 0;
-  if (daysDetails.isJoined && daysDetails.workedWorkingDays > 0) {
-    earnedSalary = Math.round((baseSalary * daysDetails.workedWorkingDays) / (daysDetails.totalMonthWorkingDays || 26));
-  }
-
-  // Count absent/leave days for this employee in selected month
-  const empAttForMonth = (cache.attendance || []).filter(a =>
-    a.empId === emp.id && a.date && a.date.startsWith(monthVal)
-  );
-  const absentDaysSlip = empAttForMonth.filter(a => a.status === 'absent').length;
-  const leaveDaysSlip  = empAttForMonth.filter(a => a.status === 'leave').length;
-  const halfDaysSlip   = empAttForMonth.filter(a => a.status === 'half-day').length;
-  const totalDeductionDaysSlip = absentDaysSlip + leaveDaysSlip + (halfDaysSlip * 0.5);
-
-  // Deduction for ALL employees
-  let grossEarned = earnedSalary; // gross before deduction
-  let absentDeductionSlip = 0;
-  if (totalDeductionDaysSlip > 0 && daysDetails.totalMonthWorkingDays > 0) {
-    const perDaySalarySlip = Math.round(baseSalary / daysDetails.totalMonthWorkingDays);
-    absentDeductionSlip = perDaySalarySlip * totalDeductionDaysSlip;
-  }
-  const earnedAfterAbsent = Math.max(0, grossEarned - absentDeductionSlip);
-
-  const leaveData = calculateCumulativeLeaves(emp, monthVal, cache.attendance);
-  const advanceDeduction = emp.advanceDeduction ? Number(emp.advanceDeduction) : 0;
-  const netPayable = Math.max(0, earnedAfterAbsent - advanceDeduction);
+  // Absents (incl. no check-in), unpaid leave and advance — same rules everywhere (payrollFor)
+  const pay = payrollFor(emp, monthVal);
+  const daysDetails = pay.daysDetails;
+  const earnedSalary = pay.grossEarned;      // earnings shown on the slip, before deductions
+  const grossEarned = pay.grossEarned;
+  const absentDaysSlip = pay.absentDays;
+  const totalDeductionDaysSlip = pay.totalDeductionDays;
+  const absentDeductionSlip = pay.absentDeduction;
+  const earnedAfterAbsent = pay.earnedSalary;
+  const leaveData = pay.leaveData;
+  const advanceDeduction = pay.advanceDeduction;
+  const netPayable = pay.netPayable;
 
   const basic = Math.round(earnedSalary * 0.60);
   const hra = Math.round(earnedSalary * 0.30);
@@ -2629,19 +2658,11 @@ async function quickReleaseSalarySlip(empId, monthVal) {
   const emp = cache.employees.find(e => e.id === empId);
   if (!emp) return;
 
-  const baseSalary = Number(emp.salary || 0);
-  const daysDetails = getWorkingDaysForMonth(emp.joinDate || 'N/A', monthVal, 'month');
-  let earnedSalary = 0;
-  if (daysDetails.isJoined && daysDetails.workedWorkingDays > 0) {
-    earnedSalary = Math.round((baseSalary * daysDetails.workedWorkingDays) / (daysDetails.totalMonthWorkingDays || 26));
-  }
-  const advanceDeduction = emp.advanceDeduction !== undefined ? Number(emp.advanceDeduction) : 3000;
-  const netPayable = Math.max(0, earnedSalary - advanceDeduction);
-  const basic = Math.round(earnedSalary * 0.60);
-  const hra = Math.round(earnedSalary * 0.30);
-  const special = earnedSalary - (basic + hra);
-
-  const slipData = { emp, monthVal, earnedSalary, advanceDeduction, netPayable, basic, hra, special, daysDetails };
+  await loadPayrollHolidays();
+  const { earnedSalary, advanceDeduction, netPayable, basic, hra, special, daysDetails,
+          absentDeduction, totalDeductionDays } = payrollFor(emp, monthVal);
+  const slipData = { emp, monthVal, earnedSalary, advanceDeduction, netPayable, basic, hra, special, daysDetails,
+                     absentDeduction, totalDeductionDays };
 
   try {
     await EMS_DB.releaseSalarySlip(emp.id, monthVal, slipData);
@@ -2665,22 +2686,14 @@ async function bulkReleaseAllSalarySlips() {
     return;
   }
 
+  await loadPayrollHolidays();
   let successCount = 0;
   for (const emp of emps) {
     try {
-      const baseSalary = Number(emp.salary || 0);
-      const daysDetails = getWorkingDaysForMonth(emp.joinDate || 'N/A', monthVal, 'month');
-      let earnedSalary = 0;
-      if (daysDetails.isJoined && daysDetails.workedWorkingDays > 0) {
-        earnedSalary = Math.round((baseSalary * daysDetails.workedWorkingDays) / (daysDetails.totalMonthWorkingDays || 26));
-      }
-      const advanceDeduction = emp.advanceDeduction !== undefined ? Number(emp.advanceDeduction) : 3000;
-      const netPayable = Math.max(0, earnedSalary - advanceDeduction);
-      const basic = Math.round(earnedSalary * 0.60);
-      const hra = Math.round(earnedSalary * 0.30);
-      const special = earnedSalary - (basic + hra);
-
-      const slipData = { emp, monthVal, earnedSalary, advanceDeduction, netPayable, basic, hra, special, daysDetails };
+      const { earnedSalary, advanceDeduction, netPayable, basic, hra, special, daysDetails,
+              absentDeduction, totalDeductionDays } = payrollFor(emp, monthVal);
+      const slipData = { emp, monthVal, earnedSalary, advanceDeduction, netPayable, basic, hra, special, daysDetails,
+                         absentDeduction, totalDeductionDays };
       await EMS_DB.releaseSalarySlip(emp.id, monthVal, slipData);
       successCount++;
     } catch(err) {
@@ -3324,33 +3337,13 @@ async function exportCSV(type) {
       const joinDate = e.joinDate || 'N/A';
       const daysDetails = getWorkingDaysForMonth(joinDate, monthVal, calcMode);
 
-      // Count absent/leave days from attendance
-      const empAttForMonth = (cache.attendance || []).filter(a =>
-        a.empId === e.id && a.date && a.date.startsWith(monthVal)
-      );
-      const absentDays = empAttForMonth.filter(a => a.status === 'absent').length;
-      const leaveDays = empAttForMonth.filter(a => a.status === 'leave').length;
-      const halfDays = empAttForMonth.filter(a => a.status === 'half-day').length;
-      const totalDeductionDays = absentDays + leaveDays + (halfDays * 0.5);
-
-      let earnedSalary = 0;
-      if (daysDetails.isJoined && daysDetails.workedWorkingDays > 0) {
-        if (calcMode === 'cumulative') {
-          earnedSalary = calcCumulativeSalary(joinDate, monthVal, baseSalary);
-        } else {
-          earnedSalary = Math.round((baseSalary * daysDetails.workedWorkingDays) / (daysDetails.totalMonthWorkingDays || 26));
-        }
+      // Same rules as the salary table and slips (payrollFor)
+      const pay = payrollFor(e, monthVal);
+      const { totalDeductionDays, absentDeduction, advanceDeduction } = pay;
+      let earnedSalary = pay.earnedSalary;
+      if (calcMode === 'cumulative' && daysDetails.isJoined && daysDetails.workedWorkingDays > 0) {
+        earnedSalary = Math.max(0, calcCumulativeSalary(joinDate, monthVal, baseSalary) - absentDeduction);
       }
-
-      // Deduction for all employees
-      let absentDeduction = 0;
-      if (totalDeductionDays > 0 && daysDetails.totalMonthWorkingDays > 0) {
-        const perDaySalary = Math.round(baseSalary / daysDetails.totalMonthWorkingDays);
-        absentDeduction = perDaySalary * totalDeductionDays;
-        earnedSalary = Math.max(0, earnedSalary - absentDeduction);
-      }
-
-      const advanceDeduction = e.advanceDeduction ? Number(e.advanceDeduction) : 0;
       const netPayable = Math.max(0, earnedSalary - advanceDeduction);
 
       return [e.id, `"${e.name}"`, joinDate, e.department, `"${e.designation||''}"`, baseSalary, daysDetails.workedCalendarDays, daysDetails.sundays, daysDetails.workedWorkingDays, totalDeductionDays, absentDeduction, earnedSalary, netPayable];
@@ -3927,17 +3920,10 @@ async function sendBulkSalarySlipsWhatsApp() {
   if (!confirm(`Launch WhatsApp Salary Slips for all ${activeEmps.length} active employees?`)) return;
 
   const monthVal = document.getElementById('salary-month-select')?.value || '2026-08';
+  await loadPayrollHolidays();
   let count = 0;
   for (const emp of activeEmps) {
-    const leaveData = calculateCumulativeLeaves(emp, monthVal, cache.attendance);
-    const daysDetails = getWorkingDaysForMonth(emp.joinDate, monthVal, 'month');
-    const baseSalary = Number(emp.salary || 0);
-    let earnedSalary = 0;
-    if (daysDetails.isJoined && daysDetails.workedWorkingDays > 0) {
-      earnedSalary = Math.round((baseSalary * daysDetails.workedWorkingDays) / (daysDetails.totalMonthWorkingDays || 26));
-    }
-    const advanceDeduction = emp.advanceDeduction !== undefined ? Number(emp.advanceDeduction) : 3000;
-    const netPayable = Math.max(0, earnedSalary - advanceDeduction);
+    const { leaveData, daysDetails, earnedSalary, advanceDeduction, netPayable } = payrollFor(emp, monthVal);
 
     let targetPhone = (emp.phone || '').trim().replace(/\D/g, '');
     if (targetPhone.length === 10) targetPhone = '91' + targetPhone;

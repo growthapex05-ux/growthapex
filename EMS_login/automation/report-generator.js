@@ -670,8 +670,8 @@ async function generateMonthlyReport(db) {
   Object.values(employeeStats)
     .sort((a, b) => b.tasksCompleted - a.tasksCompleted)
     .forEach(stats => {
-      const lateStr = stats.lateDays > 0 ? ` (⏰ ${stats.lateDays} Late)` : '';
-      report += ` • *${stats.name}*: ${stats.tasksCompleted}/${stats.tasksAssigned} Tasks (Attendance: ${stats.presentDays}d Present | ${stats.absentDays}d Absent | ${stats.leaveDays}d Leave)${lateStr}\n`;
+      // Attendance / leave numbers come from the shared payroll rules in the section appended by month-summary.js
+      report += ` • *${stats.name}*: ${stats.tasksCompleted}/${stats.tasksAssigned} Tasks\n`;
     });
 
   // Notable holidays / festivals section

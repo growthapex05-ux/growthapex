@@ -24,7 +24,8 @@ const BUILDERS = {
   daily: (db, date) => gen.generateDailyReport(db, date),
   login: (db, date) => gen.generateLoginReport(db, date),
   weekly: (db) => gen.generateWeeklyReport(db),
-  monthly: (db) => gen.generateMonthlyReport(db)
+  // + attendance & leave per employee (lazy require: month-summary.js requires this file)
+  monthly: async (db) => (await gen.generateMonthlyReport(db)) + (await require('./month-summary').groupSection(db))
 };
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
