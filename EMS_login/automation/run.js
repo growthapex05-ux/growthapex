@@ -13,6 +13,10 @@ const {
 } = require('./report-generator');
 const { getGreenApiState } = require('./sender');
 const { deliver, flush, enqueue, listQueued, isOnline, waitForNetwork, todayIST } = require('./outbox');
+const { sendReminders } = require('./reminders');
+
+const REPORT_TYPES = ['daily', 'weekly', 'monthly', 'login'];
+const REMINDER_TYPES = ['remind-checkin', 'remind-checkout'];
 
 // Parse CLI arguments
 // Example: node run.js --type=daily [--date=2026-08-26] [--dry-run] [--force]
@@ -66,9 +70,9 @@ async function main() {
     process.exit(0);
   }
 
-  if (!argv.flush && !['daily', 'weekly', 'monthly', 'login'].includes(reportType)) {
+  if (!argv.flush && ![...REPORT_TYPES, ...REMINDER_TYPES].includes(reportType)) {
     console.error("❌ Error: Invalid or missing report type.");
-    console.error("👉 Usage: node run.js --type=[daily|weekly|monthly|login] [--date=YYYY-MM-DD] [--dry-run] [--force]");
+    console.error("👉 Usage: node run.js --type=[daily|weekly|monthly|login|remind-checkin|remind-checkout] [--date=YYYY-MM-DD] [--dry-run] [--force]");
     console.error("         node run.js --flush | --status");
     console.error("   Short aliases: node run.js -t daily -d");
     process.exit(1);
@@ -89,7 +93,8 @@ async function main() {
   }
   console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
 
-  const item = argv.flush ? null : {
+  const isReminder = REMINDER_TYPES.includes(reportType);
+  const item = (argv.flush || isReminder) ? null : {
     id: reportId(reportType, targetDate),
     type: reportType,
     date: targetDate || (['daily', 'login'].includes(reportType) ? todayIST() : null)
@@ -110,6 +115,12 @@ async function main() {
   } catch (err) {
     console.error("❌ Firebase Initialization Error:", err.message);
     process.exit(1);
+  }
+
+  if (isReminder) {
+    if (!isDryRun) await flush(db);
+    await sendReminders(db, reportType.replace('remind-', ''), targetDate || todayIST(), { dryRun: isDryRun });
+    process.exit(0);
   }
 
   if (isDryRun) {

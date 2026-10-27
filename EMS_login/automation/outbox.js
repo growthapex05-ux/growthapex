@@ -105,6 +105,7 @@ function enqueue(item, error) {
     type: item.type,
     date: item.date || null,
     message: item.message || null,
+    chatId: item.chatId || null,
     createdAt: item.createdAt || Date.now(),
     attempts: (item.attempts || 0) + 1,
     lastError: error ? String(error.message || error) : null
@@ -130,10 +131,10 @@ function listQueued() {
 
 // ---------- Sending ----------
 
-async function sendWithRetry(message) {
+async function sendWithRetry(message, chatId) {
   for (let attempt = 0; ; attempt++) {
     try {
-      return await sendReport(message);
+      return await sendReport(message, chatId);
     } catch (err) {
       if (err.permanent || attempt >= RETRY_DELAYS_MS.length) throw err;
       const wait = RETRY_DELAYS_MS[attempt];
@@ -143,7 +144,8 @@ async function sendWithRetry(message) {
   }
 }
 
-// item: { id, type, date?, message? } — message is built from `type` when missing.
+// item: { id, type, date?, message?, chatId? } — message is built from `type` when missing;
+// chatId sends to a personal chat instead of the group.
 // Returns 'sent' | 'already-sent' | 'in-progress' | 'queued'
 async function deliver(db, item, { force = false } = {}) {
   item = { ...item, id: safeId(item.id) };
@@ -171,7 +173,7 @@ async function deliver(db, item, { force = false } = {}) {
     }
 
     console.log(`Sending "${item.id}" to WhatsApp...`);
-    await sendWithRetry(item.message);
+    await sendWithRetry(item.message, item.chatId);
     await markSent(db, item.id, item.type);
     dequeue(item.id);
     console.log(`✅ "${item.id}" delivered.`);

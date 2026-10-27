@@ -238,10 +238,11 @@ function saveJidToEnv(jid) {
 }
 
 // Main Send Router
-async function sendReport(message) {
+// chatId (optional): send to this chat instead of the group, e.g. "919876543210@c.us" for a personal message
+async function sendReport(message, chatId) {
   const provider = (process.env.PROVIDER || 'whatsapp-web-js').toLowerCase();
-  const inviteLink = process.env.WA_INVITE_LINK;
-  const groupJid = process.env.WA_GROUP_JID;
+  const inviteLink = chatId ? null : process.env.WA_INVITE_LINK;
+  const groupJid = chatId || process.env.WA_GROUP_JID;
 
   if (provider === 'green-api') {
     return await sendViaGreenApi(message, groupJid);

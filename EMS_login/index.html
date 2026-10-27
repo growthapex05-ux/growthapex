@@ -355,10 +355,11 @@
             role: 'admin',
             email: cred.user.email,
             loginTime: new Date().toLocaleTimeString('en-IN', { hour12: true }),
-            date: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
-            timestamp: new Date().toISOString()
+            date: emsToday(),
+            timestamp: new Date().toISOString(),
+            device: emsDevice()
           });
-        } catch (_) {}
+        } catch (e) { console.error('Could not save login record:', e.message); }
         window.location.href = '/EMS_login/admin-dashboard';
       } catch (e) {
         btn.classList.remove('loading');
@@ -389,22 +390,18 @@
         if (!inputVal.includes('@')) {
           const formattedId = inputVal.toUpperCase();
           try {
-            // Step 1: Sign in with read-only resolver account silently
-            await auth.signInWithEmailAndPassword('ems-system-resolver@growthapex.com', 'SystemResolverPassword123!');
-            
-            // Step 2: Retrieve employee document by ID to get their real email
-            const empDoc = await db.collection('employees').doc(formattedId).get();
-            
-            // Sign out the resolver immediately
-            await auth.signOut();
+            // Resolve Employee ID -> email from the public lookup (firestore.rules allows a
+            // single get on empLogin/{ID}, nothing else, so no shared account/password is needed)
+            await auth.signOut().catch(() => {});
+            const lookup = await db.collection('empLogin').doc(formattedId).get({ source: 'server' });
 
-            if (!empDoc.exists) {
+            if (!lookup.exists) {
               btn.classList.remove('loading');
               showError('❌ Employee ID not found.');
               return;
             }
-            
-            emailToAuth = empDoc.data().email;
+
+            emailToAuth = lookup.data().email;
           } catch (resErr) {
             await auth.signOut().catch(() => {});
             btn.classList.remove('loading');
@@ -441,10 +438,12 @@
             role: 'employee',
             email: emp.email,
             loginTime: new Date().toLocaleTimeString('en-IN', { hour12: true }),
-            date: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
-            timestamp: new Date().toISOString()
+            date: emsToday(),
+            timestamp: new Date().toISOString(),
+            device: emsDevice()
           });
-        } catch (_) {}
+        } catch (e) { console.error('Could not save login record:', e.message); }
+        try { localStorage.setItem(`ems_visit_${emp.id}_${emsToday()}`, '1'); } catch (_) {}
         window.location.href = '/EMS_login/employee-dashboard';
       } catch (e) {
         btn.classList.remove('loading');

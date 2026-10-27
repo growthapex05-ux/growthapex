@@ -7,10 +7,78 @@
 //   firebase-firestore-compat.js, firebase-config.js
 // ============================================================
 
+// ── Shared helpers ──────────────────────────────────────────
+
+/** Today's date (YYYY-MM-DD) in India time. toISOString() is UTC and gives yesterday before 5:30 AM. */
+function emsToday() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+}
+
+/** Which device the employee is using: { type: 'mobile'|'tablet'|'desktop', os, browser } */
+function emsDevice() {
+  const ua = navigator.userAgent || '';
+  const isTablet = /iPad|Tablet/i.test(ua) || (/Android/i.test(ua) && !/Mobile/i.test(ua))
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isMobile = !isTablet && /Mobi|Android|iPhone|iPod/i.test(ua);
+  const os = /Android/i.test(ua) ? 'Android'
+    : /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? 'iOS'
+    : /Windows/i.test(ua) ? 'Windows'
+    : /Mac OS/i.test(ua) ? 'macOS'
+    : /Linux/i.test(ua) ? 'Linux' : 'Other';
+  const browser = /Edg\//.test(ua) ? 'Edge'
+    : /OPR\//.test(ua) ? 'Opera'
+    : /SamsungBrowser/.test(ua) ? 'Samsung'
+    : /Chrome\//.test(ua) ? 'Chrome'
+    : /Firefox\//.test(ua) ? 'Firefox'
+    : /Safari\//.test(ua) ? 'Safari' : 'Other';
+  return { type: isTablet ? 'tablet' : (isMobile ? 'mobile' : 'desktop'), os, browser };
+}
+
+/**
+ * Public IP of the current network and whether it is the office network.
+ * Office IPs are set by the admin in Firestore: admin/config.officeIPs (array of strings).
+ * Returns { ip, network: 'office'|'outside'|'unknown' } — never throws.
+ */
+let _emsNetworkCache = null;
+async function emsNetwork() {
+  if (_emsNetworkCache) return _emsNetworkCache;
+  let ip = null;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 4000);
+    const res = await fetch('https://api.ipify.org?format=json', { signal: ctrl.signal });
+    clearTimeout(t);
+    ip = (await res.json()).ip || null;
+  } catch (_) {}
+  let network = 'unknown';
+  try {
+    const cfg = await EMS_DB.getAdmin();
+    const officeIPs = Array.isArray(cfg.officeIPs) ? cfg.officeIPs : [];
+    if (ip && officeIPs.length) network = officeIPs.includes(ip) ? 'office' : 'outside';
+  } catch (_) {}
+  _emsNetworkCache = { ip, network };
+  return _emsNetworkCache;
+}
+
 const EMS_DB = {
 
   // ── Collection helpers ────────────────────────────────────
   _col(name) { return db.collection(name); },
+
+  // Login lookups used by firestore.rules: staffEmails/{email} marks registered staff,
+  // empLogin/{EMPID} lets the login page turn an Employee ID into an email.
+  async _setLoginLookup(empId, email) {
+    email = (email || '').trim().toLowerCase();
+    if (!empId || !email) return;
+    await this._col('staffEmails').doc(email).set({ empId, role: 'employee' });
+    await this._col('empLogin').doc(empId).set({ email });
+  },
+
+  async _removeLoginLookup(empId, email) {
+    email = (email || '').trim().toLowerCase();
+    if (email) await this._col('staffEmails').doc(email).delete().catch(() => {});
+    if (empId) await this._col('empLogin').doc(empId).delete().catch(() => {});
+  },
 
   // ── Employees ─────────────────────────────────────────────
 
@@ -46,10 +114,14 @@ const EMS_DB = {
     const email   = data.email.trim().toLowerCase();
     const password = data.password;
 
-    // Create Firebase Auth account for this employee
+    // Create Firebase Auth account on a secondary app, so the admin stays signed in
+    // (createUserWithEmailAndPassword on the main app would switch the session to the new employee)
     try {
-      const cred = await auth.createUserWithEmailAndPassword(email, password);
+      const secondary = firebase.apps.find(a => a.name === 'ems-create-user')
+        || firebase.initializeApp(firebase.app().options, 'ems-create-user');
+      const cred = await secondary.auth().createUserWithEmailAndPassword(email, password);
       await cred.user.updateProfile({ displayName: data.name });
+      await secondary.auth().signOut();
     } catch (e) {
       // Auth account may already exist — log and continue
       console.warn('Auth createUser warning:', e.message);
@@ -63,19 +135,27 @@ const EMS_DB = {
       department:  restData.department || 'General',
       designation: restData.designation || '',
       salary:      Number(restData.salary) || 0,
-      joinDate:    restData.joinDate || new Date().toISOString().split('T')[0],
+      joinDate:    restData.joinDate || emsToday(),
       status:      restData.status || 'active',
       createdAt:   new Date().toISOString(),
     };
 
     await this._col('employees').doc(empId).set(emp);
+    await this._setLoginLookup(empId, email);
     return { id: empId, ...emp };
   },
 
   async updateEmployee(id, data) {
     // Never store password in Firestore
     const { password, ...safeData } = data;
+    const before = await this.getEmployee(id);
     await this._col('employees').doc(id).update(safeData);
+    if (safeData.email !== undefined) {
+      const oldEmail = (before?.email || '').trim().toLowerCase();
+      const newEmail = (safeData.email || '').trim().toLowerCase();
+      if (oldEmail && oldEmail !== newEmail) await this._removeLoginLookup(null, oldEmail);
+      await this._setLoginLookup(id, newEmail);
+    }
 
     // If password supplied, update Firebase Auth password
     if (password && password.length >= 6) {
@@ -89,7 +169,9 @@ const EMS_DB = {
   },
 
   async deleteEmployee(id) {
+    const emp = await this.getEmployee(id);
     await this._col('employees').doc(id).delete();
+    await this._removeLoginLookup(id, emp?.email);
     // Note: Firebase Auth account deletion requires Admin SDK; handled separately
   },
 
@@ -128,7 +210,7 @@ const EMS_DB = {
   },
 
   async getTodayAttendance(empId) {
-    const today = new Date().toISOString().split('T')[0];
+    const today = emsToday();
     const snap  = await this._col('attendance')
       .where('empId', '==', empId)
       .where('date',  '==', today)
@@ -139,7 +221,7 @@ const EMS_DB = {
   },
 
   async updateHeartbeat(empId, statusState = 'active') {
-    const today = new Date().toISOString().split('T')[0];
+    const today = emsToday();
     const snap = await this._col('attendance')
       .where('empId', '==', empId)
       .where('date',  '==', today)
@@ -150,17 +232,24 @@ const EMS_DB = {
       const data = doc.data();
       // Only heartbeat if employee is checked in and not checked out
       if (data.checkIn && (!data.checkOut || data.checkOut === '—')) {
-        await doc.ref.update({
+        // Count real active time: seconds since the previous heartbeat (capped, so a sleeping phone adds nothing)
+        const prev = Date.parse(data.lastHeartbeat || '');
+        const activeAdd = statusState === 'active' && !isNaN(prev)
+          ? Math.round(Math.min(60, Math.max(0, (Date.now() - prev) / 1000))) : 0;
+        const update = {
           lastHeartbeat: new Date().toISOString(),
           activityStatus: statusState,
+          lastDevice: emsDevice().type,
           pcConnected: true
-        });
+        };
+        if (activeAdd) update.activeSeconds = firebase.firestore.FieldValue.increment(activeAdd);
+        await doc.ref.update(update);
       }
     }
   },
 
   async autoCheckoutDisconnected(empId, dateStr) {
-    const today = dateStr || new Date().toISOString().split('T')[0];
+    const today = dateStr || emsToday();
     const snap = await this._col('attendance')
       .where('empId', '==', empId)
       .where('date',  '==', today)
@@ -189,23 +278,27 @@ const EMS_DB = {
   },
 
   async processAutoCheckouts() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = emsToday();
     const snap = await this._col('attendance')
       .where('date', '==', today)
       .get();
 
     const now = Date.now();
-    const TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes timeout
+    const TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes timeout (desktop)
+    // Phones pause the page when locked / app switched, so heartbeats stop without the employee leaving.
+    const MOBILE_TIMEOUT_MS = 90 * 60 * 1000;
 
     for (const doc of snap.docs) {
       const data = doc.data();
       if (data.checkIn && (!data.checkOut || data.checkOut === '—') && data.lastHeartbeat) {
         const lastHbTime = new Date(data.lastHeartbeat).getTime();
-        if (!isNaN(lastHbTime) && (now - lastHbTime > TIMEOUT_MS)) {
+        const device = data.lastDevice || data.checkInDevice?.type || 'desktop';
+        const isMobile = device === 'mobile' || device === 'tablet';
+        if (!isNaN(lastHbTime) && (now - lastHbTime > (isMobile ? MOBILE_TIMEOUT_MS : TIMEOUT_MS))) {
           let outTime = new Date(lastHbTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
           await doc.ref.update({
             checkOut: outTime,
-            checkoutReason: 'Auto-Checkout (PC Closed / Disconnected)',
+            checkoutReason: isMobile ? 'Auto-Checkout (Mobile inactive 90 min)' : 'Auto-Checkout (PC Closed / Disconnected)',
             pcConnected: false,
             activityStatus: 'disconnected'
           });

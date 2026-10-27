@@ -1194,7 +1194,7 @@ function showPage(id, el) {
 let deptChart, attChart;
 async function renderOverview() {
   const emps   = cache.employees;
-  const today  = new Date().toISOString().split('T')[0];
+  const today  = emsToday();
   const att    = cache.attendance;
   const leaves = cache.leaves;
   const tasks  = cache.tasks;
@@ -1309,7 +1309,7 @@ function openEmpModal(emp) {
   document.getElementById('f-phone').value  = emp?.phone||'';
   document.getElementById('f-desig').value  = emp?.designation||'';
   document.getElementById('f-salary').value = emp?.salary||'';
-  document.getElementById('f-join').value   = emp?.joinDate||new Date().toISOString().split('T')[0];
+  document.getElementById('f-join').value   = emp?.joinDate||emsToday();
   document.getElementById('f-pass').value   = emp?.password||'';
   document.getElementById('f-dept').value   = emp?.department||'Management';
   document.getElementById('f-status').value = emp?.status||'active';
@@ -1384,6 +1384,14 @@ async function confirmChangeEmpId() {
     if (!empDoc.exists) throw new Error('Employee not found');
     batch.set(db.collection('employees').doc(newId), empDoc.data());
     batch.delete(db.collection('employees').doc(oldId));
+
+    // 1b. Move the login lookups (Employee ID login + staff access in firestore.rules)
+    const empEmail = (empDoc.data().email || '').trim().toLowerCase();
+    if (empEmail) {
+      batch.set(db.collection('empLogin').doc(newId), { email: empEmail });
+      batch.set(db.collection('staffEmails').doc(empEmail), { empId: newId, role: 'employee' });
+    }
+    batch.delete(db.collection('empLogin').doc(oldId));
 
     // 2. Move attendance records
     const attSnap = await db.collection('attendance').where('empId', '==', oldId).get();
@@ -1467,6 +1475,27 @@ async function initAtt() {
     emps.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
   renderAdminAtt();
 }
+// Device / network / real active time recorded at check-in (shown under the pulse badge)
+function getDeviceInfoHtml(a) {
+  if (!a || !a.checkIn || a.checkIn === '—') return '';
+  const parts = [];
+  const d = a.checkInDevice;
+  const type = d?.type || a.lastDevice;
+  if (type) {
+    const icon = type === 'desktop' ? '💻' : '📱';
+    const label = type.charAt(0).toUpperCase() + type.slice(1);
+    parts.push(`${icon} ${label}${d ? ` · ${d.os} ${d.browser}` : ''}`);
+  }
+  if (a.checkInNetwork === 'office') parts.push('🏢 Office network');
+  else if (a.checkInNetwork === 'outside') parts.push(`<span style="color:#fbbf24">🌐 Outside office (${a.checkInIP})</span>`);
+  else if (a.checkInIP) parts.push(`🌐 ${a.checkInIP}`);
+  if (a.activeSeconds) {
+    const m = Math.round(a.activeSeconds / 60);
+    parts.push(`⏱ Active ${Math.floor(m / 60)}h ${m % 60}m`);
+  }
+  return parts.length ? `<div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5">${parts.join('<br>')}</div>` : '';
+}
+
 function getLivePulseBadge(a) {
   if (!a) return '<span class="badge badge-gray">Not Marked</span>';
   if (a.checkOut && a.checkOut !== '—') {
@@ -1570,7 +1599,7 @@ async function renderAdminAtt() {
         <td><div style="font-weight:600">${emp.name||a.empId}</div><div style="font-size:11px;color:var(--muted)">${a.empId}</div></td>
         <td>${fmt(a.date)}</td>
         <td>${sBadge(a.status)}</td>
-        <td>${getLivePulseBadge(a)}</td>
+        <td>${getLivePulseBadge(a)}${getDeviceInfoHtml(a)}</td>
         <td>${a.checkIn||'—'}</td>
         <td>${a.checkOut||'—'}</td>
         <td>${calcHours(a.date, a.checkIn, a.checkOut)}</td>
@@ -1595,7 +1624,7 @@ async function editAtt(empId, date) {
 async function openMarkAttModal() {
   const emps = cache.employees;
   document.getElementById('att-emp-select').innerHTML = emps.map(e=>`<option value="${e.id}">${e.name} (${e.id})</option>`).join('');
-  document.getElementById('att-date-inp').value   = new Date().toISOString().split('T')[0];
+  document.getElementById('att-date-inp').value   = emsToday();
   document.getElementById('att-status-inp').value = 'present';
   document.getElementById('att-checkin').value    = '';
   document.getElementById('att-checkout').value   = '';
@@ -1629,7 +1658,7 @@ async function autoMarkAbsent() {
 
   if (!activeEmps.length) { toast('No active employees found', 'error'); return; }
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = emsToday();
 
   // Build set of existing attendance records for this month
   const existingAtt = (cache.attendance || []).filter(a => a.date && a.date.startsWith(monthVal));
@@ -1719,7 +1748,7 @@ async function renderAdminTasks() {
     container.innerHTML = sorted.map(t => {
       const emp     = empMap[t.empId] || {};
       const isDone  = t.status === 'done';
-      const overdue = !isDone && t.deadline && t.deadline < new Date().toISOString().split('T')[0];
+      const overdue = !isDone && t.deadline && t.deadline < emsToday();
       const isSelf  = t.createdBy === 'employee';
       const pctCls  = isDone ? 'badge-green' : overdue ? 'badge-red' : 'badge-amber';
 
@@ -2703,7 +2732,7 @@ function initLetterPadPage() {
 
   const dateInp = document.getElementById('lp-issue-date');
   if (dateInp && !dateInp.value) {
-    dateInp.value = new Date().toISOString().split('T')[0];
+    dateInp.value = emsToday();
   }
 
   const emps = cache.employees || [];
@@ -2723,7 +2752,7 @@ function onLpEmpChange() {
   const empId = document.getElementById('lp-emp-select')?.value;
   const emp = (cache.employees || []).find(e => e.id === empId);
 
-  const issueDateStr = document.getElementById('lp-issue-date')?.value || new Date().toISOString().split('T')[0];
+  const issueDateStr = document.getElementById('lp-issue-date')?.value || emsToday();
 
   if (emp) {
     if (document.getElementById('lp-name')) document.getElementById('lp-name').value = emp.name || '';
@@ -2750,7 +2779,7 @@ function onLpDocTypeChange() {
   const designation = document.getElementById('lp-designation')?.value || 'Executive';
   const department = document.getElementById('lp-department')?.value || 'Operations';
   const joinDate = document.getElementById('lp-join-date')?.value || '2025-01-01';
-  const issueDate = document.getElementById('lp-issue-date')?.value || new Date().toISOString().split('T')[0];
+  const issueDate = document.getElementById('lp-issue-date')?.value || emsToday();
 
   const subjectInp = document.getElementById('lp-subject');
   const bodyInp = document.getElementById('lp-body-text');
@@ -2799,7 +2828,7 @@ function renderLetterPad() {
   const department = (document.getElementById('lp-department')?.value || 'Operations').trim();
   const refNo = (document.getElementById('lp-ref-no')?.value || 'GA/DOC/2026/001').trim();
   const joinDateStr = document.getElementById('lp-join-date')?.value || '2025-01-01';
-  const issueDateStr = document.getElementById('lp-issue-date')?.value || new Date().toISOString().split('T')[0];
+  const issueDateStr = document.getElementById('lp-issue-date')?.value || emsToday();
   const salary = Number(document.getElementById('lp-salary')?.value || 50000);
   const subject = (document.getElementById('lp-subject')?.value || 'Official Document').trim();
   const priority = document.getElementById('lp-memo-priority')?.value || 'INFO';
@@ -3411,7 +3440,7 @@ function initReportsPage() {
 // ── KPI chips ──────────────────────────────────────────────────
 function refreshRptKPIs() {
   const emps = cache.employees || [];
-  const today = new Date().toISOString().split('T')[0];
+  const today = emsToday();
   const att   = cache.attendance || [];
   const active = emps.filter(e => e.status === 'active');
   const presentToday = att.filter(a => a.date === today && a.status === 'present').map(a => a.empId);
@@ -3439,7 +3468,7 @@ async function generateReportText(type) {
   const att     = cache.attendance || [];
   const tasks   = cache.tasks || [];
   const leaves  = cache.leaves || [];
-  const today   = new Date().toISOString().split('T')[0];
+  const today   = emsToday();
   const active  = emps.filter(e => e.status === 'active');
 
   const getDateStr = (offsetDays) => {
@@ -4256,7 +4285,7 @@ function renderAnalyticsPage() {
   const logs = cache.worklogs || [];
 
   const activeEmps = emps.filter(e => e.status === 'active');
-  const today = new Date().toISOString().split('T')[0];
+  const today = emsToday();
 
   let totalProdScore = 0;
   const empScores = activeEmps.map(e => {

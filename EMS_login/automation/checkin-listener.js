@@ -1,6 +1,7 @@
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const { initializeFirebase } = require('./report-generator');
 const { deliver, flush } = require('./outbox');
+const { sendReminders } = require('./reminders');
 
 // Keep the 24/7 listener alive through network drops / unexpected errors
 process.on('unhandledRejection', (err) => console.error('⚠️ Unhandled rejection:', err && err.message ? err.message : err));
@@ -34,6 +35,33 @@ const timeStr = process.env.DAILY_REPORT_TIME || '19:00';
 const [targetHourStr, targetMinStr] = timeStr.split(':');
 const targetHour = parseInt(targetHourStr, 10) || 19;
 const targetMin = parseInt(targetMinStr, 10) || 0;
+
+// Personal reminder times (HH:MM, IST)
+function parseHHMM(str, fallback) {
+  const [h, m] = String(str || fallback).split(':').map(n => parseInt(n, 10));
+  return { h: isNaN(h) ? 0 : h, m: isNaN(m) ? 0 : m };
+}
+const remindIn = parseHHMM(process.env.REMIND_CHECKIN_TIME, '10:15');
+const remindOut = parseHHMM(process.env.REMIND_CHECKOUT_TIME, '22:00');
+const remindersDone = { checkin: '', checkout: '' };
+
+function isPast(now, t) {
+  return now.getHours() > t.h || (now.getHours() === t.h && now.getMinutes() >= t.m);
+}
+
+// "📱 *Device:* Mobile · Android Chrome"
+function deviceLine(device) {
+  if (!device || !device.type) return '';
+  const icon = device.type === 'desktop' ? '💻' : '📱';
+  const label = device.type.charAt(0).toUpperCase() + device.type.slice(1);
+  return `${icon} *Device:* ${label}${device.os ? ` · ${device.os} ${device.browser || ''}` : ''}\n`;
+}
+
+function networkLine(att) {
+  if (att.checkInNetwork === 'office') return `🏢 *Network:* Office\n`;
+  if (att.checkInNetwork === 'outside') return `🌐 *Network:* Outside office (${att.checkInIP})\n`;
+  return '';
+}
 
 let employeeMap = {};
 
@@ -95,6 +123,7 @@ function setupListenersForDate(targetDateStr) {
                           `👤 *User:* ${data.name}\n` +
                           `🆔 *ID / Role:* ${data.empId} (${(data.role || 'user').toUpperCase()})\n` +
                           `⏰ *Login Time:* ${data.loginTime}\n` +
+                          deviceLine(data.device) +
                           `📅 *Date:* ${data.date}\n` +
                           `━━━━━━━━━━━━━━━━━━━━━━━━━━`;
 
@@ -159,6 +188,8 @@ function setupListenersForDate(targetDateStr) {
                           `⏰ *Check-In Time:* ${checkIn}\n` +
                           `📅 *Date:* ${data.date}\n` +
                           `🚦 *Status:* ${statusText}\n` +
+                          deviceLine(data.checkInDevice) +
+                          networkLine(data) +
                           `━━━━━━━━━━━━━━━━━━━━━━━━━━`;
 
           console.log(`\n📲 New Check-in Detected! Sending WhatsApp Alert for ${empName} (${checkIn})...`);
@@ -205,6 +236,17 @@ async function startListener() {
       // If the PC was off/offline at that time it catches up later; the shared "sent" marker
       // stops duplicates with GitHub Actions and the Windows task.
       const pastTarget = now.getHours() > targetHour || (now.getHours() === targetHour && now.getMinutes() >= targetMin);
+      // Personal check-in / check-out reminders (once a day each; dedupe ids stop repeats after a restart)
+      for (const [kind, t] of [['checkin', remindIn], ['checkout', remindOut]]) {
+        if (isPast(now, t) && remindersDone[kind] !== currentTodayStr) {
+          remindersDone[kind] = currentTodayStr;
+          // Don't send a stale morning check-in reminder if the listener only starts late at night
+          if (kind === 'checkin' && isPast(now, remindOut)) continue;
+          console.log(`\n⏰ [Reminders] Sending ${kind} reminders for ${currentTodayStr}...`);
+          await sendReminders(db, kind, currentTodayStr);
+        }
+      }
+
       if (pastTarget && now.getDay() !== 0 && lastDailyReportDate !== currentTodayStr) {
         lastDailyReportDate = currentTodayStr;
         console.log(`\n⏰ [Auto Scheduler] Daily Report for ${currentTodayStr}...`);

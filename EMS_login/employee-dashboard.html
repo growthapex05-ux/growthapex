@@ -750,6 +750,32 @@
   if (!sess || sess.role !== 'employee') window.location.href = '/EMS_login/';
 
   const empId = sess ? sess.id : null;
+
+  // Sessions are remembered, so most days nobody types a password and no login was recorded.
+  // Record one "dashboard opened" entry per employee, per device, per day instead.
+  if (empId) {
+    const unsubVisit = firebase.auth().onAuthStateChanged(async (user) => {
+      unsubVisit();
+      if (!user) return;
+      const visitKey = `ems_visit_${empId}_${emsToday()}`;
+      try { if (localStorage.getItem(visitKey)) return; } catch (_) {}
+      try {
+        await db.collection('logins').add({
+          empId,
+          name: (sess && sess.name) || empId,
+          role: 'employee',
+          email: user.email,
+          loginTime: new Date().toLocaleTimeString('en-IN', { hour12: true }),
+          date: emsToday(),
+          timestamp: new Date().toISOString(),
+          device: emsDevice(),
+          source: 'dashboard-open'
+        });
+        try { localStorage.setItem(visitKey, '1'); } catch (_) {}
+      } catch (e) { console.error('Could not save visit record:', e.message); }
+    });
+  }
+
   let emp = {
     id: (sess && sess.id) || '',
     name: (sess && sess.name) || 'Employee',
@@ -1054,7 +1080,7 @@
     if (timerPopoutWindow && !timerPopoutWindow.closed) return;
 
     try {
-      const today = dateStr || new Date().toISOString().split('T')[0];
+      const today = dateStr || emsToday();
       const url = `/EMS_login/timer.html?empId=${encodeURIComponent(empId)}&checkIn=${encodeURIComponent(checkInStr || '')}&date=${encodeURIComponent(today)}`;
       const left = window.screen.width - 360;
       const top = window.screen.height - 280;
@@ -1189,12 +1215,26 @@
     }
   }
 
-  // Window disconnect hooks
-  window.addEventListener('beforeunload', () => {
-    if (empId) EMS_DB.autoCheckoutDisconnected(empId).catch(() => {});
-  });
-  window.addEventListener('pagehide', () => {
-    if (empId) EMS_DB.autoCheckoutDisconnected(empId).catch(() => {});
+  // Window disconnect hooks.
+  // On phones, pagehide fires on every screen lock / app switch — that was silently checking
+  // employees out. There we only mark them "idle"; the admin's 90-min mobile timeout handles real exits.
+  const IS_MOBILE_DEVICE = emsDevice().type !== 'desktop';
+  function onPageLeave() {
+    if (!empId) return;
+    if (IS_MOBILE_DEVICE) EMS_DB.updateHeartbeat(empId, 'idle').catch(() => {});
+    else EMS_DB.autoCheckoutDisconnected(empId).catch(() => {});
+  }
+  window.addEventListener('beforeunload', onPageLeave);
+  window.addEventListener('pagehide', onPageLeave);
+
+  // Back on screen (phone unlocked / tab focused): report active straight away
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && empId && heartbeatInterval) {
+      lastUserActivityTime = Date.now();
+      currentActivityState = 'active';
+      updateLiveStatusBadgeUI('active');
+      EMS_DB.updateHeartbeat(empId, 'active').catch(() => {});
+    }
   });
 
   // ── Attendance ─────────────────────────────────────────────
@@ -1304,7 +1344,7 @@
   }
 
   async function markAtt(type) {
-    const today = new Date().toISOString().split('T')[0];
+    const today = emsToday();
     const time  = new Date().toLocaleTimeString('en-IN', { hour12: false });
     const rec   = await EMS_DB.getTodayAttendance(empId);
     
@@ -1318,15 +1358,22 @@
         const isReCheckIn = (rec && rec.checkIn && rec.checkOut && rec.checkOut !== '—');
         const checkInTime = isReCheckIn ? rec.checkIn : time;
 
-        const updatedRec = { 
-          empId, 
-          date: today, 
-          status: 'present', 
-          checkIn: checkInTime, 
+        const device = emsDevice();
+        const net = await emsNetwork();
+        const updatedRec = {
+          empId,
+          date: today,
+          status: 'present',
+          checkIn: checkInTime,
           checkOut: '—',
           checkoutReason: '',
-          lastHeartbeat: new Date().toISOString() 
+          lastHeartbeat: new Date().toISOString(),
+          lastDevice: device.type,
+          checkInIP: net.ip,
+          checkInNetwork: net.network
         };
+        // Keep the device of the first check-in of the day; a re-check-in only updates lastDevice
+        if (!isReCheckIn) updatedRec.checkInDevice = device;
 
         await EMS_DB.markAttendance(updatedRec);
 
@@ -1387,7 +1434,7 @@
 
     // Sort: undone first, then done
     const sorted = [...tasks].sort((a, b) => (a.status === 'done' ? 1 : 0) - (b.status === 'done' ? 1 : 0));
-    const today  = new Date().toISOString().split('T')[0];
+    const today  = emsToday();
 
     container.innerHTML = sorted.map(t => {
       const isDone   = t.status === 'done';
@@ -1455,7 +1502,7 @@
     document.getElementById('task-modal-title').textContent = task ? 'Edit Daily Task' : 'Submit Daily Task';
     document.getElementById('task-title').value = task ? task.title : '';
     document.getElementById('task-desc').value = task ? (task.description || '') : '';
-    document.getElementById('task-deadline').value = task ? task.deadline : new Date().toISOString().split('T')[0];
+    document.getElementById('task-deadline').value = task ? task.deadline : emsToday();
     document.getElementById('task-status').value = task ? task.status : 'todo';
     document.getElementById('task-edit-id').value = task ? task.id : '';
     document.getElementById('task-modal').classList.add('open');
@@ -2189,7 +2236,7 @@ function updateTaskProgressUI() {
 function sendReportToWhatsAppGroup() {
   const targetId = empId || (emp && emp.id) || '';
   const empNameStr = (emp && emp.name) || 'Employee';
-  const dateVal = document.getElementById('wl-date')?.value || new Date().toISOString().split('T')[0];
+  const dateVal = document.getElementById('wl-date')?.value || emsToday();
   const hoursVal = document.getElementById('wl-hours')?.value || '8';
   const driveLinkVal = (document.getElementById('wl-drive-link')?.value || '').trim();
   const instaLinkVal = (document.getElementById('wl-insta-link')?.value || '').trim();
@@ -2281,7 +2328,7 @@ async function renderEmpWorkLogs() {
   const container = document.getElementById('emp-worklogs-history');
   if (!container) return;
   const targetId = empId || (emp && emp.id) || '';
-  if (document.getElementById('wl-date')) document.getElementById('wl-date').value = new Date().toISOString().split('T')[0];
+  if (document.getElementById('wl-date')) document.getElementById('wl-date').value = emsToday();
 
   initTasksChecklistUI();
 
@@ -2356,7 +2403,7 @@ async function renderEmpWorkLogs() {
 
 async function submitEmpWorkLog() {
   const targetId = empId || (emp && emp.id) || '';
-  const date = document.getElementById('wl-date')?.value || new Date().toISOString().split('T')[0];
+  const date = document.getElementById('wl-date')?.value || emsToday();
   const hours = Number(document.getElementById('wl-hours')?.value || 8);
   const driveLink = (document.getElementById('wl-drive-link')?.value || '').trim();
   const instaLink = (document.getElementById('wl-insta-link')?.value || '').trim();
@@ -2408,7 +2455,7 @@ async function renderEmpExpenses() {
   const container = document.getElementById('emp-expenses-history');
   if (!container) return;
   const targetId = empId || (emp && emp.id) || '';
-  if (document.getElementById('exp-date')) document.getElementById('exp-date').value = new Date().toISOString().split('T')[0];
+  if (document.getElementById('exp-date')) document.getElementById('exp-date').value = emsToday();
 
   try {
     let claims = [];

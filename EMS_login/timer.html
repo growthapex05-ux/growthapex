@@ -236,7 +236,7 @@
       btn.disabled = true;
       btn.textContent = '⌛ Checking out...';
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = emsToday();
       const time  = new Date().toLocaleTimeString('en-IN', { hour12: false });
       const rec   = await EMS_DB.getTodayAttendance(empId);
       
