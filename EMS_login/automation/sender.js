@@ -155,19 +155,63 @@ async function sendViaGreenApi(message, groupJid) {
     );
   }
 
+  await assertGreenApiAuthorized(instanceId, apiToken);
+
   console.log(`Sending message to group ${groupJid} via Green-API...`);
-  const url = `https://api.green-api.com/waInstance${instanceId}/sendMessage/${apiToken}`;
-  
+  const url = `${greenApiBase()}/waInstance${instanceId}/sendMessage/${apiToken}`;
+
   const response = await axios.post(url, {
     chatId: groupJid,
     message: message
-  });
+  }, { timeout: 30000 });
 
   if (response.data && response.data.idMessage) {
     console.log("🎉 Report sent successfully via Green-API! Message ID:", response.data.idMessage);
     return true;
   } else {
     throw new Error(`Green-API response error: ${JSON.stringify(response.data)}`);
+  }
+}
+
+// Each instance has its own host (apiUrl in the Green-API console)
+function greenApiBase() {
+  return (process.env.GREEN_API_URL || 'https://api.green-api.com').replace(/\/+$/, '');
+}
+
+// Green-API silently stops delivering when the phone is unlinked, so check the instance first.
+// Result is cached for 5 minutes to avoid an extra call per alert.
+let greenApiStateCache = { state: null, at: 0 };
+
+async function getGreenApiState(instanceId, apiToken) {
+  if (greenApiStateCache.state && Date.now() - greenApiStateCache.at < 5 * 60 * 1000) {
+    return greenApiStateCache.state;
+  }
+  const url = `${greenApiBase()}/waInstance${instanceId}/getStateInstance/${apiToken}`;
+  const { data } = await axios.get(url, { timeout: 15000 });
+  greenApiStateCache = { state: data.stateInstance, at: Date.now() };
+  return data.stateInstance;
+}
+
+async function assertGreenApiAuthorized(instanceId, apiToken) {
+  let state;
+  try {
+    state = await getGreenApiState(instanceId, apiToken);
+  } catch (err) {
+    if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+      const e = new Error('Green-API rejected the instance id / token. Check GREEN_API_INSTANCE_ID and GREEN_API_TOKEN.');
+      e.permanent = true;
+      throw e;
+    }
+    throw err; // network issue — caller will retry / queue
+  }
+  if (state !== 'authorized') {
+    greenApiStateCache = { state: null, at: 0 };
+    const e = new Error(
+      `Green-API instance is "${state}". WhatsApp is not linked — open console.green-api.com and scan the QR code ` +
+      `(WhatsApp -> Linked Devices -> Link a Device). Messages are kept in the queue until then.`
+    );
+    e.permanent = true;
+    throw e;
   }
 }
 
@@ -209,5 +253,6 @@ async function sendReport(message) {
 }
 
 module.exports = {
-  sendReport
+  sendReport,
+  getGreenApiState
 };

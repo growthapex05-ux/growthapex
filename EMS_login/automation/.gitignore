@@ -3,3 +3,5 @@ node_modules/
 serviceAccountKey.json
 .wwebjs_auth/
 .wwebjs_cache/
+outbox/
+listener_log.txt

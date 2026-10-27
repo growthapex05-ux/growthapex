@@ -4,45 +4,103 @@
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 
 const parseArgs = require('minimist');
-const { 
-  initializeFirebase, 
-  generateDailyReport, 
-  generateWeeklyReport, 
+const {
+  initializeFirebase,
+  generateDailyReport,
+  generateWeeklyReport,
   generateMonthlyReport,
   generateLoginReport
 } = require('./report-generator');
-const { sendReport } = require('./sender');
+const { getGreenApiState } = require('./sender');
+const { deliver, flush, enqueue, listQueued, isOnline, waitForNetwork, todayIST } = require('./outbox');
 
 // Parse CLI arguments
-// Example: node run.js --type=daily [--date=2026-08-26] [--dry-run]
+// Example: node run.js --type=daily [--date=2026-08-26] [--dry-run] [--force]
+//          node run.js --flush     (send everything waiting in the offline queue)
+//          node run.js --status    (check internet, WhatsApp link and queue)
 const argv = parseArgs(process.argv.slice(2), {
   string: ['type', 'date'],
-  boolean: ['dry-run'],
-  alias: { t: 'type', d: 'dry-run' }
+  boolean: ['dry-run', 'flush', 'status', 'force'],
+  alias: { t: 'type', d: 'dry-run', f: 'force' }
 });
+
+// Stable id per report so it is sent exactly once (shared by PC, listener and GitHub Actions)
+function reportId(type, date) {
+  const today = date || todayIST();
+  if (type === 'daily') return `daily_${today}`;
+  if (type === 'login') return `morning_${today}`;
+  const d = new Date(`${today}T12:00:00`);
+  if (type === 'weekly') {
+    const monday = new Date(d);
+    monday.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    return `weekly_${monday.toLocaleDateString('en-CA')}`;
+  }
+  // monthly: first 5 days of a month report on the previous month (same rule as generateMonthlyReport)
+  const m = new Date(d.getFullYear(), d.getMonth() - (d.getDate() <= 5 ? 1 : 0), 1);
+  return `monthly_${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}`;
+}
+
+async function showStatus() {
+  const online = await isOnline();
+  console.log(`🌐 Internet:      ${online ? '✅ online' : '❌ offline'}`);
+  if (online && (process.env.PROVIDER || '').toLowerCase() === 'green-api') {
+    try {
+      const state = await getGreenApiState(process.env.GREEN_API_INSTANCE_ID, process.env.GREEN_API_TOKEN);
+      console.log(`📱 Green-API:     ${state === 'authorized' ? '✅' : '❌'} ${state}`);
+    } catch (err) {
+      console.log(`📱 Green-API:     ❌ ${err.message}`);
+    }
+  }
+  const queued = listQueued();
+  console.log(`📥 Offline queue: ${queued.length} message(s)`);
+  queued.forEach(q => console.log(`   • ${q.id} (attempts: ${q.attempts}, last error: ${q.lastError || '-'})`));
+}
 
 async function main() {
   const reportType = (argv.type || '').toLowerCase();
   const targetDate = argv.date || null;
   const isDryRun = !!argv['dry-run'];
 
-  if (!['daily', 'weekly', 'monthly', 'login'].includes(reportType)) {
+  if (argv.status) {
+    await showStatus();
+    process.exit(0);
+  }
+
+  if (!argv.flush && !['daily', 'weekly', 'monthly', 'login'].includes(reportType)) {
     console.error("❌ Error: Invalid or missing report type.");
-    console.error("👉 Usage: node run.js --type=[daily|weekly|monthly|login] [--date=YYYY-MM-DD] [--dry-run]");
+    console.error("👉 Usage: node run.js --type=[daily|weekly|monthly|login] [--date=YYYY-MM-DD] [--dry-run] [--force]");
+    console.error("         node run.js --flush | --status");
     console.error("   Short aliases: node run.js -t daily -d");
     process.exit(1);
   }
 
-  // Skip running the daily report on Sundays (unless explicit date specified)
-  if (reportType === 'daily' && !targetDate && new Date().getDay() === 0) {
-    console.log(`📅 Today is Sunday. Exclude Sunday from working days. Skipping daily report.`);
+  // Skip running the daily/morning report on Sundays (unless explicit date specified)
+  if (['daily', 'login'].includes(reportType) && !targetDate && new Date().getDay() === 0) {
+    console.log(`📅 Today is Sunday. Exclude Sunday from working days. Skipping ${reportType} report.`);
     process.exit(0);
   }
 
-  console.log(`🤖 Starting EMS Report Automation`);
-  console.log(`📊 Report Type: ${reportType.toUpperCase()}${targetDate ? ` (Date: ${targetDate})` : ''}`);
-  console.log(`⚙️  Dry Run: ${isDryRun ? 'ENABLED (Will only print to console)' : 'DISABLED (Will send to WhatsApp)'}`);
+  console.log(`\n🤖 Starting EMS Report Automation — ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
+  if (argv.flush) {
+    console.log(`📤 Mode: FLUSH offline queue`);
+  } else {
+    console.log(`📊 Report Type: ${reportType.toUpperCase()}${targetDate ? ` (Date: ${targetDate})` : ''}`);
+    console.log(`⚙️  Dry Run: ${isDryRun ? 'ENABLED (Will only print to console)' : 'DISABLED (Will send to WhatsApp)'}`);
+  }
   console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+
+  const item = argv.flush ? null : {
+    id: reportId(reportType, targetDate),
+    type: reportType,
+    date: targetDate || (['daily', 'login'].includes(reportType) ? todayIST() : null)
+  };
+
+  // Wait a while for the connection; if it never comes, park the job in the offline queue
+  if (!isDryRun && !(await waitForNetwork())) {
+    if (item) enqueue(item, new Error('offline'));
+    else console.log('🌐 Still offline. Queue will be flushed on the next run.');
+    process.exit(0);
+  }
 
   let db;
   try {
@@ -54,42 +112,44 @@ async function main() {
     process.exit(1);
   }
 
-  let reportText = "";
-  try {
-    console.log(`Generating ${reportType} report data...`);
-    if (reportType === 'daily') {
-      reportText = await generateDailyReport(db, targetDate);
-    } else if (reportType === 'login') {
-      reportText = await generateLoginReport(db, targetDate);
-    } else if (reportType === 'weekly') {
-      reportText = await generateWeeklyReport(db);
-    } else if (reportType === 'monthly') {
-      reportText = await generateMonthlyReport(db);
-    }
-    console.log("✅ Report generated successfully!");
-  } catch (err) {
-    console.error("❌ Error generating report content:", err);
-    process.exit(1);
-  }
-
-  console.log(`\n📄 Generated Message content:\n`);
-  console.log(reportText);
-  console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-
   if (isDryRun) {
+    let reportText;
+    try {
+      console.log(`Generating ${reportType} report data...`);
+      if (reportType === 'daily') reportText = await generateDailyReport(db, targetDate);
+      else if (reportType === 'login') reportText = await generateLoginReport(db, targetDate);
+      else if (reportType === 'weekly') reportText = await generateWeeklyReport(db);
+      else reportText = await generateMonthlyReport(db);
+    } catch (err) {
+      console.error("❌ Error generating report content:", err);
+      process.exit(1);
+    }
+    console.log(`\n📄 Generated Message content:\n`);
+    console.log(reportText);
+    console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
     console.log("✨ Dry run completed. Message was NOT sent to WhatsApp.");
     process.exit(0);
   }
 
-  try {
-    console.log("Sending report to WhatsApp...");
-    await sendReport(reportText);
-    console.log("🚀 Report automation run completed successfully!");
+  // Send anything left over from earlier offline periods first
+  const backlog = await flush(db);
+  if (backlog.sent) console.log(`📤 Sent ${backlog.sent} queued message(s) from earlier.`);
+
+  if (argv.flush) {
+    console.log(`🚀 Flush finished. ${backlog.pending} message(s) still waiting.`);
     process.exit(0);
-  } catch (err) {
-    console.error("❌ Failed to send report to WhatsApp:", err.message);
-    process.exit(1);
   }
+
+  const result = await deliver(db, item, { force: !!argv.force });
+  if (result === 'queued') {
+    console.log("⏳ Report could not be sent now — it is queued and will go out automatically.");
+  } else {
+    console.log("🚀 Report automation run completed successfully!");
+  }
+  process.exit(0);
 }
 
-main();
+main().catch(err => {
+  console.error("❌ Unexpected error:", err);
+  process.exit(1);
+});

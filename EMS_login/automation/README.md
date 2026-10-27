@@ -89,6 +89,26 @@ Whenever any employee clicks **"Mark Check-In"** on their dashboard, an instant 
 
 ---
 
+## 📴 Offline Handling & Duplicate Protection
+
+- If there is no internet, a run waits up to `NETWORK_WAIT_MINUTES`, then saves the report to `outbox/`.
+- If WhatsApp sending fails (network error, Green-API logged out), the message is also saved to `outbox/`.
+- Queued messages are re-sent automatically by the listener (every 5 min) and by the `GrowthApex_EMS_Flush` task.
+- Each report is recorded in Firestore (`automation_sent`) when sent, so GitHub Actions, the Windows task and the listener never send the same report twice.
+
+```bash
+node run.js --status          # internet, Green-API login state, queued messages
+node run.js --flush           # send queued messages now
+node run.js --type=daily -f   # force re-send today's daily report
+```
+
+### 🪟 Windows tasks (recommended)
+Set the times in `.env` (`DAILY_REPORT_TIME`, `MORNING_REPORT_TIME`, `WEEKLY_REPORT_TIME`, `MONTHLY_REPORT_TIME`) and run:
+```powershell
+powershell -ExecutionPolicy Bypass -File setup-tasks.ps1
+```
+This replaces all old GrowthApex tasks. Tasks catch up after the PC was off/asleep.
+
 ## ⏰ Scheduling Automation (Cron Jobs)
 
 To make these reports run fully automatically, you can schedule them:

@@ -1,34 +1,66 @@
 name: Scheduled EMS Daily WhatsApp Report
 
+# Cloud backup for when the office PC is off or offline.
+# Each report is recorded in Firestore (automation_sent) when sent, so whichever runs first
+# (this workflow, the Windows task or the listener) sends it and the others skip it.
+#
+# Required repository secrets (Settings -> Secrets and variables -> Actions):
+#   GREEN_API_INSTANCE_ID, GREEN_API_TOKEN, WA_GROUP_JID, FIREBASE_SERVICE_ACCOUNT (full JSON key)
+
 on:
   schedule:
-    # Runs Mon-Sat at 13:30 UTC (7:00 PM IST / 19:00 IST)
+    # Mon-Sat 13:30 UTC (7:00 PM IST)
     - cron: '30 13 * * 1-6'
+    # Mon-Sat 15:30 UTC (9:00 PM IST) - retry in case the first run failed
+    - cron: '30 15 * * 1-6'
   workflow_dispatch:
+    inputs:
+      type:
+        description: 'Report type'
+        default: 'daily'
+        type: choice
+        options: [daily, login, weekly, monthly]
 
 jobs:
   send-report:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Install dependencies
         run: |
           cd EMS_login/automation
           npm ci
 
-      - name: Send Daily Report
+      - name: Write Firebase service account
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error::Secret FIREBASE_SERVICE_ACCOUNT is not set"; exit 1
+          fi
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > EMS_login/automation/serviceAccountKey.json
+
+      - name: Send Report
         env:
           PROVIDER: green-api
-          GREEN_API_INSTANCE_ID: 710722717591
-          GREEN_API_TOKEN: 585dd13708e94c6f8f424252765f46f924dde228378049fe8b
-          WA_GROUP_JID: 120363412057920447@g.us
+          GREEN_API_INSTANCE_ID: ${{ secrets.GREEN_API_INSTANCE_ID }}
+          GREEN_API_TOKEN: ${{ secrets.GREEN_API_TOKEN }}
+          GREEN_API_URL: https://7107.api.greenapi.com
+          WA_GROUP_JID: ${{ secrets.WA_GROUP_JID }}
+          FIREBASE_SERVICE_ACCOUNT_PATH: serviceAccountKey.json
+          NETWORK_WAIT_MINUTES: '2'
         run: |
           cd EMS_login/automation
-          node run.js --type=daily
+          node run.js --type=${{ github.event.inputs.type || 'daily' }}
+          node run.js --status
+          # In the cloud there is no "later" - fail the job if the report is still unsent
+          if ls outbox/*.json >/dev/null 2>&1; then
+            echo "::error::Report could not be sent (see log above)"; exit 1
+          fi

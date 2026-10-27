@@ -1,6 +1,10 @@
-const { initializeFirebase, generateDailyReport } = require('./report-generator');
-const { sendReport } = require('./sender');
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+const { initializeFirebase } = require('./report-generator');
+const { deliver, flush } = require('./outbox');
+
+// Keep the 24/7 listener alive through network drops / unexpected errors
+process.on('unhandledRejection', (err) => console.error('⚠️ Unhandled rejection:', err && err.message ? err.message : err));
+process.on('uncaughtException', (err) => console.error('⚠️ Uncaught exception:', err && err.message ? err.message : err));
 
 const db = initializeFirebase();
 
@@ -57,11 +61,15 @@ function setupListenersForDate(targetDateStr) {
     unsubAttendance = null;
   }
 
+  // On a new day start fresh; on a re-subscribe after an error keep what we already alerted,
+  // so check-ins that happened while disconnected are still sent.
+  if (activeDateStr !== targetDateStr) {
+    processedCheckIns.clear();
+    processedLogins.clear();
+    isInitialLoad = true;
+    isInitialLoginLoad = true;
+  }
   activeDateStr = targetDateStr;
-  processedCheckIns.clear();
-  processedLogins.clear();
-  isInitialLoad = true;
-  isInitialLoginLoad = true;
 
   console.log(`\n📅 Subscribing Real-Time Firestore Listeners for Date: ${activeDateStr} (IST)`);
 
@@ -91,12 +99,7 @@ function setupListenersForDate(targetDateStr) {
                           `━━━━━━━━━━━━━━━━━━━━━━━━━━`;
 
           console.log(`\n📲 New Login Detected! Sending WhatsApp Alert for ${data.name}...`);
-          try {
-            await sendReport(message);
-            console.log(`✅ WhatsApp Login Alert sent successfully for ${data.name}!`);
-          } catch (err) {
-            console.error(`❌ Failed to send Login Alert for ${data.name}:`, err.message);
-          }
+          await deliver(db, { id: `login_${docId}`, type: 'alert', message });
         }
       }
 
@@ -105,7 +108,8 @@ function setupListenersForDate(targetDateStr) {
         console.log(`⚡ Real-time login listener active for ${activeDateStr}.`);
       }
     }, (err) => {
-      console.error("❌ Firestore Logins Snapshot Error:", err);
+      console.error("❌ Firestore Logins Snapshot Error (will re-subscribe):", err.message);
+      unsubLogins = null;
     });
 
   // 2. Listen to target date's attendance changes in Firestore real-time
@@ -159,12 +163,7 @@ function setupListenersForDate(targetDateStr) {
 
           console.log(`\n📲 New Check-in Detected! Sending WhatsApp Alert for ${empName} (${checkIn})...`);
           
-          try {
-            await sendReport(message);
-            console.log(`✅ WhatsApp Check-in Alert sent successfully for ${empName}!`);
-          } catch (err) {
-            console.error(`❌ Failed to send Check-in Alert for ${empName}:`, err.message);
-          }
+          await deliver(db, { id: `checkin_${key}`, type: 'alert', message });
         }
       }
 
@@ -173,7 +172,8 @@ function setupListenersForDate(targetDateStr) {
         console.log(`⚡ Real-time check-in listener active for ${activeDateStr}. Waiting for new employee logins & check-ins...`);
       }
     }, (err) => {
-      console.error("❌ Firestore Attendance Snapshot Error:", err);
+      console.error("❌ Firestore Attendance Snapshot Error (will re-subscribe):", err.message);
+      unsubAttendance = null;
     });
 }
 
@@ -187,32 +187,47 @@ async function startListener() {
 
   // 3. Auto Daily Report Scheduler & Midnight Date Rollover Check
   setInterval(async () => {
-    const now = new Date();
-    const currentTodayStr = getTodayDateStr();
+    try {
+      const now = new Date();
+      const currentTodayStr = getTodayDateStr();
 
-    // Check if date rolled over to next day
-    if (currentTodayStr !== activeDateStr) {
-      console.log(`🔄 Date changed from ${activeDateStr} to ${currentTodayStr}. Refreshing real-time listeners...`);
-      await updateEmployeeMap();
-      setupListenersForDate(currentTodayStr);
-    }
-
-    const hours = now.getHours();
-    const minutes = now.getMinutes();
-
-    // Trigger daily report at exact target HH:MM (e.g. 19:00 / 7:00 PM), skip Sundays (0)
-    if (hours === targetHour && minutes === targetMin && now.getDay() !== 0 && lastDailyReportDate !== currentTodayStr) {
-      lastDailyReportDate = currentTodayStr;
-      console.log(`\n⏰ [Auto Scheduler] Triggering Scheduled Daily Report at ${timeStr} for ${currentTodayStr}...`);
-      try {
-        const report = await generateDailyReport(db);
-        await sendReport(report);
-        console.log(`✅ [Auto Scheduler] Daily Report sent successfully!`);
-      } catch (err) {
-        console.error(`❌ [Auto Scheduler] Failed to send Daily Report:`, err.message);
+      // Check if date rolled over to next day, or a listener died after a network error
+      if (currentTodayStr !== activeDateStr) {
+        console.log(`🔄 Date changed from ${activeDateStr} to ${currentTodayStr}. Refreshing real-time listeners...`);
+        await updateEmployeeMap();
+        setupListenersForDate(currentTodayStr);
+      } else if (!unsubLogins || !unsubAttendance) {
+        console.log(`🔁 Re-subscribing real-time listeners...`);
+        setupListenersForDate(currentTodayStr);
       }
+
+      // Send the daily report once it is past the target time (e.g. 19:00), skip Sundays (0).
+      // If the PC was off/offline at that time it catches up later; the shared "sent" marker
+      // stops duplicates with GitHub Actions and the Windows task.
+      const pastTarget = now.getHours() > targetHour || (now.getHours() === targetHour && now.getMinutes() >= targetMin);
+      if (pastTarget && now.getDay() !== 0 && lastDailyReportDate !== currentTodayStr) {
+        lastDailyReportDate = currentTodayStr;
+        console.log(`\n⏰ [Auto Scheduler] Daily Report for ${currentTodayStr}...`);
+        await deliver(db, { id: `daily_${currentTodayStr}`, type: 'daily', date: currentTodayStr });
+      }
+    } catch (err) {
+      console.error(`❌ [Auto Scheduler] Error:`, err.message);
     }
   }, 20000); // Check every 20 seconds
+
+  // 4. Re-send anything that was queued while offline / while WhatsApp was unlinked
+  let flushing = false;
+  setInterval(async () => {
+    if (flushing) return;
+    flushing = true;
+    try {
+      await flush(db);
+    } catch (err) {
+      console.error(`❌ [Queue] Flush error:`, err.message);
+    } finally {
+      flushing = false;
+    }
+  }, 5 * 60 * 1000);
 }
 
 startListener();
