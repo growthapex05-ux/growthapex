@@ -60,6 +60,44 @@ async function emsNetwork() {
   return _emsNetworkCache;
 }
 
+/**
+ * One-time location for check-in / check-out (asks the browser's permission; no background tracking).
+ * Returns { lat, lng, accuracy, at } or { error: 'denied'|'unavailable'|'timeout'|'unsupported' } — never throws.
+ */
+function emsLocation(timeoutMs = 12000) {
+  return new Promise(resolve => {
+    if (!navigator.geolocation) return resolve({ error: 'unsupported' });
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve({
+        lat: +pos.coords.latitude.toFixed(6),
+        lng: +pos.coords.longitude.toFixed(6),
+        accuracy: Math.round(pos.coords.accuracy),
+        at: new Date().toISOString()
+      }),
+      err => resolve({ error: err.code === 1 ? 'denied' : err.code === 3 ? 'timeout' : 'unavailable' }),
+      { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 60000 }
+    );
+  });
+}
+
+/** Straight-line distance in km between two {lat,lng} points (haversine) */
+function emsDistanceKm(a, b) {
+  if (!a || !b || a.lat == null || b.lat == null) return null;
+  const R = 6371, toRad = d => d * Math.PI / 180;
+  const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return +(2 * R * Math.asin(Math.sqrt(h))).toFixed(2);
+}
+
+/** Location + distance from the employee's saved home (employees/{id}.homeLocation, set by the admin) */
+async function emsLocationWithHome(empId) {
+  const loc = await emsLocation();
+  if (loc.error) return { location: loc, distanceFromHomeKm: null };
+  let home = null;
+  try { home = (await EMS_DB.getEmployee(empId))?.homeLocation || null; } catch (_) {}
+  return { location: loc, distanceFromHomeKm: home ? emsDistanceKm(home, loc) : null };
+}
+
 const EMS_DB = {
 
   // ── Collection helpers ────────────────────────────────────

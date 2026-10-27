@@ -401,6 +401,7 @@
         <div id="live-pulse-badge"></div>
       </div>
       <div id="today-att-info" style="font-size:13px;color:var(--muted)"></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px">📍 Attendance ke liye sirf Check-In aur Check-Out ke time aapki location li jaati hai — din bhar tracking nahi hoti.</div>
     </div>
     <div class="section-card">
       <div class="section-head"><h3>📊 Attendance History</h3>
@@ -1359,7 +1360,8 @@
         const checkInTime = isReCheckIn ? rec.checkIn : time;
 
         const device = emsDevice();
-        const net = await emsNetwork();
+        toast('📍 Location check ho rahi hai…', 'info');
+        const [net, geo] = await Promise.all([emsNetwork(), emsLocationWithHome(empId)]);
         const updatedRec = {
           empId,
           date: today,
@@ -1372,8 +1374,16 @@
           checkInIP: net.ip,
           checkInNetwork: net.network
         };
-        // Keep the device of the first check-in of the day; a re-check-in only updates lastDevice
-        if (!isReCheckIn) updatedRec.checkInDevice = device;
+        // Keep the device/location of the first check-in of the day; a re-check-in only updates the "last" fields
+        updatedRec.lastLocation = geo.location;
+        if (!isReCheckIn) {
+          updatedRec.checkInDevice = device;
+          updatedRec.checkInLocation = geo.location;
+          updatedRec.checkInDistanceFromHomeKm = geo.distanceFromHomeKm;
+        }
+        if (geo.location.error === 'denied') {
+          toast('⚠️ Location permission band hai — admin ko "Location denied" dikhega.', 'error');
+        }
 
         await EMS_DB.markAttendance(updatedRec);
 
@@ -1385,7 +1395,12 @@
         if (!rec || !rec.checkIn) { toast('You must check in first', 'error'); return; }
         if (rec.checkOut && rec.checkOut !== '—') { toast('Check-out already marked for today', 'info'); return; }
 
-        const updatedRec = { empId, date:today, status:rec.status, checkIn:rec.checkIn, checkOut:time };
+        const geo = await emsLocationWithHome(empId);
+        const updatedRec = {
+          empId, date:today, status:rec.status, checkIn:rec.checkIn, checkOut:time,
+          checkOutLocation: geo.location,
+          checkOutDistanceFromHomeKm: geo.distanceFromHomeKm
+        };
         await EMS_DB.markAttendance(updatedRec);
 
         toast('Checked out successfully. Live timer stopped.', 'success');

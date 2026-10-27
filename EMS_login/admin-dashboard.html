@@ -1475,7 +1475,10 @@ async function initAtt() {
     emps.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
   renderAdminAtt();
 }
-// Device / network / real active time recorded at check-in (shown under the pulse badge)
+// Check-ins farther than this from the employee's saved home location are flagged
+const HOME_RADIUS_KM = 1;
+
+// Device / network / location / real active time recorded at check-in (shown under the pulse badge)
 function getDeviceInfoHtml(a) {
   if (!a || !a.checkIn || a.checkIn === '—') return '';
   const parts = [];
@@ -1489,6 +1492,23 @@ function getDeviceInfoHtml(a) {
   if (a.checkInNetwork === 'office') parts.push('🏢 Office network');
   else if (a.checkInNetwork === 'outside') parts.push(`<span style="color:#fbbf24">🌐 Outside office (${a.checkInIP})</span>`);
   else if (a.checkInIP) parts.push(`🌐 ${a.checkInIP}`);
+  const locHtml = (loc, dist, label) => {
+    if (!loc) return null;
+    if (loc.error) return `<span style="color:#f87171">📍 ${label}: Location ${loc.error}</span>`;
+    const link = `<a href="https://www.google.com/maps?q=${loc.lat},${loc.lng}" target="_blank" rel="noopener" style="color:var(--cyan)">Map</a>`;
+    const approx = loc.accuracy > 1000 ? ` <span title="PC/laptop location is approximate">(±${(loc.accuracy / 1000).toFixed(1)} km)</span>` : '';
+    let home = '';
+    if (dist != null) {
+      home = dist > HOME_RADIUS_KM
+        ? ` · <span style="color:#fbbf24">🏠 Ghar se ${dist} km door</span>`
+        : ' · 🏠 Ghar se';
+    }
+    return `📍 ${label}: ${link}${approx}${home}`;
+  };
+  const inLoc = locHtml(a.checkInLocation, a.checkInDistanceFromHomeKm, 'In');
+  const outLoc = locHtml(a.checkOutLocation, a.checkOutDistanceFromHomeKm, 'Out');
+  if (inLoc) parts.push(inLoc);
+  if (outLoc) parts.push(outLoc);
   if (a.activeSeconds) {
     const m = Math.round(a.activeSeconds / 60);
     parts.push(`⏱ Active ${Math.floor(m / 60)}h ${m % 60}m`);

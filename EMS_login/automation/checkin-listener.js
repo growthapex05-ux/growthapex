@@ -57,6 +57,19 @@ function deviceLine(device) {
   return `${icon} *Device:* ${label}${device.os ? ` · ${device.os} ${device.browser || ''}` : ''}\n`;
 }
 
+const HOME_RADIUS_KM = 1;
+
+// "📍 *Location:* https://maps... · 🏠 Ghar se 4.2 km door ⚠️"
+function locationLine(att) {
+  const loc = att.checkInLocation;
+  if (!loc) return '';
+  if (loc.error) return `📍 *Location:* ❌ ${loc.error === 'denied' ? 'Permission denied' : 'Not available'}\n`;
+  const dist = att.checkInDistanceFromHomeKm;
+  const home = dist == null ? ''
+    : dist > HOME_RADIUS_KM ? ` · 🏠 Ghar se ${dist} km door ⚠️` : ' · 🏠 Ghar se';
+  return `📍 *Location:* https://www.google.com/maps?q=${loc.lat},${loc.lng}${home}\n`;
+}
+
 function networkLine(att) {
   if (att.checkInNetwork === 'office') return `🏢 *Network:* Office\n`;
   if (att.checkInNetwork === 'outside') return `🌐 *Network:* Outside office (${att.checkInIP})\n`;
@@ -189,6 +202,7 @@ function setupListenersForDate(targetDateStr) {
                           `📅 *Date:* ${data.date}\n` +
                           `🚦 *Status:* ${statusText}\n` +
                           deviceLine(data.checkInDevice) +
+                          locationLine(data) +
                           networkLine(data) +
                           `━━━━━━━━━━━━━━━━━━━━━━━━━━`;
 
