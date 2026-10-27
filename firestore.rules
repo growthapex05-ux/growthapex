@@ -29,11 +29,27 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Employee records (salary, home location, status), admin settings and salary slips:
+    // staff can read, only the admin can change them.
+    match /employees/{empId} {
+      allow read: if isAdmin() || isStaff();
+      allow write: if isAdmin();
+    }
+    match /admin/{doc} {
+      allow read: if isAdmin() || isStaff();
+      allow write: if isAdmin();
+    }
+    match /salary_releases/{doc} {
+      allow read: if isAdmin() || isStaff();
+      allow write: if isAdmin();
+    }
+
     // Everything else: admin + registered staff only.
     // Random accounts created with the public API key get nothing.
     match /{coll}/{rest=**} {
       allow read, write: if isAdmin()
-        || (isStaff() && !(coll in ['empLogin', 'staffEmails', 'automation_sent']));
+        || (isStaff() && !(coll in ['empLogin', 'staffEmails', 'automation_sent',
+                                    'employees', 'admin', 'salary_releases']));
     }
   }
 }
