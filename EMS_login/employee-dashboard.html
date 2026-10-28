@@ -937,7 +937,7 @@
     let cfg = {};
     try { cfg = await EMS_DB.getAdmin(); } catch (_) {}
     const today = emsToday();
-    const summary = EMS_PAYROLL.monthSummary(emp, today.slice(0, 7), att, leaves, today, { holidays: cfg.holidays || [] });
+    const summary = EMS_PAYROLL.monthSummary(emp, today.slice(0, 7), att, leaves, today, { holidays: cfg.holidays || [], team: await getTeamCalendar() });
     const todayRec = att.find(a => a && a.date === today);
     const heroEl = document.getElementById('emp-hero');
     if (heroEl) heroEl.innerHTML = EMS_PAYROLL.heroHtml(emp, summary, todayRec);
@@ -1325,6 +1325,17 @@
     renderMonthSummary();
   }
 
+  // Team-wide attendance days (system start + days the office was open), cached for 5 minutes
+  let _teamCal = null, _teamCalAt = 0;
+  async function getTeamCalendar() {
+    if (_teamCal && Date.now() - _teamCalAt < 300000) return _teamCal;
+    try {
+      _teamCal = EMS_PAYROLL.teamCalendar(await EMS_DB.getAttendance());
+      _teamCalAt = Date.now();
+    } catch (_) { _teamCal = null; }
+    return _teamCal;
+  }
+
   // ── Monthly attendance / leave / salary summary (shared rules in ems-payroll.js) ──
   async function renderMonthSummary() {
     const box = document.getElementById('month-summary-box');
@@ -1350,7 +1361,7 @@
         EMS_DB.getAdmin().catch(() => ({})), EMS_DB.getEmployee(empId)
       ]);
       const summary = EMS_PAYROLL.monthSummary({ ...emp, ...(fresh || {}) }, sel.value, att, leaves, emsToday(),
-                                               { holidays: cfg.holidays || [] });
+                                               { holidays: cfg.holidays || [], team: await getTeamCalendar() });
       box.innerHTML = EMS_PAYROLL.summaryHtml(summary);
     } catch (e) {
       box.innerHTML = `<div style="color:var(--danger);padding:12px">Hisaab load nahi hua: ${e.message}</div>`;
@@ -1849,7 +1860,7 @@
       const [empLeaves, adminCfg] = await Promise.all([
         EMS_DB.getLeaves(emp.id).catch(() => []), EMS_DB.getAdmin().catch(() => ({}))
       ]);
-      const pay = EMS_PAYROLL.monthSummary(emp, monthVal, empAtt, empLeaves, emsToday(), { holidays: adminCfg.holidays || [] });
+      const pay = EMS_PAYROLL.monthSummary(emp, monthVal, empAtt, empLeaves, emsToday(), { holidays: adminCfg.holidays || [], team: await getTeamCalendar() });
       const earnedSalary = pay.salary.monthTotal;
       const leaveData = {
         ...calculateCumulativeLeaves(emp, monthVal, empAtt),

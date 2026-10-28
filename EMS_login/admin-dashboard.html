@@ -2386,7 +2386,7 @@ async function loadPayrollHolidays() {
 function payrollFor(emp, monthVal) {
   const att = (cache.attendance || []).filter(a => a.empId === emp.id);
   const leaves = (cache.leaves || []).filter(l => l.empId === emp.id);
-  const s = EMS_PAYROLL.monthSummary(emp, monthVal, att, leaves, emsToday(), { holidays: PAYROLL_HOLIDAYS });
+  const s = EMS_PAYROLL.monthSummary(emp, monthVal, att, leaves, emsToday(), { holidays: PAYROLL_HOLIDAYS, team: EMS_PAYROLL.teamCalendar(cache.attendance) });
   const earnedSalary = s.salary.monthTotal;
   const basic = Math.round(earnedSalary * 0.60);
   const hra = Math.round(earnedSalary * 0.30);

@@ -99,7 +99,7 @@ async function buildAttendanceReport(db, date = todayIST(), { mode = 'evening' }
   employees.forEach((emp, i) => {
     const empAtt = attendance.filter(a => a.empId === emp.id);
     const empLeaves = leaves.filter(l => l.empId === emp.id);
-    const s = P.monthSummary(emp, month, empAtt, empLeaves, asOf, { holidays });
+    const s = P.monthSummary(emp, month, empAtt, empLeaves, asOf, { holidays, team: P.teamCalendar(attendance) });
     const day = s.days.find(d => d.date === date) || {};
     const rec = empAtt.find(a => a.date === date && has(a.checkIn)) || empAtt.find(a => a.date === date);
     const inMin = rec && has(rec.checkIn) ? P.timeToMinutes(rec.checkIn) : null;

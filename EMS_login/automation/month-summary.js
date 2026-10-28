@@ -33,7 +33,7 @@ async function loadSummaries(db, monthVal) {
     .map(emp => ({
       emp,
       s: P.monthSummary(emp, monthVal, att.filter(a => a.empId === emp.id),
-                        leaves.filter(l => l.empId === emp.id), todayIST(), { holidays })
+                        leaves.filter(l => l.empId === emp.id), todayIST(), { holidays, team: P.teamCalendar(att) })
     }))
     .filter(x => x.s.joined);
 }

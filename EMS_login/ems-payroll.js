@@ -12,6 +12,9 @@
 //    Approved leave is PAID while balance lasts; leave beyond the balance is UNPAID.
 //    Absent days do not use the leave balance — they are always unpaid.
 //  • Holidays (admin/config.holidays) are paid days off, never absent.
+//  • Days before the attendance system was in use, and days on which nobody in the team has any
+//    record (office closed / system down), are paid and never absent (opts.team = teamCalendar()).
+//  • Leave requests saved with from/to (older format) are read as well as startDate/endDate.
 //  • Today is "pending" until the day is over (not absent yet). Future days are "upcoming".
 // ============================================================
 (function (root) {
@@ -52,10 +55,12 @@
   function approvedLeaveMap(leaves) {
     const map = {};
     (leaves || []).forEach(l => {
-      if (l.status !== 'approved' || !validDate(l.startDate)) return;
+      // Older leave requests were saved with from/to instead of startDate/endDate
+      const start = [l.startDate, l.from, l.fromDate].find(validDate);
+      if (l.status !== 'approved' || !start) return;
       const unit = /half/i.test(l.type || '') ? 0.5 : 1;
-      const end = validDate(l.endDate) ? l.endDate : l.startDate;
-      const cur = new Date(`${l.startDate}T12:00:00`);
+      const end = [l.endDate, l.to, l.toDate].find(validDate) || start;
+      const cur = new Date(`${start}T12:00:00`);
       const last = new Date(`${end}T12:00:00`);
       while (cur <= last) {
         const ds = cur.toLocaleDateString('en-CA');
@@ -64,6 +69,18 @@
       }
     });
     return map;
+  }
+
+  /**
+   * Team-wide context for monthSummary(opts.team), built from ALL employees' attendance:
+   *  trackingStart = first day anyone has a record (system went live) — earlier days are never absent
+   *  openDays      = days on which at least one employee has any record — other days = office closed
+   */
+  function teamCalendar(allAttendance) {
+    const days = new Set();
+    (allAttendance || []).forEach(a => { if (a && a.date) days.add(String(a.date).slice(0, 10)); });
+    const sorted = [...days].filter(validDate).sort();
+    return { trackingStart: sorted[0] || null, openDays: sorted };
   }
 
   // Attendance records -> { date: record } (prefers the record that has a check-in)
@@ -120,6 +137,9 @@
    */
   function monthSummary(emp, monthVal, attendance, leaves, today, opts) {
     const holidays = new Set((opts && opts.holidays) || []);
+    // Team context from teamCalendar(): first day the system was used + days anyone had a record
+    const trackingStart = opts && opts.team ? opts.team.trackingStart : null;
+    const openDays = opts && opts.team ? new Set(opts.team.openDays) : null;
     today = today || istToday();
     const [y, m] = monthVal.split('-').map(Number);
     const monthStart = ymd(y, m, 1);
@@ -133,7 +153,7 @@
     const result = {
       empId: emp.id, name: emp.name, monthVal, today, baseSalary, perDay, totalWorkingDays,
       joined: !joinDate || joinDate <= monthEnd,
-      eligibleWorkingDays: 0, present: 0, halfDays: 0, worked: 0, holidays: 0,
+      eligibleWorkingDays: 0, present: 0, halfDays: 0, worked: 0, holidays: 0, notTracked: 0, officeClosed: 0,
       paidLeave: 0, unpaidLeave: 0, absent: 0, late: 0, activeSeconds: 0,
       pendingToday: false, upcomingWorkingDays: 0, upcomingLeave: 0,
       days: [],
@@ -173,6 +193,10 @@
       let day = classifyDay(ds, today, rec, leaveMap[ds]);
       // A holiday is a paid day off unless the employee actually worked that day
       if (holidays.has(ds) && day.worked === 0) day = { status: 'holiday', worked: 0, leave: 0, absent: 0 };
+      // Before the attendance system was in use there is no data -> paid, never absent
+      else if (trackingStart && ds < trackingStart && day.absent > 0) day = { status: 'not-tracked', worked: 0, leave: 0, absent: 0 };
+      // Nobody in the team has any record that day -> office closed / system down -> paid, never absent
+      else if (openDays && ds < today && !openDays.has(ds) && day.absent > 0) day = { status: 'office-closed', worked: 0, leave: 0, absent: 0 };
 
       // Leave is paid while there is balance
       let paid = 0, unpaid = 0;
@@ -192,6 +216,8 @@
       result.absent += day.absent;
       if (day.status === 'present') result.present++;
       if (day.status === 'holiday' && ds <= today) result.holidays++;
+      if (day.status === 'not-tracked') result.notTracked++;
+      if (day.status === 'office-closed') result.officeClosed++;
       if (day.status === 'half-day') result.halfDays++;
       if (day.status === 'pending') result.pendingToday = true;
       if (day.status === 'upcoming' || day.status === 'upcoming-leave' || day.status === 'pending') result.upcomingWorkingDays++;
@@ -215,7 +241,7 @@
       ? Math.round(baseSalary * result.eligibleWorkingDays / totalWorkingDays) : 0; // full month if attended every day
     const unpaidDays = +(result.absent + result.unpaidLeave).toFixed(2);
     const deduction = Math.round(perDay * unpaidDays);
-    const earnedSoFar = Math.round(perDay * (result.worked + result.paidLeave + result.holidays));
+    const earnedSoFar = Math.round(perDay * (result.worked + result.paidLeave + result.holidays + result.notTracked + result.officeClosed));
     const monthTotal = Math.max(0, gross - deduction); // what the month pays if the remaining days are attended
     const monthOver = today > monthEnd;
 
@@ -245,6 +271,8 @@
     'half-leave':     ['#06b6d4', 'Half leave'],
     absent:           ['#ef4444', 'Absent'],
     holiday:          ['#8b5cf6', 'Holiday'],
+    'office-closed':  ['#a78bfa', 'Office band (koi record nahi)'],
+    'not-tracked':    ['#94a3b8', 'System chalu hone se pehle'],
     sunday:           ['#475569', 'Sunday'],
     pending:          ['#64748b', 'Today'],
     upcoming:         ['#cbd5e1', 'Upcoming'],
@@ -277,7 +305,8 @@
       const title = `${d.date} — ${label}${extra}${d.checkIn ? ` · In ${d.checkIn}` : ''}${d.checkOut && d.checkOut !== '—' ? ` · Out ${d.checkOut}` : ''}`;
       return `<div title="${title}" style="width:26px;height:26px;border-radius:6px;background:${color};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:${d.status === 'upcoming' ? '#475569' : '#fff'}">${Number(d.date.slice(8))}</div>`;
     }).join('');
-    const legendKeys = ['present', 'half-day', 'leave', 'absent', 'holiday', 'sunday', 'upcoming'];
+    const legendKeys = ['present', 'half-day', 'leave', 'absent', 'holiday', 'office-closed', 'not-tracked', 'sunday', 'upcoming']
+      .filter(k => ['present', 'absent', 'sunday'].includes(k) || r.days.some(d => d.status === k));
     const legend = legendKeys.map(k => `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:10px"><span style="width:10px;height:10px;border-radius:3px;background:${DAY_STYLE[k][0]}"></span>${DAY_STYLE[k][1]}</span>`).join('');
 
     return `
@@ -290,6 +319,8 @@
           ${stat('❌ Absent', num(r.absent), '#dc2626', 'Check-in nahi, leave nahi')}
           ${stat('⏰ Late', num(r.late), '#d97706', '10:00 ke baad')}
           ${r.holidays ? stat('🎉 Holiday', num(r.holidays), '#7c3aed', 'Paid') : ''}
+          ${r.officeClosed ? stat('🏢 Office band', num(r.officeClosed), '#7c3aed', 'Kisi ka record nahi · paid') : ''}
+          ${r.notTracked ? stat('🕓 Tracking se pehle', num(r.notTracked), '#64748b', 'System chalu nahi tha · paid') : ''}
           ${stat('🏦 Leave balance', num(r.leave.balance), '#2563eb', `${num(r.leave.accrued)} mile · ${num(r.leave.used)} use`)}
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${strip}</div>
@@ -371,7 +402,7 @@
       </div>`;
   }
 
-  const api = { monthSummary, summaryHtml, teamCardHtml, heroHtml, todayState, workingDaysInMonth, istToday, timeToMinutes, MONTHLY_LEAVE_CREDIT };
+  const api = { teamCalendar, monthSummary, summaryHtml, teamCardHtml, heroHtml, todayState, workingDaysInMonth, istToday, timeToMinutes, MONTHLY_LEAVE_CREDIT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.EMS_PAYROLL = api;
 })(typeof window !== 'undefined' ? window : this);
