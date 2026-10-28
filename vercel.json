@@ -1,3 +1,10 @@
 {
-  "cleanUrls": true
+  "cleanUrls": true,
+  "redirects": [
+    {
+      "source": "/blog-single",
+      "destination": "/blog-standard",
+      "permanent": true
+    }
+  ]
 }
