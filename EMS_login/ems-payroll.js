@@ -371,7 +371,7 @@
       </div>`;
   }
 
-  const api = { monthSummary, summaryHtml, teamCardHtml, heroHtml, todayState, workingDaysInMonth, istToday, MONTHLY_LEAVE_CREDIT };
+  const api = { monthSummary, summaryHtml, teamCardHtml, heroHtml, todayState, workingDaysInMonth, istToday, timeToMinutes, MONTHLY_LEAVE_CREDIT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.EMS_PAYROLL = api;
 })(typeof window !== 'undefined' ? window : this);

@@ -21,8 +21,9 @@ const STALE_CLAIM_MS = 10 * 60 * 1000;
 const RETRY_DELAYS_MS = [15000, 45000];
 
 const BUILDERS = {
-  daily: (db, date) => gen.generateDailyReport(db, date),
-  login: (db, date) => gen.generateLoginReport(db, date),
+  // Detailed attendance reports with time, hours, device and location (lazy require: it requires this file)
+  daily: (db, date) => require('./attendance-report').buildAttendanceReport(db, date, { mode: 'evening' }),
+  login: (db, date) => require('./attendance-report').buildAttendanceReport(db, date, { mode: 'morning' }),
   weekly: (db) => gen.generateWeeklyReport(db),
   // + attendance & leave per employee (lazy require: month-summary.js requires this file)
   monthly: async (db) => (await gen.generateMonthlyReport(db)) + (await require('./month-summary').groupSection(db))

@@ -6,26 +6,27 @@ require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const parseArgs = require('minimist');
 const {
   initializeFirebase,
-  generateDailyReport,
   generateWeeklyReport,
-  generateMonthlyReport,
-  generateLoginReport
+  generateMonthlyReport
 } = require('./report-generator');
 const { getGreenApiState } = require('./sender');
 const { deliver, flush, enqueue, listQueued, isOnline, waitForNetwork, todayIST } = require('./outbox');
 const { sendReminders } = require('./reminders');
 const { groupSection, sendPersonalSalarySummaries } = require('./month-summary');
+const { catchUpMissed, processReportRequests } = require('./catch-up');
+const { buildAttendanceReport } = require('./attendance-report');
 
 const REPORT_TYPES = ['daily', 'weekly', 'monthly', 'login'];
 const REMINDER_TYPES = ['remind-checkin', 'remind-checkout'];
 
 // Parse CLI arguments
 // Example: node run.js --type=daily [--date=2026-08-26] [--dry-run] [--force]
-//          node run.js --flush     (send everything waiting in the offline queue)
+//          node run.js --flush     (send queued messages + any missed report + admin "send now" requests)
+//          node run.js --catch-up  (same as --flush)
 //          node run.js --status    (check internet, WhatsApp link and queue)
 const argv = parseArgs(process.argv.slice(2), {
   string: ['type', 'date'],
-  boolean: ['dry-run', 'flush', 'status', 'force'],
+  boolean: ['dry-run', 'flush', 'status', 'force', 'catch-up'],
   alias: { t: 'type', d: 'dry-run', f: 'force' }
 });
 
@@ -62,6 +63,7 @@ async function showStatus() {
 }
 
 async function main() {
+  if (argv['catch-up']) argv.flush = true;
   const reportType = (argv.type || '').toLowerCase();
   const targetDate = argv.date || null;
   const isDryRun = !!argv['dry-run'];
@@ -128,8 +130,8 @@ async function main() {
     let reportText;
     try {
       console.log(`Generating ${reportType} report data...`);
-      if (reportType === 'daily') reportText = await generateDailyReport(db, targetDate);
-      else if (reportType === 'login') reportText = await generateLoginReport(db, targetDate);
+      if (reportType === 'daily') reportText = await buildAttendanceReport(db, targetDate || todayIST(), { mode: 'evening' });
+      else if (reportType === 'login') reportText = await buildAttendanceReport(db, targetDate || todayIST(), { mode: 'morning' });
       else if (reportType === 'weekly') reportText = await generateWeeklyReport(db);
       else {
         reportText = (await generateMonthlyReport(db)) + (await groupSection(db));
@@ -151,7 +153,14 @@ async function main() {
   if (backlog.sent) console.log(`📤 Sent ${backlog.sent} queued message(s) from earlier.`);
 
   if (argv.flush) {
-    console.log(`🚀 Flush finished. ${backlog.pending} message(s) still waiting.`);
+    // Also send any report that was missed and any "send now" request from the admin portal
+    try {
+      await processReportRequests(db);
+      await catchUpMissed(db);
+    } catch (err) {
+      console.error('❌ Catch-up error:', err.message);
+    }
+    console.log(`🚀 Flush finished. ${listQueued().length} message(s) still waiting.`);
     process.exit(0);
   }
 

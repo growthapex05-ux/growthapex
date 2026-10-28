@@ -59,6 +59,7 @@ jobs:
         run: |
           cd EMS_login/automation
           node run.js --type=${{ github.event.inputs.type || 'daily' }}
+          node run.js --catch-up
           node run.js --status
           # In the cloud there is no "later" - fail the job if the report is still unsent
           if ls outbox/*.json >/dev/null 2>&1; then

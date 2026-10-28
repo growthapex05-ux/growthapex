@@ -361,6 +361,8 @@
       <div class="section-head">
         <h3>📊 Team ka Hisaab <span class="hx-live">LIVE</span></h3>
         <div class="toolbar">
+          <button class="btn btn-export" onclick="requestWhatsAppReport('morning')" title="Abhi tak ka check-in status WhatsApp group par bhejo">🌅 Morning report bhejo</button>
+          <button class="btn btn-primary" onclick="requestWhatsAppReport('daily')" title="Aaj ki poori daily report WhatsApp group par bhejo">📤 Daily report bhejo</button>
           <select class="filter-select" id="hx-month" onchange="renderTeamHisaab()"></select>
         </div>
       </div>
@@ -1205,6 +1207,39 @@ function showPage(id, el) {
 
 // ─── OVERVIEW ─────────────────────────────────────────────────
 let deptChart, attChart;
+// ── Manual "send report now": the PC automation (listener / 15-min task) picks this up ──
+async function requestWhatsAppReport(type) {
+  const label = type === 'morning' ? 'Morning' : 'Daily';
+  let date = emsToday();
+  if (type === 'daily') {
+    const picked = prompt('Kis date ki daily report bhejni hai? (YYYY-MM-DD)', date);
+    if (picked === null) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(picked.trim())) { toast('Date YYYY-MM-DD format mein likhein', 'error'); return; }
+    date = picked.trim();
+  }
+  try {
+    const ref = await db.collection('report_requests').add({
+      type, date, status: 'pending', requestedAt: Date.now(), requestedBy: auth.currentUser?.email || 'admin'
+    });
+    toast(`⏳ ${label} report (${date}) bhejne ke liye queue mein daali…`, 'info');
+    let settled = false;
+    const unsub = ref.onSnapshot(snap => {
+      const d = snap.data() || {};
+      if (d.status === 'sent') { settled = true; unsub(); toast(`✅ ${label} report WhatsApp group par chali gayi!`, 'success'); }
+      else if (d.status === 'failed') { settled = true; unsub(); toast(`❌ ${d.error || 'Report nahi gayi'}`, 'error'); }
+    });
+    // Nobody picked it up quickly -> the office PC automation is off
+    setTimeout(() => {
+      if (!settled) {
+        unsub();
+        toast('ℹ️ Office PC ki automation abhi band lagti hai — PC on hote hi (15 min ke andar) report apne aap chali jaayegi.', 'info');
+      }
+    }, 45000);
+  } catch (e) {
+    toast('Request save nahi hui: ' + e.message, 'error');
+  }
+}
+
 // ── Live team summary (re-rendered on every Firestore change via renderOverview) ──
 let payrollHolidaysLoaded = false;
 async function renderTeamHisaab() {

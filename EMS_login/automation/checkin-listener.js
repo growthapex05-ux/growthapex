@@ -2,6 +2,7 @@ require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const { initializeFirebase } = require('./report-generator');
 const { deliver, flush } = require('./outbox');
 const { sendReminders } = require('./reminders');
+const { catchUpMissed, processReportRequests } = require('./catch-up');
 
 // Keep the 24/7 listener alive through network drops / unexpected errors
 process.on('unhandledRejection', (err) => console.error('⚠️ Unhandled rejection:', err && err.message ? err.message : err));
@@ -271,6 +272,20 @@ async function startListener() {
     }
   }, 20000); // Check every 20 seconds
 
+  // 5. "Send report now" button in the admin portal -> report_requests -> sent instantly
+  let handlingRequests = false;
+  db.collection('report_requests').where('status', '==', 'pending').onSnapshot(async (snap) => {
+    if (snap.empty || handlingRequests) return;
+    handlingRequests = true;
+    try {
+      await processReportRequests(db);
+    } catch (err) {
+      console.error('❌ [Requests] Error:', err.message);
+    } finally {
+      handlingRequests = false;
+    }
+  }, (err) => console.error('❌ report_requests listener error:', err.message));
+
   // 4. Re-send anything that was queued while offline / while WhatsApp was unlinked
   let flushing = false;
   setInterval(async () => {
@@ -278,6 +293,7 @@ async function startListener() {
     flushing = true;
     try {
       await flush(db);
+      await catchUpMissed(db); // any report missed while the PC was off / offline
     } catch (err) {
       console.error(`❌ [Queue] Flush error:`, err.message);
     } finally {

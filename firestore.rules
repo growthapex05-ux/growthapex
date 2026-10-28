@@ -48,7 +48,7 @@ service cloud.firestore {
     // Random accounts created with the public API key get nothing.
     match /{coll}/{rest=**} {
       allow read, write: if isAdmin()
-        || (isStaff() && !(coll in ['empLogin', 'staffEmails', 'automation_sent',
+        || (isStaff() && !(coll in ['empLogin', 'staffEmails', 'automation_sent', 'report_requests',
                                     'employees', 'admin', 'salary_releases']));
     }
   }
