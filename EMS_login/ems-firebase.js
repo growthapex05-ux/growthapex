@@ -98,6 +98,32 @@ async function emsLocationWithHome(empId) {
   return { location: loc, distanceFromHomeKm: home ? emsDistanceKm(home, loc) : null };
 }
 
+/**
+ * Worked (online) time for an attendance record, in seconds.
+ * Only time while the dashboard was connected counts: heartbeats every 15s add the gap since the
+ * previous one, and a gap longer than EMS_ONLINE_GAP_S means the employee was offline — not counted.
+ * So 1h work, 4h offline, back online => the timer continues from 1h, not 5h.
+ */
+const EMS_ONLINE_GAP_S = 120;
+function emsWorkedSeconds(rec, nowMs = Date.now()) {
+  if (!rec) return 0;
+  const base = Number(rec.workedSeconds ?? rec.activeSeconds ?? 0);
+  const open = rec.checkIn && rec.checkIn !== '—' && (!rec.checkOut || rec.checkOut === '—');
+  const hb = Date.parse(rec.lastHeartbeat || '');
+  let live = 0;
+  if (open && !isNaN(hb)) {
+    const gap = (nowMs - hb) / 1000;
+    if (gap >= 0 && gap <= EMS_ONLINE_GAP_S) live = gap;
+  }
+  return Math.max(0, Math.floor(base + live));
+}
+
+/** "01 : 05 : 09" */
+function emsClock(totalSecs) {
+  const s = Math.max(0, Math.floor(totalSecs));
+  return `${String(Math.floor(s / 3600)).padStart(2, '0')} : ${String(Math.floor((s % 3600) / 60)).padStart(2, '0')} : ${String(s % 60).padStart(2, '0')}`;
+}
+
 const EMS_DB = {
 
   // ── Collection helpers ────────────────────────────────────
@@ -270,18 +296,32 @@ const EMS_DB = {
       const data = doc.data();
       // Only heartbeat if employee is checked in and not checked out
       if (data.checkIn && (!data.checkOut || data.checkOut === '—')) {
-        // Count real active time: seconds since the previous heartbeat (capped, so a sleeping phone adds nothing)
+        // Time since the previous heartbeat counts only if we were connected the whole time
+        // (gap <= EMS_ONLINE_GAP_S). A longer gap = offline / phone locked / browser closed -> adds nothing.
         const prev = Date.parse(data.lastHeartbeat || '');
-        const activeAdd = statusState === 'active' && !isNaN(prev)
-          ? Math.round(Math.min(60, Math.max(0, (Date.now() - prev) / 1000))) : 0;
+        const gap = isNaN(prev) ? 0 : (Date.now() - prev) / 1000;
+        const onlineAdd = gap > 0 && gap <= EMS_ONLINE_GAP_S ? Math.round(gap) : 0;
+        const activeAdd = statusState === 'active' ? onlineAdd : 0;
+        const nowIso = new Date().toISOString();
         const update = {
-          lastHeartbeat: new Date().toISOString(),
+          lastHeartbeat: nowIso,
           activityStatus: statusState,
           lastDevice: emsDevice().type,
           pcConnected: true
         };
         if (activeAdd) update.activeSeconds = firebase.firestore.FieldValue.increment(activeAdd);
+        // Records from before online-time tracking start from their active time
+        let worked;
+        if (data.workedSeconds === undefined) {
+          worked = Number(data.activeSeconds || 0) + onlineAdd;
+          update.workedSeconds = worked;
+        } else {
+          worked = Number(data.workedSeconds) + onlineAdd;
+          if (onlineAdd) update.workedSeconds = firebase.firestore.FieldValue.increment(onlineAdd);
+        }
         await doc.ref.update(update);
+        return { ...data, ...update, workedSeconds: worked, lastHeartbeat: nowIso,
+                 activeSeconds: Number(data.activeSeconds || 0) + activeAdd };
       }
     }
   },

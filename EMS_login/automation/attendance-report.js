@@ -27,6 +27,20 @@ function duration(mins) {
   return `${Math.floor(mins / 60)}h ${String(Math.round(mins % 60)).padStart(2, '0')}m`;
 }
 
+// Online (connected) work time — same rule as emsWorkedSeconds() in ems-firebase.js:
+// offline gaps (> 2 min without a heartbeat) are not counted.
+function onlineSeconds(rec) {
+  if (!rec || rec.workedSeconds === undefined) return null;
+  let secs = Number(rec.workedSeconds) || 0;
+  const open = !has(rec.checkOut);
+  const hb = Date.parse(rec.lastHeartbeat || '');
+  if (open && !isNaN(hb)) {
+    const gap = (Date.now() - hb) / 1000;
+    if (gap >= 0 && gap <= 120) secs += gap;
+  }
+  return Math.floor(secs);
+}
+
 function deviceText(d) {
   if (!d || !d.type) return null;
   const icon = d.type === 'desktop' ? '💻' : '📱';
@@ -115,14 +129,19 @@ async function buildAttendanceReport(db, date = todayIST(), { mode = 'evening' }
 
     if (rec && has(rec.checkIn)) {
       const outMin = has(rec.checkOut) ? P.timeToMinutes(rec.checkOut) : null;
+      const online = onlineSeconds(rec);
       let timing = `🕘 In *${rec.checkIn}*`;
       if (!isMorning) {
         if (outMin != null) {
-          const worked = duration(outMin - inMin);
-          timing += ` → Out *${rec.checkOut}*${worked ? ` · ⌛ ${worked}` : ''}`;
+          // Prefer real online time; old records only have check-in → check-out
+          const worked = online != null ? duration(online / 60) : duration(outMin - inMin);
+          timing += ` → Out *${rec.checkOut}*${worked ? ` · ⌛ ${worked}${online != null ? ' online' : ''}` : ''}`;
         } else {
           timing += ` → ⚠️ Check-out nahi kiya`;
+          if (online != null) timing += ` · ⌛ ${duration(online / 60)} online`;
         }
+      } else if (online != null) {
+        timing += ` · ⌛ ${duration(online / 60)} online`;
       }
       if (rec.activeSeconds) timing += ` · 🟢 Active ${duration(rec.activeSeconds / 60)}`;
       lines.push(`   ${timing}`);
@@ -162,7 +181,7 @@ async function buildAttendanceReport(db, date = todayIST(), { mode = 'evening' }
   msg += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
   msg += blocks.join('\n\n');
   msg += `\n\n━━━━━━━━━━━━━━━━━━━━━━\n`;
-  msg += `_Late = 10:00 ke baad check-in · Absent = working din bina check-in aur bina approved leave · Location sirf check-in/out ke time li jaati hai._`;
+  msg += `_Late = 10:00 ke baad check-in · ⌛ = sirf online time (offline gap nahi gina jaata) · Absent = working din bina check-in aur bina approved leave · Location sirf check-in/out ke time li jaati hai._`;
   return msg;
 }
 

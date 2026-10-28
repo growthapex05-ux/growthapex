@@ -1041,7 +1041,7 @@
     if (currentActivityState === 'idle') {
       currentActivityState = 'active';
       updateLiveStatusBadgeUI('active');
-      EMS_DB.updateHeartbeat(empId, 'active').catch(() => {});
+      emsBeat('active');
     }
   }
 
@@ -1051,14 +1051,14 @@
 
   function startHeartbeatEngine() {
     stopHeartbeatEngine();
-    EMS_DB.updateHeartbeat(empId, currentActivityState).catch(() => {});
+    emsBeat(currentActivityState);
     updateLiveStatusBadgeUI(currentActivityState);
 
     heartbeatInterval = setInterval(async () => {
       const isIdle = (Date.now() - lastUserActivityTime) > IDLE_TIMEOUT_MS;
       currentActivityState = isIdle ? 'idle' : 'active';
       updateLiveStatusBadgeUI(currentActivityState);
-      await EMS_DB.updateHeartbeat(empId, currentActivityState).catch(() => {});
+      await emsBeat(currentActivityState);
     }, 15000);
   }
 
@@ -1072,6 +1072,13 @@
   }
 
   let liveTimerInterval = null;
+  // Latest attendance record for the live timer (updated by every heartbeat)
+  let liveTimerRec = null;
+  function emsBeat(state) {
+    return EMS_DB.updateHeartbeat(empId, state)
+      .then(rec => { if (rec) liveTimerRec = rec; return rec; })
+      .catch(() => {});
+  }
 
   function getCheckInDateObj(checkInStr, dateStr) {
     if (!checkInStr) return new Date();
@@ -1120,11 +1127,12 @@
     }
   }
 
-  function startLiveTimerWidget(checkInStr, dateStr, triggerPopout = false) {
+  function startLiveTimerWidget(checkInStr, dateStr, triggerPopout = false, rec = null) {
     if (liveTimerInterval) {
       clearInterval(liveTimerInterval);
       liveTimerInterval = null;
     }
+    if (rec) liveTimerRec = rec;
 
     const widget = document.getElementById('floating-work-timer');
     if (widget) widget.style.display = 'block';
@@ -1141,15 +1149,11 @@
     }
 
     const updateTimer = () => {
-      const now = new Date();
-      let diffSecs = Math.floor((now - checkInDate) / 1000);
-      if (diffSecs < 0) diffSecs = 0;
-
-      const hrs = String(Math.floor(diffSecs / 3600)).padStart(2, '0');
-      const mins = String(Math.floor((diffSecs % 3600) / 60)).padStart(2, '0');
-      const secs = String(diffSecs % 60).padStart(2, '0');
-
-      const clockStr = `${hrs} : ${mins} : ${secs}`;
+      // Online time only (offline gaps don't count); falls back to wall-clock for a record we don't have yet
+      const diffSecs = liveTimerRec
+        ? emsWorkedSeconds(liveTimerRec)
+        : Math.max(0, Math.floor((Date.now() - checkInDate) / 1000));
+      const clockStr = emsClock(diffSecs);
 
       // 1. Update in-page floating widget
       const clockEl = document.getElementById('timer-clock-val');
@@ -1213,7 +1217,7 @@
       if (currentActivityState === 'idle') {
         currentActivityState = 'active';
         updateLiveStatusBadgeUI('active');
-        EMS_DB.updateHeartbeat(empId, 'active').catch(() => {});
+        emsBeat('active');
       }
     };
 
@@ -1244,7 +1248,7 @@
   const IS_MOBILE_DEVICE = emsDevice().type !== 'desktop';
   function onPageLeave() {
     if (!empId) return;
-    if (IS_MOBILE_DEVICE) EMS_DB.updateHeartbeat(empId, 'idle').catch(() => {});
+    if (IS_MOBILE_DEVICE) emsBeat('idle');
     else EMS_DB.autoCheckoutDisconnected(empId).catch(() => {});
   }
   window.addEventListener('beforeunload', onPageLeave);
@@ -1256,7 +1260,7 @@
       lastUserActivityTime = Date.now();
       currentActivityState = 'active';
       updateLiveStatusBadgeUI('active');
-      EMS_DB.updateHeartbeat(empId, 'active').catch(() => {});
+      emsBeat('active');
     }
   });
 
@@ -1284,7 +1288,7 @@
         btnCheckOut.innerHTML = '❌ Mark Check-Out'; 
       }
       startHeartbeatEngine();
-      startLiveTimerWidget(todayRec.checkIn, todayRec.date, false);
+      startLiveTimerWidget(todayRec.checkIn, todayRec.date, false, todayRec);
     } else if (todayRec && todayRec.checkIn && todayRec.checkOut && todayRec.checkOut !== '—') {
       // Checked out earlier today -> Allow Resume Work (Re-Check-In)!
       if (btnCheckIn) { 
@@ -1432,6 +1436,7 @@
         // Keep the device/location of the first check-in of the day; a re-check-in only updates the "last" fields
         updatedRec.lastLocation = geo.location;
         if (!isReCheckIn) {
+          updatedRec.workedSeconds = 0; // online time starts now; a re-check-in keeps counting from where it stopped
           updatedRec.checkInDevice = device;
           updatedRec.checkInLocation = geo.location;
           updatedRec.checkInDistanceFromHomeKm = geo.distanceFromHomeKm;
@@ -1444,7 +1449,7 @@
 
         toast(isReCheckIn ? 'Resumed work & re-checked in successfully! 🟢' : 'Checked in successfully. Active live timer & tracking started! 🟢', 'success');
         startHeartbeatEngine();
-        startLiveTimerWidget(checkInTime, today, true);
+        startLiveTimerWidget(checkInTime, today, true, { ...(rec || {}), ...updatedRec });
         updateAttendanceButtonsUI(updatedRec);
     } else {
         if (!rec || !rec.checkIn) { toast('You must check in first', 'error'); return; }
@@ -1453,6 +1458,7 @@
         const geo = await emsLocationWithHome(empId);
         const updatedRec = {
           empId, date:today, status:rec.status, checkIn:rec.checkIn, checkOut:time,
+          workedSeconds: emsWorkedSeconds(rec), // close the session: online time up to this check-out
           checkOutLocation: geo.location,
           checkOutDistanceFromHomeKm: geo.distanceFromHomeKm
         };

@@ -1098,9 +1098,20 @@ const parseTimeString = (timeStr) => {
   return { hours, minutes, seconds, totalSeconds: hours * 3600 + minutes * 60 + seconds };
 };
 
-const calcHours = (dateStr, checkIn, checkOut) => {
+const calcHours = (dateStr, checkIn, checkOut, rec) => {
   if (!checkIn || checkIn === '—') return '—';
-  
+
+  // Records with online-time tracking: count only connected time (offline gaps excluded)
+  if (rec && rec.workedSeconds !== undefined) {
+    const secs = emsWorkedSeconds(rec);
+    const formatted = `${Math.floor(secs / 3600)}h ${Math.floor((secs % 3600) / 60)}m`;
+    const open = !checkOut || checkOut === '—';
+    const fresh = Date.now() - Date.parse(rec.lastHeartbeat || '') <= EMS_ONLINE_GAP_S * 1000;
+    if (open && fresh) return `<span style="color:var(--green);font-weight:600">⚡ Working (${formatted})</span>`;
+    if (open) return `<span style="color:#d97706;font-weight:600" title="Offline time count nahi hota">⏸ Offline (${formatted})</span>`;
+    return `${formatted} <span style="font-size:11px;color:var(--muted)">online</span>`;
+  }
+
   const t1 = parseTimeString(checkIn);
   if (!t1) return '—';
 
@@ -1143,6 +1154,7 @@ const calcTotalHours = (attList) => {
   
   (attList || []).forEach(a => {
     if (!a || !a.checkIn || a.checkIn === '—') return;
+    if (a.workedSeconds !== undefined) { totalMs += emsWorkedSeconds(a) * 1000; return; }
     const t1 = parseTimeString(a.checkIn);
     if (!t1) return;
 
@@ -1725,7 +1737,7 @@ async function renderAdminAtt() {
         <td>${getLivePulseBadge(a)}${getDeviceInfoHtml(a)}</td>
         <td>${a.checkIn||'—'}</td>
         <td>${a.checkOut||'—'}</td>
-        <td>${calcHours(a.date, a.checkIn, a.checkOut)}</td>
+        <td>${calcHours(a.date, a.checkIn, a.checkOut, a)}</td>
         <td>${reportHtml}</td>
         <td><button class="btn btn-sm btn-edit" onclick="editAtt('${a.empId}','${a.date}')">✏</button></td>
       </tr>`;

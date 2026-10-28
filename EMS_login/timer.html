@@ -125,6 +125,8 @@
 
     let checkInDate = new Date();
     let clockStarted = false;
+    let latestRec = null;     // today's attendance record (refreshed every 5s) for online-time display
+    let timerClosed = false;
 
     function parseCheckInDate(timeStr, dStr) {
       if (!timeStr || timeStr === '--:--') return new Date();
@@ -170,15 +172,12 @@
       }
 
       const updateTick = () => {
-        const now = new Date();
-        let diffSecs = Math.floor((now - checkInDate) / 1000);
-        if (diffSecs < 0) diffSecs = 0;
-
-        const hrs = String(Math.floor(diffSecs / 3600)).padStart(2, '0');
-        const mins = String(Math.floor((diffSecs % 3600) / 60)).padStart(2, '0');
-        const secs = String(diffSecs % 60).padStart(2, '0');
-
-        document.getElementById('clock-val').textContent = `${hrs} : ${mins} : ${secs}`;
+        if (timerClosed) return;
+        // Online time only (offline gaps don't count) once the record is loaded
+        const diffSecs = latestRec
+          ? emsWorkedSeconds(latestRec)
+          : Math.max(0, Math.floor((Date.now() - checkInDate) / 1000));
+        document.getElementById('clock-val').textContent = emsClock(diffSecs);
       };
 
       updateTick();
@@ -196,6 +195,7 @@
       try {
         const todayRec = await EMS_DB.getTodayAttendance(empId);
         if (todayRec && todayRec.checkIn) {
+          latestRec = todayRec;
           if (!clockStarted) {
             startClock(todayRec.checkIn, todayRec.date);
           }
@@ -214,6 +214,7 @@
 
           // Only close if checkOut is explicitly marked and valid
           if (todayRec.checkOut && todayRec.checkOut !== '—') {
+            timerClosed = true;
             document.getElementById('clock-val').textContent = 'CHECKED OUT';
             document.getElementById('status-badge').innerHTML = '🔴 CHECKED OUT';
             document.getElementById('status-badge').style.background = 'rgba(239,68,68,0.2)';
@@ -241,7 +242,8 @@
       const rec   = await EMS_DB.getTodayAttendance(empId);
       
       if (rec && rec.checkIn) {
-        await EMS_DB.markAttendance({ empId, date: today, status: rec.status, checkIn: rec.checkIn, checkOut: time });
+        await EMS_DB.markAttendance({ empId, date: today, status: rec.status, checkIn: rec.checkIn, checkOut: time,
+                                      workedSeconds: emsWorkedSeconds(rec) });
       }
 
       if (window.opener) {
