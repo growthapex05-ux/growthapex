@@ -125,7 +125,7 @@ function emsWorkedSeconds(rec, nowMs = Date.now()) {
  * "ActivityWatch Web Watcher" extension is installed.
  * Returns { apps: [{ name, secs }], activeSecs, idleSecs, web: bool } or { error: 'not-running' | ... } — never throws.
  */
-const EMS_AW_URL = 'http://localhost:5600/api/0';
+const EMS_AW_URLS = ['http://localhost:5600/api/0', 'http://127.0.0.1:5600/api/0'];
 const EMS_BROWSERS = ['chrome.exe', 'msedge.exe', 'firefox.exe', 'brave.exe', 'opera.exe', 'vivaldi.exe',
   'Google Chrome', 'Microsoft Edge', 'Firefox', 'Brave Browser', 'Safari', 'Opera', 'Arc'];
 async function emsScreenActivity(sinceMs, nowMs = Date.now()) {
@@ -134,20 +134,32 @@ async function emsScreenActivity(sinceMs, nowMs = Date.now()) {
     const t = setTimeout(() => ctrl.abort(), 8000);
     try { return await fetch(url, { ...opts, signal: ctrl.signal }); } finally { clearTimeout(t); }
   };
-  let buckets;
-  try {
-    const res = await awFetch(`${EMS_AW_URL}/buckets/`);
-    if (!res.ok) return { error: `http-${res.status}` };
-    buckets = Object.keys(await res.json());
-  } catch (_) {
+  // Chrome's "local network access" permission for this site: granted | denied | prompt | unsupported
+  let lna = 'unsupported';
+  try { lna = (await navigator.permissions.query({ name: 'local-network-access' })).state; } catch (_) {}
+
+  // Some laptops only answer on 127.0.0.1 (or only on localhost) — try both
+  let buckets, base, lastErr = '';
+  for (const url of EMS_AW_URLS) {
+    try {
+      const res = await awFetch(`${url}/buckets/`);
+      if (!res.ok) { lastErr = `http-${res.status}`; continue; }
+      buckets = Object.keys(await res.json());
+      base = url;
+      break;
+    } catch (e) { lastErr = `${e.name}: ${e.message}`; }
+  }
+  if (!base) {
     // A no-cors request succeeds when ActivityWatch is running but growthapex.in is not in its
     // cors_origins yet (setup file not run) — tells the two cases apart.
-    try {
-      await awFetch(`${EMS_AW_URL}/info`, { mode: 'no-cors' });
-      return { error: 'setup-not-run' };
-    } catch (_) {
-      return { error: 'not-running' }; // not installed / not running, or Chrome blocked local network access
+    for (const url of EMS_AW_URLS) {
+      try {
+        await awFetch(`${url}/info`, { mode: 'no-cors' });
+        return { error: 'setup-not-run', detail: lastErr, lna };
+      } catch (_) {}
     }
+    // not installed / not running, or Chrome blocked local network access
+    return { error: lna === 'denied' ? 'chrome-blocked' : 'not-running', detail: lastErr, lna };
   }
   const pick = prefix => buckets.find(b => b.startsWith(prefix));
   const win = pick('aw-watcher-window_'), afk = pick('aw-watcher-afk_');
@@ -173,7 +185,7 @@ async function emsScreenActivity(sinceMs, nowMs = Date.now()) {
   const iso = ms => new Date(ms).toISOString();
   let out;
   try {
-    const res = await awFetch(`${EMS_AW_URL}/query/`, {
+    const res = await awFetch(`${base}/query/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ timeperiods: [`${iso(sinceMs)}/${iso(nowMs)}`], query })
@@ -208,7 +220,7 @@ async function emsScreenActivity(sinceMs, nowMs = Date.now()) {
   // Away right now? (no mouse/keyboard on the whole laptop — ActivityWatch's AFK watcher)
   let afkSince = null;
   try {
-    const res = await awFetch(`${EMS_AW_URL}/buckets/${encodeURIComponent(afk)}/events?limit=1`);
+    const res = await awFetch(`${base}/buckets/${encodeURIComponent(afk)}/events?limit=1`);
     const last = res.ok ? (await res.json())[0] : null;
     if (last && last.data && last.data.status === 'afk') afkSince = new Date(last.timestamp).toISOString();
   } catch (_) {}
