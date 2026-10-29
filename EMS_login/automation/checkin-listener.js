@@ -3,6 +3,7 @@ const { initializeFirebase } = require('./report-generator');
 const { deliver, flush } = require('./outbox');
 const { sendReminders } = require('./reminders');
 const { catchUpMissed, processReportRequests } = require('./catch-up');
+const { checkOfflineEmployees } = require('./offline-alerts');
 
 // Keep the 24/7 listener alive through network drops / unexpected errors
 process.on('unhandledRejection', (err) => console.error('⚠️ Unhandled rejection:', err && err.message ? err.message : err));
@@ -271,6 +272,20 @@ async function startListener() {
       console.error(`❌ [Auto Scheduler] Error:`, err.message);
     }
   }, 20000); // Check every 20 seconds
+
+  // 6. Employees who went offline / were auto-checked-out during office hours -> personal WhatsApp
+  let checkingOffline = false;
+  setInterval(async () => {
+    if (checkingOffline) return;
+    checkingOffline = true;
+    try {
+      await checkOfflineEmployees(db);
+    } catch (err) {
+      console.error('❌ [Offline alerts] Error:', err.message);
+    } finally {
+      checkingOffline = false;
+    }
+  }, 5 * 60 * 1000);
 
   // 5. "Send report now" button in the admin portal -> report_requests -> sent instantly
   // Requests that arrive while others are being sent are picked up straight after (not dropped)
