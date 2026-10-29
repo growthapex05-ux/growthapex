@@ -225,7 +225,27 @@ async function emsScreenActivity(sinceMs, nowMs = Date.now()) {
     if (last && last.data && last.data.status === 'afk') afkSince = new Date(last.timestamp).toISOString();
   } catch (_) {}
 
-  return { apps, activeSecs: Math.round(status('not-afk')), idleSecs: Math.round(status('afk')), web: webBuckets.length > 0, afkSince };
+  // What is on screen right now: last focused app, and the website if it is a browser
+  let current = null;
+  try {
+    const lastOf = async b => {
+      const res = await awFetch(`${base}/buckets/${encodeURIComponent(b)}/events?limit=1`);
+      return res.ok ? (await res.json())[0] : null;
+    };
+    const w = await lastOf(win);
+    if (w && w.data) {
+      const app = String(w.data.app || '').replace(/\.exe$/i, '');
+      let site = null;
+      if (EMS_BROWSERS.includes(String(w.data.app)) && webBuckets.length) {
+        const webs = (await Promise.all(webBuckets.map(lastOf))).filter(Boolean)
+          .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
+        try { if (webs[0]) site = new URL(webs[0].data.url).hostname.replace(/^www\./, ''); } catch (_) {}
+      }
+      current = { app, site, at: new Date(Date.parse(w.timestamp) + (w.duration || 0) * 1000).toISOString() };
+    }
+  } catch (_) {}
+
+  return { apps, activeSecs: Math.round(status('not-afk')), idleSecs: Math.round(status('afk')), web: webBuckets.length > 0, afkSince, current };
 }
 
 /** "01 : 05 : 09" */

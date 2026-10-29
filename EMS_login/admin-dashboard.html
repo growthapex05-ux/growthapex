@@ -1644,7 +1644,9 @@ function getDeviceInfoHtml(a) {
   const aw = awStatus[a.empId];
   const top = a.screenActivity && Array.isArray(a.screenActivity.apps) ? a.screenActivity.apps.slice(0, 3) : [];
   const fmtMin = secs => { const mm = Math.round(secs / 60); return mm >= 60 ? `${Math.floor(mm / 60)}h ${mm % 60}m` : `${mm}m`; };
-  if (top.length) parts.push(`🖥️ ${top.map(x => `${x.name} ${fmtMin(x.secs)}`).join(' · ')}`);
+  const cur = a.screenActivity && a.screenActivity.current;
+  if (cur && !a.screenActivity.afkSince && (!a.checkOut || a.checkOut === '—')) parts.push(`<span style="color:#34d399">👁️ Now: ${cur.site || cur.app}</span>`);
+  if (top.length) parts.push(`🖥️ ${top.map(x => `${x.name} ${fmtMin(x.secs)}`).join(' · ')} · <a href="#" onclick="showScreenTime('${a.empId}','${a.date}');return false" style="color:var(--cyan)">View all</a>`);
   else if (aw && aw.connected) parts.push('<span style="color:#34d399">🖥️ ActivityWatch connected</span>');
   else if (aw) parts.push(`<span style="color:#f87171">🖥️ ActivityWatch not connected (${aw.device ? aw.device.os : '?'})</span>`);
   else if (type === 'desktop') parts.push('<span style="color:#fbbf24">🖥️ ActivityWatch not set up</span>');
@@ -2433,6 +2435,53 @@ function payrollFor(emp, monthVal) {
 }
 
 // Popup with the same "Mera Hisaab" card the employee sees
+// Full app / website list for one employee's day (from ActivityWatch via the employee dashboard)
+function showScreenTime(empIdToShow, date) {
+  const emp = cache.employees.find(e => e.id === empIdToShow) || { name: empIdToShow, id: empIdToShow };
+  const rec = (cache.attendance || []).find(r => r.empId === empIdToShow && r.date === date);
+  const act = rec && rec.screenActivity;
+  const fmt = secs => { const m = Math.round(secs / 60); return m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m}m`; };
+  const when = iso => iso ? new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' }) : '—';
+  let body;
+  if (!act || !Array.isArray(act.apps) || !act.apps.length) {
+    body = '<div class="empty-state"><div>🖥️</div>No screen activity data for this day</div>';
+  } else {
+    const max = act.apps[0].secs || 1;
+    const cur = act.current;
+    const away = act.afkSince ? `<span style="color:#fbbf24">⏸️ Away since ${when(act.afkSince)}</span>` : '';
+    body = `
+      <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;margin-bottom:14px">
+        <span>🟢 Active <b>${fmt(act.activeSecs || 0)}</b></span>
+        <span>💤 Idle <b>${fmt(act.idleSecs || 0)}</b></span>
+        ${cur ? `<span>👁️ Last on screen: <b>${cur.site || cur.app}</b>${cur.site ? ` (${cur.app})` : ''} · ${when(cur.at)}</span>` : ''}
+        ${away}
+      </div>
+      ${act.apps.map(x => `
+        <div style="display:grid;grid-template-columns:minmax(120px,1fr) 2fr 70px;gap:10px;align-items:center;padding:5px 0;font-size:13px">
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x.name}">${x.name}</span>
+          <div style="background:var(--soft,rgba(255,255,255,.06));border-radius:6px;height:10px"><div style="width:${Math.max(2, Math.round(x.secs / max * 100))}%;height:10px;border-radius:6px;background:var(--cyan,#22d3ee)"></div></div>
+          <b style="text-align:right">${fmt(x.secs)}</b>
+        </div>`).join('')}
+      <div style="font-size:11px;color:var(--muted);margin-top:12px">Since check-in · updated ${when(act.updatedAt)} · top 15 apps/sites · websites need the ActivityWatch Web Watcher extension</div>`;
+  }
+  let overlay = document.getElementById('screen-time-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'screen-time-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto';
+    overlay.addEventListener('click', ev => { if (ev.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML = `
+    <div style="background:var(--card,#0f172a);border:1px solid var(--border,rgba(255,255,255,.1));border-radius:14px;padding:20px;max-width:640px;width:100%">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h3 style="margin:0">🖥️ ${emp.name} <span style="font-size:12px;color:var(--muted)">(${emp.id}) · ${date}</span></h3>
+        <button class="btn btn-sm" onclick="document.getElementById('screen-time-overlay').remove()">✕</button>
+      </div>
+      ${body}
+    </div>`;
+}
+
 function showEmpSummary(empId, monthVal) {
   const emp = cache.employees.find(e => e.id === empId);
   if (!emp) return;
