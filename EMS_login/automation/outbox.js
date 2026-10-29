@@ -5,6 +5,7 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const gen = require('./report-generator');
 const { sendReport } = require('./sender');
+const { sendEmail, emailSubject, emailEnabled } = require('./email-sender');
 
 // Offline-safe delivery:
 //  1. Every message has a stable id (e.g. daily_2026-10-27). A marker doc in Firestore
@@ -108,6 +109,8 @@ function enqueue(item, error) {
     date: item.date || null,
     message: item.message || null,
     chatId: item.chatId || null,
+    channel: item.channel || null,
+    subject: item.subject || null,
     createdAt: item.createdAt || Date.now(),
     attempts: (item.attempts || 0) + 1,
     lastError: error ? String(error.message || error) : null
@@ -148,9 +151,24 @@ async function sendWithRetry(message, chatId) {
 
 // item: { id, type, date?, message?, chatId? } — message is built from `type` when missing;
 // chatId sends to a personal chat instead of the group.
+// channel: 'email' sends item.subject + message by email instead (see emailCopy).
 // Returns 'sent' | 'already-sent' | 'in-progress' | 'queued'
 async function deliver(db, item, { force = false } = {}) {
   item = { ...item, id: safeId(item.id) };
+  const result = await deliverOnce(db, item, force);
+  if (result === 'sent' || result === 'queued') await emailCopy(db, item);
+  return result;
+}
+
+// Check-in alerts and daily / weekly / monthly reports also go to EMAIL_TO, once each
+async function emailCopy(db, item) {
+  if (item.channel === 'email' || !item.message || !emailEnabled()) return;
+  const subject = emailSubject(item);
+  if (!subject) return;
+  await deliverOnce(db, { id: `email_${item.id}`, type: item.type, channel: 'email', subject, message: item.message }, false);
+}
+
+async function deliverOnce(db, item, force) {
 
   if (!(await isOnline())) {
     enqueue(item, new Error('offline'));
@@ -174,8 +192,13 @@ async function deliver(db, item, { force = false } = {}) {
       item.message = await build(db, item.date);
     }
 
-    console.log(`Sending "${item.id}" to WhatsApp...`);
-    await sendWithRetry(item.message, item.chatId);
+    if (item.channel === 'email') {
+      console.log(`Emailing "${item.id}"...`);
+      await sendEmail(item.subject, item.message);
+    } else {
+      console.log(`Sending "${item.id}" to WhatsApp...`);
+      await sendWithRetry(item.message, item.chatId);
+    }
     await markSent(db, item.id, item.type);
     dequeue(item.id);
     console.log(`✅ "${item.id}" delivered.`);
@@ -209,7 +232,8 @@ async function flush(db) {
     const result = await deliver(db, item);
     if (result === 'sent') sent++;
     // Stop early if sending is broken (e.g. WhatsApp logged out) instead of hammering every item
-    if (result === 'queued') break;
+    // (a failing email must not hold up WhatsApp messages behind it)
+    if (result === 'queued' && item.channel !== 'email') break;
   }
   return { sent, pending: listQueued().length };
 }

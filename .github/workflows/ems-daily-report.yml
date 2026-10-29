@@ -6,6 +6,7 @@ name: Scheduled EMS Daily WhatsApp Report
 #
 # Required repository secrets (Settings -> Secrets and variables -> Actions):
 #   GREEN_API_INSTANCE_ID, GREEN_API_TOKEN, WA_GROUP_JID, FIREBASE_SERVICE_ACCOUNT (full JSON key)
+# Optional, for the email copy of the reports: EMAIL_APP_PASSWORD (password of the support@growthapex.in mailbox)
 
 on:
   schedule:
@@ -56,6 +57,11 @@ jobs:
           WA_GROUP_JID: ${{ secrets.WA_GROUP_JID }}
           FIREBASE_SERVICE_ACCOUNT_PATH: serviceAccountKey.json
           NETWORK_WAIT_MINUTES: '2'
+          EMAIL_USER: support@growthapex.in
+          SMTP_HOST: smtp.hostinger.com
+          SMTP_PORT: '465'
+          EMAIL_TO: growthapex05@gmail.com
+          EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
         run: |
           cd EMS_login/automation
           node run.js --type=${{ github.event.inputs.type || 'daily' }}
