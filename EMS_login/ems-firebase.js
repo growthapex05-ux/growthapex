@@ -140,7 +140,14 @@ async function emsScreenActivity(sinceMs, nowMs = Date.now()) {
     if (!res.ok) return { error: `http-${res.status}` };
     buckets = Object.keys(await res.json());
   } catch (_) {
-    return { error: 'not-running' }; // not installed, not running, or growthapex.in not in cors_origins
+    // A no-cors request succeeds when ActivityWatch is running but growthapex.in is not in its
+    // cors_origins yet (setup file not run) — tells the two cases apart.
+    try {
+      await awFetch(`${EMS_AW_URL}/info`, { mode: 'no-cors' });
+      return { error: 'setup-not-run' };
+    } catch (_) {
+      return { error: 'not-running' }; // not installed / not running, or Chrome blocked local network access
+    }
   }
   const pick = prefix => buckets.find(b => b.startsWith(prefix));
   const win = pick('aw-watcher-window_'), afk = pick('aw-watcher-afk_');

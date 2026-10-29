@@ -577,7 +577,7 @@
         <button class="btn btn-primary" onclick="sendAwSetupToAll()" title="Send the setup link on WhatsApp to everyone who is not connected">📲 Send setup link to all not connected</button>
       </div>
       <div id="aw-status-table"><div class="empty-state"><div>⏳</div>Loading…</div></div>
-      <div style="font-size:11px;color:var(--muted);margin-top:10px">Status is updated when the employee opens the EMS dashboard on their laptop, and every 10 min while checked in.</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:10px">Status is updated when the employee opens the EMS dashboard on their laptop, and every 5 min while checked in.</div>
     </div>
 
     <!-- Recent Send History -->
@@ -3599,7 +3599,8 @@ function watchAwStatus() {
 function awState(st) {
   if (!st) return { key: 'never', html: '<span class="badge badge-amber">⏳ Not checked yet</span>' };
   if (st.connected) return { key: 'ok', html: `<span class="badge badge-green">✅ Connected</span>${st.web ? '' : ' <span class="badge badge-amber">no website extension</span>'}` };
-  return { key: 'off', html: '<span class="badge badge-red">❌ Not connected</span>' };
+  const why = st.reason === 'setup-not-run' ? 'running, setup file not run' : 'ActivityWatch not running / Chrome blocked';
+  return { key: 'off', html: `<span class="badge badge-red">❌ Not connected</span><div style="font-size:11px;color:var(--muted);margin-top:3px">${why}</div>` };
 }
 
 function renderAwStatus() {

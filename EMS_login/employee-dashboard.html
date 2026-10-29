@@ -1104,8 +1104,11 @@
   function renderScreenActivityStatus(act) {
     const el = document.getElementById('screen-activity-status');
     if (!el) return;
+    const why = act.error === 'setup-not-run'
+      ? 'ActivityWatch is running, but the setup step is not done — please run the setup file / Terminal command from the admin\'s guide, then refresh this page.'
+      : 'please open ActivityWatch on this laptop. If Chrome asks to allow local network access, click Allow (see the setup guide from the admin).';
     el.innerHTML = act.error
-      ? '🖥️ Screen activity: <b style="color:var(--danger)">ActivityWatch not connected</b> — please open ActivityWatch on this laptop (see the setup guide from the admin).'
+      ? `🖥️ Screen activity: <b style="color:var(--danger)">ActivityWatch not connected</b> — ${why}`
       : `🖥️ Screen activity: <b style="color:#16a34a">connected</b>${act.web ? '' : ' · add the "ActivityWatch Web Watcher" browser extension to see websites'}`;
   }
 
