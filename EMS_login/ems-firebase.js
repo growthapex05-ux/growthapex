@@ -245,7 +245,15 @@ async function emsScreenActivity(sinceMs, nowMs = Date.now()) {
     }
   } catch (_) {}
 
-  return { apps, activeSecs: Math.round(status('not-afk')), idleSecs: Math.round(status('afk')), web: webBuckets.length > 0, afkSince, current };
+  // Separate lists for the admin popup: programs (browser = total) and websites (active tab only)
+  const programs = (out.apps || [])
+    .map(e => ({ name: String(e.data.app || '').replace(/\.exe$/i, ''), secs: Math.round(e.duration) }))
+    .filter(a => a.name && a.secs >= 60).slice(0, 15);
+  const sites = (out.web || [])
+    .map(e => ({ name: String(e.data.$domain || '').replace(/^www\./, ''), secs: Math.round(e.duration) }))
+    .filter(a => a.name && a.secs >= 30).slice(0, 25);
+
+  return { apps, programs, sites, activeSecs: Math.round(status('not-afk')), idleSecs: Math.round(status('afk')), web: webBuckets.length > 0, afkSince, current };
 }
 
 /** "01 : 05 : 09" */

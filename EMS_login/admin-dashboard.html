@@ -2446,7 +2446,21 @@ function showScreenTime(empIdToShow, date) {
   if (!act || !Array.isArray(act.apps) || !act.apps.length) {
     body = '<div class="empty-state"><div>🖥️</div>No screen activity data for this day</div>';
   } else {
-    const max = act.apps[0].secs || 1;
+    const bars = list => {
+      const max = (list[0] && list[0].secs) || 1;
+      return list.map(x => `
+        <div style="display:grid;grid-template-columns:minmax(120px,1fr) 2fr 70px;gap:10px;align-items:center;padding:5px 0;font-size:13px">
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x.name}">${x.name}</span>
+          <div style="background:var(--soft,rgba(255,255,255,.06));border-radius:6px;height:10px"><div style="width:${Math.max(2, Math.round(x.secs / max * 100))}%;height:10px;border-radius:6px;background:var(--cyan,#22d3ee)"></div></div>
+          <b style="text-align:right">${fmt(x.secs)}</b>
+        </div>`).join('');
+    };
+    const head = t => `<div style="font-weight:700;margin:14px 0 4px">${t}</div>`;
+    // Newer data has separate app and website lists; older records only the combined list
+    const sections = (act.programs || act.sites)
+      ? head('🧩 Apps') + (act.programs && act.programs.length ? bars(act.programs) : '<div style="color:var(--muted);font-size:12px">—</div>')
+        + head('🌐 Websites (Chrome / browser — active tab)') + (act.sites && act.sites.length ? bars(act.sites) : '<div style="color:var(--muted);font-size:12px">No websites yet — needs the ActivityWatch Web Watcher extension</div>')
+      : bars(act.apps);
     const cur = act.current;
     const away = act.afkSince ? `<span style="color:#fbbf24">⏸️ Away since ${when(act.afkSince)}</span>` : '';
     body = `
@@ -2456,13 +2470,8 @@ function showScreenTime(empIdToShow, date) {
         ${cur ? `<span>👁️ Last on screen: <b>${cur.site || cur.app}</b>${cur.site ? ` (${cur.app})` : ''} · ${when(cur.at)}</span>` : ''}
         ${away}
       </div>
-      ${act.apps.map(x => `
-        <div style="display:grid;grid-template-columns:minmax(120px,1fr) 2fr 70px;gap:10px;align-items:center;padding:5px 0;font-size:13px">
-          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x.name}">${x.name}</span>
-          <div style="background:var(--soft,rgba(255,255,255,.06));border-radius:6px;height:10px"><div style="width:${Math.max(2, Math.round(x.secs / max * 100))}%;height:10px;border-radius:6px;background:var(--cyan,#22d3ee)"></div></div>
-          <b style="text-align:right">${fmt(x.secs)}</b>
-        </div>`).join('')}
-      <div style="font-size:11px;color:var(--muted);margin-top:12px">Since check-in · updated ${when(act.updatedAt)} · top 15 apps/sites · websites need the ActivityWatch Web Watcher extension</div>`;
+      ${sections}
+      <div style="font-size:11px;color:var(--muted);margin-top:12px">Since check-in · updated ${when(act.updatedAt)} · time on screen, not counting idle time</div>`;
   }
   let overlay = document.getElementById('screen-time-overlay');
   if (!overlay) {
