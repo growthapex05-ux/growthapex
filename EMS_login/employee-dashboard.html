@@ -1089,6 +1089,7 @@
   function saveScreenStatus(act) {
     return db.collection('screen_status').doc(empId).set({
       empId, name: emp.name || empId, connected: !act.error, reason: act.error || null,
+      detail: act.detail || null, lna: act.lna || null,
       web: !!act.web, device: emsDevice(), at: new Date().toISOString()
     }, { merge: true }).catch(e => console.warn('Screen status:', e.message));
   }
@@ -1106,7 +1107,9 @@
     if (!el) return;
     const why = act.error === 'setup-not-run'
       ? 'ActivityWatch is running, but the setup step is not done — please run the setup file / Terminal command from the admin\'s guide, then refresh this page.'
-      : 'please open ActivityWatch on this laptop. If Chrome asks to allow local network access, click Allow (see the setup guide from the admin).';
+      : act.error === 'chrome-blocked'
+        ? 'Chrome is blocking it. Click the icon left of the address bar → Site settings → set <b>Local network access</b> to <b>Allow</b>, then refresh this page.'
+        : 'please open ActivityWatch on this laptop (check: <a href="http://localhost:5600" target="_blank" rel="noopener">localhost:5600</a> should open). If Chrome asks to allow local network access, click Allow.';
     el.innerHTML = act.error
       ? `🖥️ Screen activity: <b style="color:var(--danger)">ActivityWatch not connected</b> — ${why}`
       : `🖥️ Screen activity: <b style="color:#16a34a">connected</b>${act.web ? '' : ' · add the "ActivityWatch Web Watcher" browser extension to see websites'}`;

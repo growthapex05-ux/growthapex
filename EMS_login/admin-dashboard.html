@@ -3599,7 +3599,9 @@ function watchAwStatus() {
 function awState(st) {
   if (!st) return { key: 'never', html: '<span class="badge badge-amber">⏳ Not checked yet</span>' };
   if (st.connected) return { key: 'ok', html: `<span class="badge badge-green">✅ Connected</span>${st.web ? '' : ' <span class="badge badge-amber">no website extension</span>'}` };
-  const why = st.reason === 'setup-not-run' ? 'running, setup file not run' : 'ActivityWatch not running / Chrome blocked';
+  const why = st.reason === 'setup-not-run' ? 'ActivityWatch running — setup file / Terminal command not run'
+    : st.reason === 'chrome-blocked' ? 'Chrome blocked local network access — allow it in site settings'
+    : `ActivityWatch not reachable${st.lna && st.lna !== 'unsupported' ? ` · Chrome permission: ${st.lna}` : ''}${st.detail ? ` · ${st.detail}` : ''}`;
   return { key: 'off', html: `<span class="badge badge-red">❌ Not connected</span><div style="font-size:11px;color:var(--muted);margin-top:3px">${why}</div>` };
 }
 
