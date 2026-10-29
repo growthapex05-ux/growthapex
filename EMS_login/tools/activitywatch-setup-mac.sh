@@ -31,6 +31,19 @@ pkill -f aw-qt >/dev/null 2>&1 || true
 sleep 3
 open -a ActivityWatch
 
+# Check: does ActivityWatch now allow growthapex.in? (waits up to ~40 s for it to start)
+echo "Checking the connection..."
+for i in $(seq 1 20); do
+  if curl -s -i -H "Origin: https://growthapex.in" http://localhost:5600/api/0/info 2>/dev/null | grep -qi "access-control-allow-origin"; then
+    echo ""
+    echo "DONE - ActivityWatch is connected to GrowthApex EMS."
+    echo "Now open the EMS dashboard in Chrome and press Cmd+Shift+R - it should say: Screen activity: connected"
+    exit 0
+  fi
+  sleep 2
+done
 echo ""
-echo "DONE - ActivityWatch is connected to GrowthApex EMS."
-echo "Now refresh the EMS dashboard -> Attendance. It should say: Screen activity: connected"
+echo "NOT CONNECTED YET - ActivityWatch did not accept growthapex.in."
+echo "Quit ActivityWatch from the menu bar icon, open it again, and run the command once more."
+echo "If it still fails, send a screenshot of this window to the admin."
+exit 1
