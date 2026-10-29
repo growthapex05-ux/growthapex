@@ -1684,8 +1684,13 @@ function getLivePulseBadge(a) {
   }
 }
 
+// The table re-renders every 5 s; the auto-checkout check reads Firestore, so it runs at most once a minute
+let lastAutoCheckoutRun = 0;
 async function renderAdminAtt() {
-  await EMS_DB.processAutoCheckouts().catch(() => {});
+  if (Date.now() - lastAutoCheckoutRun > 60000) {
+    lastAutoCheckoutRun = Date.now();
+    await EMS_DB.processAutoCheckouts().catch(() => {});
+  }
 
   const date   = document.getElementById('att-date-filter')?.value||'';
   const empId  = document.getElementById('att-emp-filter')?.value||'';

@@ -228,7 +228,7 @@
     }
 
     syncFirestoreState();
-    setInterval(syncFirestoreState, 5000);
+    setInterval(syncFirestoreState, 60000); // the clock ticks locally; Firestore only to resync (was every 5 s)
 
     // Check-out button handler
     document.getElementById('btn-checkout').onclick = async () => {

@@ -100,7 +100,7 @@ async function emsLocationWithHome(empId) {
 
 /**
  * Worked (online) time for an attendance record, in seconds.
- * Only time while the dashboard was connected counts: heartbeats every 15s add the gap since the
+ * Only time while the dashboard was connected counts: heartbeats every 30s add the gap since the
  * previous one, and a gap longer than EMS_ONLINE_GAP_S means the employee was offline — not counted.
  * So 1h work, 4h offline, back online => the timer continues from 1h, not 5h.
  */
