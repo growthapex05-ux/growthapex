@@ -273,12 +273,18 @@ async function startListener() {
   }, 20000); // Check every 20 seconds
 
   // 5. "Send report now" button in the admin portal -> report_requests -> sent instantly
+  // Requests that arrive while others are being sent are picked up straight after (not dropped)
   let handlingRequests = false;
+  let requestsWaiting = false;
   db.collection('report_requests').where('status', '==', 'pending').onSnapshot(async (snap) => {
-    if (snap.empty || handlingRequests) return;
+    if (snap.empty) return;
+    if (handlingRequests) { requestsWaiting = true; return; }
     handlingRequests = true;
     try {
-      await processReportRequests(db);
+      do {
+        requestsWaiting = false;
+        await processReportRequests(db);
+      } while (requestsWaiting);
     } catch (err) {
       console.error('❌ [Requests] Error:', err.message);
     } finally {
