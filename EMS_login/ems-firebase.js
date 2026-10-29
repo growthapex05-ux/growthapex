@@ -126,8 +126,19 @@ function emsWorkedSeconds(rec, nowMs = Date.now()) {
  * Returns { apps: [{ name, secs }], activeSecs, idleSecs, web: bool } or { error: 'not-running' | ... } — never throws.
  */
 const EMS_AW_URLS = ['http://localhost:5600/api/0', 'http://127.0.0.1:5600/api/0'];
-const EMS_BROWSERS = ['chrome.exe', 'msedge.exe', 'firefox.exe', 'brave.exe', 'opera.exe', 'vivaldi.exe',
-  'Google Chrome', 'Microsoft Edge', 'Firefox', 'Brave Browser', 'Safari', 'Opera', 'Arc'];
+// Browser app names per browser; the web watcher bucket name says which browser it runs in
+// (aw-watcher-web-chrome, -firefox, -edge …). Chrome is the fallback (Chrome-store extension).
+const EMS_BROWSER_FAMILIES = [
+  { key: 'edge', label: 'Edge', apps: ['msedge.exe', 'Microsoft Edge', 'msedge'] },
+  { key: 'firefox', label: 'Firefox', apps: ['firefox.exe', 'Firefox', 'firefox'] },
+  { key: 'brave', label: 'Brave', apps: ['brave.exe', 'Brave Browser', 'brave'] },
+  { key: 'opera', label: 'Opera', apps: ['opera.exe', 'Opera', 'opera'] },
+  { key: 'vivaldi', label: 'Vivaldi', apps: ['vivaldi.exe', 'Vivaldi', 'vivaldi'] },
+  { key: 'arc', label: 'Arc', apps: ['Arc'] },
+  { key: 'safari', label: 'Safari', apps: ['Safari'] },
+  { key: 'chrome', label: 'Chrome', apps: ['chrome.exe', 'Google Chrome', 'chrome'] }
+];
+const EMS_BROWSERS = EMS_BROWSER_FAMILIES.flatMap(b => b.apps);
 async function emsScreenActivity(sinceMs, nowMs = Date.now()) {
   const awFetch = async (url, opts = {}) => {
     const ctrl = new AbortController();
@@ -165,6 +176,14 @@ async function emsScreenActivity(sinceMs, nowMs = Date.now()) {
   const win = pick('aw-watcher-window_'), afk = pick('aw-watcher-afk_');
   if (!win || !afk) return { error: 'no-watchers' };
   const webBuckets = buckets.filter(b => b.startsWith('aw-watcher-web'));
+  const famOf = b => EMS_BROWSER_FAMILIES.find(f => f.key !== 'chrome' && b.toLowerCase().includes(f.key))
+    || EMS_BROWSER_FAMILIES.find(f => f.key === 'chrome');
+  const webFamilies = [];
+  webBuckets.forEach(b => {
+    const fam = famOf(b);
+    const entry = webFamilies.find(x => x.fam === fam);
+    if (entry) entry.list.push(b); else webFamilies.push({ fam, list: [b] });
+  });
 
   const q = JSON.stringify;
   const query = [
@@ -173,14 +192,13 @@ async function emsScreenActivity(sinceMs, nowMs = Date.now()) {
     `events = filter_period_intersect(flood(query_bucket(${q(win)})), not_afk);`,
     `apps = sort_by_duration(merge_events_by_keys(events, ["app"]));`,
     `afk_total = merge_events_by_keys(afk, ["status"]);`,
-    `web = [];`,
-    ...(webBuckets.length ? [
-      `browser = filter_keyvals(events, "app", ${q(EMS_BROWSERS)});`,
-      `web_raw = [];`,
-      ...webBuckets.map(b => `web_raw = concat(web_raw, flood(query_bucket(${q(b)})));`),
-      `web = sort_by_duration(merge_events_by_keys(split_url_events(filter_period_intersect(web_raw, browser)), ["$domain"]));`
-    ] : []),
-    `RETURN = {"apps": apps, "afk": afk_total, "web": web};`
+    ...webFamilies.flatMap(({ fam, list }) => [
+      `b_${fam.key} = filter_keyvals(events, "app", ${q(fam.apps)});`,
+      `w_${fam.key} = [];`,
+      ...list.map(b => `w_${fam.key} = concat(w_${fam.key}, flood(query_bucket(${q(b)})));`),
+      `web_${fam.key} = sort_by_duration(merge_events_by_keys(split_url_events(filter_period_intersect(w_${fam.key}, b_${fam.key})), ["$domain"]));`
+    ]),
+    `RETURN = {"apps": apps, "afk": afk_total${webFamilies.map(({ fam }) => `, "web_${fam.key}": web_${fam.key}`).join('')}};`
   ];
   const iso = ms => new Date(ms).toISOString();
   let out;
@@ -199,23 +217,33 @@ async function emsScreenActivity(sinceMs, nowMs = Date.now()) {
   const status = s => (out.afk || []).filter(e => e.data.status === s).reduce((t, e) => t + e.duration, 0);
   const tally = {};
   const add = (name, secs) => { if (name && secs > 0) tally[name] = (tally[name] || 0) + secs; };
-  const webSecs = (out.web || []).reduce((t, e) => t + e.duration, 0);
+  const appSecs = names => (out.apps || []).filter(e => names.includes(String(e.data.app))).reduce((t, e) => t + e.duration, 0);
+  const siteTally = {};
   (out.apps || []).forEach(e => {
     const app = String(e.data.app || '');
-    // With the web watcher, browser time is shown per website instead (rest stays under the browser name)
-    if (webSecs && EMS_BROWSERS.includes(app)) return;
-    add(app.replace(/\.exe$/i, ''), e.duration);
+    if (!EMS_BROWSERS.includes(app)) add(app.replace(/.exe$/i, ''), e.duration);
   });
-  (out.web || []).forEach(e => add(String(e.data.$domain || '').replace(/^www\./, ''), e.duration));
-  if (webSecs) {
-    const browserSecs = (out.apps || []).filter(e => EMS_BROWSERS.includes(String(e.data.app))).reduce((t, e) => t + e.duration, 0);
-    add('Browser (other)', browserSecs - webSecs);
-  }
-  const apps = Object.entries(tally)
+  EMS_BROWSER_FAMILIES.forEach(fam => {
+    const total = appSecs(fam.apps);
+    if (!total) return;
+    const web = out[`web_${fam.key}`];
+    if (!web) { add(`${fam.label} (no website data)`, total); return; }
+    let webSecs = 0;
+    web.forEach(e => {
+      const domain = String(e.data.$domain || '').replace(/^www./, '');
+      if (!domain) return;
+      webSecs += e.duration;
+      add(domain, e.duration);
+      siteTally[domain] = (siteTally[domain] || 0) + e.duration;
+    });
+    if (total - webSecs >= 60) add(`${fam.label} (other pages)`, total - webSecs);
+  });
+  const toList = (obj, minSecs, max) => Object.entries(obj)
     .map(([name, secs]) => ({ name, secs: Math.round(secs) }))
-    .filter(a => a.secs >= 60)
+    .filter(a => a.secs >= minSecs)
     .sort((a, b) => b.secs - a.secs)
-    .slice(0, 15);
+    .slice(0, max);
+  const apps = toList(tally, 60, 40);
 
   // Away right now? (no mouse/keyboard on the whole laptop — ActivityWatch's AFK watcher)
   let afkSince = null;
@@ -245,13 +273,9 @@ async function emsScreenActivity(sinceMs, nowMs = Date.now()) {
     }
   } catch (_) {}
 
-  // Separate lists for the admin popup: programs (browser = total) and websites (active tab only)
-  const programs = (out.apps || [])
-    .map(e => ({ name: String(e.data.app || '').replace(/\.exe$/i, ''), secs: Math.round(e.duration) }))
-    .filter(a => a.name && a.secs >= 60).slice(0, 15);
-  const sites = (out.web || [])
-    .map(e => ({ name: String(e.data.$domain || '').replace(/^www\./, ''), secs: Math.round(e.duration) }))
-    .filter(a => a.name && a.secs >= 30).slice(0, 25);
+  // Separate lists for the admin popup / 7 PM report: every program (browsers as one entry) and every website
+  const programs = toList(Object.fromEntries((out.apps || []).map(e => [String(e.data.app || '').replace(/.exe$/i, ''), e.duration])), 60, 40);
+  const sites = toList(siteTally, 30, 60);
 
   return { apps, programs, sites, activeSecs: Math.round(status('not-afk')), idleSecs: Math.round(status('afk')), web: webBuckets.length > 0, afkSince, current };
 }

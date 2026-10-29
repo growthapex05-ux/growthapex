@@ -25,6 +25,8 @@ const BUILDERS = {
   // Detailed attendance reports with time, hours, device and location (lazy require: it requires this file)
   daily: (db, date) => require('./attendance-report').buildAttendanceReport(db, date, { mode: 'evening' }),
   login: (db, date) => require('./attendance-report').buildAttendanceReport(db, date, { mode: 'morning' }),
+  // Every app and website per employee (ActivityWatch), sent with the evening report
+  screen: (db, date) => require('../ems-reports').buildScreenReport(db, date),
   weekly: (db) => gen.generateWeeklyReport(db),
   // + attendance & leave per employee (lazy require: month-summary.js requires this file)
   monthly: async (db) => (await gen.generateMonthlyReport(db)) + (await require('./month-summary').groupSection(db))

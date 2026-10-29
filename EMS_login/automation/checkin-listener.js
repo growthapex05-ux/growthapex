@@ -267,6 +267,7 @@ async function startListener() {
         lastDailyReportDate = currentTodayStr;
         console.log(`\n⏰ [Auto Scheduler] Daily Report for ${currentTodayStr}...`);
         await deliver(db, { id: `daily_${currentTodayStr}`, type: 'daily', date: currentTodayStr });
+        await deliver(db, { id: `screen_${currentTodayStr}`, type: 'screen', date: currentTodayStr });
       }
     } catch (err) {
       console.error(`❌ [Auto Scheduler] Error:`, err.message);

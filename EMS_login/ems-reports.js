@@ -768,7 +768,51 @@ async function groupSection(db, monthVal = reportMonth()) {
          `\n_Absent = working day with no check-in and no approved leave._`;
 }
 
+  // ── 7 PM screen activity report: every app and website per employee (ActivityWatch) ──
+
+  async function buildScreenReport(db, date = todayIST()) {
+    const { attendance, employees } = await loadData(db, date);
+    let msg = `🖥️ *GROWTHAPEX — SCREEN ACTIVITY REPORT*
+📅 *${prettyDate(date)}*
+━━━━━━━━━━━━━━━━━━━━━━
+`;
+    const blocks = [];
+    employees.forEach((emp, i) => {
+      const rec = attendance.find(a => a.empId === emp.id && a.date === date && has(a.checkIn));
+      const lines = [`${NUM_EMOJI[i] || '•'} *${emp.name}* (${emp.id})`];
+      const act = rec && rec.screenActivity;
+      if (!rec) {
+        lines.push('   — Not checked in');
+      } else if (!act || !Array.isArray(act.apps) || !act.apps.length) {
+        lines.push(rec.checkInDevice && rec.checkInDevice.type !== 'desktop'
+          ? '   🖥️ Not tracked (mobile check-in)'
+          : '   ⚠️ No screen activity data (ActivityWatch not connected)');
+      } else {
+        lines.push(`   🟢 Active *${shortDuration(act.activeSecs || 0)}* · 💤 Idle *${shortDuration(act.idleSecs || 0)}*`);
+        const programs = act.programs || act.apps;
+        lines.push(act.programs ? '   🧩 *Apps:*' : '   🧩 *Apps & websites:*');
+        programs.forEach(a => lines.push(`      • ${a.name} — ${shortDuration(a.secs)}`));
+        if (act.sites) {
+          lines.push('   🌐 *Websites:*');
+          if (act.sites.length) act.sites.forEach(a => lines.push(`      • ${a.name} — ${shortDuration(a.secs)}`));
+          else lines.push('      — none (no browser extension data)');
+        }
+        const noWeb = (act.apps || []).filter(a => / (no website data)$/.test(a.name));
+        if (noWeb.length) lines.push(`   ⚠️ No website data from: ${noWeb.map(a => a.name.replace(/ (no website data)$/, '')).join(', ')} (extension not installed)`);
+        if (act.updatedAt) lines.push(`   _Updated ${new Date(act.updatedAt).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: '2-digit' })}_`);
+      }
+      blocks.push(lines.join('\n'));
+    });
+    msg += blocks.join('\n\n');
+    msg += `
+
+━━━━━━━━━━━━━━━━━━━━━━
+_Time on screen since check-in (idle time not counted) · websites = active browser tab · from ActivityWatch on each laptop._`;
+    return msg;
+  }
+
   const api = {
+    buildScreenReport,
     buildAttendanceReport, generateWeeklyReport, generateMonthlyReport, groupSection,
     loadSummaries, reportMonth, isCheckInLate, formatDateString, getHolidaysForMonth,
     getActiveEmployees, isEmployeeOnLeave, todayIST

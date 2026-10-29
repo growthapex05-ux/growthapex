@@ -16,7 +16,7 @@ const { groupSection, sendPersonalSalarySummaries } = require('./month-summary')
 const { catchUpMissed, processReportRequests } = require('./catch-up');
 const { buildAttendanceReport } = require('./attendance-report');
 
-const REPORT_TYPES = ['daily', 'weekly', 'monthly', 'login'];
+const REPORT_TYPES = ['daily', 'weekly', 'monthly', 'login', 'screen'];
 const REMINDER_TYPES = ['remind-checkin', 'remind-checkout'];
 
 // Parse CLI arguments
@@ -35,6 +35,7 @@ function reportId(type, date) {
   const today = date || todayIST();
   if (type === 'daily') return `daily_${today}`;
   if (type === 'login') return `morning_${today}`;
+  if (type === 'screen') return `screen_${today}`;
   const d = new Date(`${today}T12:00:00`);
   if (type === 'weekly') {
     const monday = new Date(d);
@@ -82,7 +83,7 @@ async function main() {
   }
 
   // Skip running the daily/morning report on Sundays (unless explicit date specified)
-  if (['daily', 'login'].includes(reportType) && !targetDate && new Date().getDay() === 0) {
+  if (['daily', 'login', 'screen'].includes(reportType) && !targetDate && new Date().getDay() === 0) {
     console.log(`📅 Today is Sunday. Exclude Sunday from working days. Skipping ${reportType} report.`);
     process.exit(0);
   }
@@ -100,7 +101,7 @@ async function main() {
   const item = (argv.flush || isReminder) ? null : {
     id: reportId(reportType, targetDate),
     type: reportType,
-    date: targetDate || (['daily', 'login'].includes(reportType) ? todayIST() : null)
+    date: targetDate || (['daily', 'login', 'screen'].includes(reportType) ? todayIST() : null)
   };
 
   // Wait a while for the connection; if it never comes, park the job in the offline queue
@@ -132,6 +133,7 @@ async function main() {
       console.log(`Generating ${reportType} report data...`);
       if (reportType === 'daily') reportText = await buildAttendanceReport(db, targetDate || todayIST(), { mode: 'evening' });
       else if (reportType === 'login') reportText = await buildAttendanceReport(db, targetDate || todayIST(), { mode: 'morning' });
+      else if (reportType === 'screen') reportText = await require('../ems-reports').buildScreenReport(db, targetDate || todayIST());
       else if (reportType === 'weekly') reportText = await generateWeeklyReport(db);
       else {
         reportText = (await generateMonthlyReport(db)) + (await groupSection(db));
@@ -168,6 +170,8 @@ async function main() {
 
   // Monthly: each employee also gets their own attendance + salary breakdown, privately
   if (reportType === 'monthly') await sendPersonalSalarySummaries(db);
+  // The evening report is followed by the full screen activity report (apps + websites)
+  if (reportType === 'daily') await deliver(db, { id: reportId('screen', item.date), type: 'screen', date: item.date }, { force: !!argv.force });
   if (result === 'queued') {
     console.log("⏳ Report could not be sent now — it is queued and will go out automatically.");
   } else {
