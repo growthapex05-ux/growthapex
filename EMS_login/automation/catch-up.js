@@ -67,6 +67,7 @@ async function catchUpMissed(db) {
 }
 
 const AW_SETUP_URL = 'https://growthapex.in/EMS_login/tools/activitywatch-setup.bat';
+const AW_SETUP_MAC_URL = 'https://growthapex.in/EMS_login/tools/activitywatch-setup-mac.sh';
 
 function awSetupMessage(emp) {
   return `🖥️ *ActivityWatch Setup Reminder*
@@ -81,7 +82,9 @@ function awSetupMessage(emp) {
 ` +
     `2️⃣ In Chrome, add the "ActivityWatch Web Watcher" extension
 ` +
-    `3️⃣ Download and run this file once (if Windows/Chrome warns, choose "Keep" → "Run anyway"): ${AW_SETUP_URL}
+    `3️⃣ *Windows:* download and run this file once (if Windows/Chrome warns, choose "Keep" → "Run anyway"): ${AW_SETUP_URL}
+` +
+    `    *Mac:* open Terminal, paste this line and press Enter: \`\`\`curl -fsSL ${AW_SETUP_MAC_URL} | bash\`\`\`
 ` +
     `4️⃣ Open the EMS dashboard → Attendance. It should say "🖥️ Screen activity: connected". If Chrome asks to allow local network access, click *Allow*.
 
