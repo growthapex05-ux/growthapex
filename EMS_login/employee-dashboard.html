@@ -1063,9 +1063,10 @@
   });
 
   // ── Screen activity (ActivityWatch on this laptop) ─────────
-  // Every 10 min while checked in (and at check-out) the app/website usage since check-in is saved
-  // on today's attendance record; the evening WhatsApp report lists it.
-  const SCREEN_SYNC_MS = 10 * 60 * 1000;
+  // Every 5 min while checked in (and at check-out) the app/website usage since check-in is saved
+  // on today's attendance record; the evening WhatsApp report lists it, and afkSince drives the
+  // automation's "inactive" alert.
+  const SCREEN_SYNC_MS = 5 * 60 * 1000;
   let screenSyncInterval = null;
 
   async function syncScreenActivity(rec) {

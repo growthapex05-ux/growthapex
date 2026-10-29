@@ -197,7 +197,16 @@ async function emsScreenActivity(sinceMs, nowMs = Date.now()) {
     .filter(a => a.secs >= 60)
     .sort((a, b) => b.secs - a.secs)
     .slice(0, 15);
-  return { apps, activeSecs: Math.round(status('not-afk')), idleSecs: Math.round(status('afk')), web: webBuckets.length > 0 };
+
+  // Away right now? (no mouse/keyboard on the whole laptop — ActivityWatch's AFK watcher)
+  let afkSince = null;
+  try {
+    const res = await awFetch(`${EMS_AW_URL}/buckets/${encodeURIComponent(afk)}/events?limit=1`);
+    const last = res.ok ? (await res.json())[0] : null;
+    if (last && last.data && last.data.status === 'afk') afkSince = new Date(last.timestamp).toISOString();
+  } catch (_) {}
+
+  return { apps, activeSecs: Math.round(status('not-afk')), idleSecs: Math.round(status('afk')), web: webBuckets.length > 0, afkSince };
 }
 
 /** "01 : 05 : 09" */

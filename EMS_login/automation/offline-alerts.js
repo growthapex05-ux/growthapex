@@ -3,8 +3,10 @@
 //                    (60 min when they checked in from a phone: a locked phone stops heartbeats)
 //  • auto check-out — the system checked them out (PC closed / disconnected) and they have not
 //                    resumed work within AUTO_CHECKOUT_ALERT_MINUTES
+//  • inactive      — online, but ActivityWatch has seen no mouse/keyboard on the laptop for
+//                    INACTIVE_ALERT_MINUTES (screenActivity.afkSince, synced by the dashboard every 5 min)
 // One message per offline episode (dedupe id), at most MAX_OFFLINE_ALERTS a day per employee.
-// "Idle" is not used: it only sees mouse/keyboard on the EMS tab, so work in other tabs looks idle.
+// The EMS tab's own idle flag is not used: it only sees input on the EMS tab, so work in other tabs looks idle.
 
 const P = require('../ems-payroll');
 const { deliver, todayIST } = require('./outbox');
@@ -13,6 +15,7 @@ const { toChatId } = require('./reminders');
 const OFFLINE_MIN = parseInt(process.env.OFFLINE_ALERT_MINUTES, 10) || 15;
 const OFFLINE_MOBILE_MIN = parseInt(process.env.OFFLINE_ALERT_MOBILE_MINUTES, 10) || 60;
 const AUTO_OUT_MIN = parseInt(process.env.AUTO_CHECKOUT_ALERT_MINUTES, 10) || 10;
+const INACTIVE_MIN = parseInt(process.env.INACTIVE_ALERT_MINUTES, 10) || 30;
 const MAX_ALERTS = parseInt(process.env.MAX_OFFLINE_ALERTS, 10) || 3;
 const WORK_START = process.env.WORK_START_TIME || '10:00';
 const WORK_END = process.env.WORK_END_TIME || '19:00';
@@ -83,8 +86,31 @@ async function checkOfflineEmployees(db, { dryRun = false } = {}) {
       if (isNaN(hb)) continue;
       const mins = Math.floor((Date.now() - hb) / 60000);
       const limit = rec.lastDevice && rec.lastDevice !== 'desktop' ? OFFLINE_MOBILE_MIN : OFFLINE_MIN;
-      if (mins < limit) continue;
-      alert = {
+      if (mins < limit) {
+        // Online — but away from the laptop? (ActivityWatch AFK; data must be fresh)
+        const act = rec.screenActivity;
+        const afk = act && Date.parse(act.afkSince || '');
+        const fresh = act && Date.now() - Date.parse(act.updatedAt || '') < 15 * 60000;
+        if (!afk || !fresh) continue;
+        const idleMin = Math.floor((Date.now() - afk) / 60000);
+        if (idleMin < INACTIVE_MIN) continue;
+        alert = {
+          id: `inactive_${emp.id}_${date}_${act.afkSince}`,
+          personal: `⏸️ *EMS Inactive Alert*
+
+Hi ${first}, there has been no activity on your laptop for *${idleMin} min* (since ${timeIST(afk)}), but you are still checked in.
+
+👉 If you are on a break, that's fine — otherwise please get back to work.
+👉 If you have stopped for the day, please *Check-Out*.
+
+_GrowthApex EMS_`,
+          group: `⏸️ *EMS Inactive Alert*
+
+${who} is checked in, but there has been no activity on their laptop for *${idleMin} min* (since ${timeIST(afk)}).
+
+_GrowthApex EMS_`
+        };
+      } else alert = {
         id: `offline_${emp.id}_${date}_${rec.lastHeartbeat}`,
         personal: offlineMessage(first, mins, timeIST(hb)),
         group: `⚠️ *EMS Offline Alert*
