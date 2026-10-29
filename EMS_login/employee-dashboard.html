@@ -844,7 +844,7 @@
       window.location.href = '/EMS_login/?expired=1';
       return;
     }
-    initEmployee();
+    initEmployee().then(checkScreenSetup);
   });
 
   // Clock
@@ -1080,7 +1080,24 @@
       else { update.screenActivity = { ...act, updatedAt: new Date().toISOString() }; update.screenActivityError = null; }
       await EMS_DB.markAttendance(update);
       renderScreenActivityStatus(act);
+      saveScreenStatus(act);
     } catch (e) { console.warn('Screen activity sync:', e.message); }
+  }
+
+  // Setup status for the admin's "ActivityWatch setup" list (screen_status/{empId})
+  function saveScreenStatus(act) {
+    return db.collection('screen_status').doc(empId).set({
+      empId, name: emp.name || empId, connected: !act.error, reason: act.error || null,
+      web: !!act.web, device: emsDevice(), at: new Date().toISOString()
+    }, { merge: true }).catch(e => console.warn('Screen status:', e.message));
+  }
+
+  // On opening the dashboard (laptop only): is ActivityWatch connected? Shown to the employee and the admin.
+  async function checkScreenSetup() {
+    if (IS_MOBILE_DEVICE) return;
+    const act = await emsScreenActivity(Date.now() - 60 * 1000);
+    renderScreenActivityStatus(act);
+    saveScreenStatus(act);
   }
 
   function renderScreenActivityStatus(act) {

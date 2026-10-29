@@ -570,6 +570,16 @@
       <div class="rpt-status" id="rpt-status"></div>
     </div>
 
+    <!-- ActivityWatch setup per employee -->
+    <div class="section-card">
+      <div class="section-head">
+        <h3>🖥️ ActivityWatch Setup</h3>
+        <button class="btn btn-primary" onclick="sendAwSetupToAll()" title="Send the setup link on WhatsApp to everyone who is not connected">📲 Send setup link to all not connected</button>
+      </div>
+      <div id="aw-status-table"><div class="empty-state"><div>⏳</div>Loading…</div></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:10px">Status is updated when the employee opens the EMS dashboard on their laptop, and every 10 min while checked in.</div>
+    </div>
+
     <!-- Recent Send History -->
     <div class="section-card">
       <div class="section-head"><h3>📜 Send History (This Session)</h3></div>
@@ -3558,6 +3568,72 @@ function initReportsPage() {
   }
   refreshRptKPIs();
   refreshRptPreview();
+  watchAwStatus();
+}
+
+// ── ActivityWatch setup status (screen_status/{empId}, written by the employee dashboard) ──
+let awStatus = {};
+let awStatusUnsub = null;
+function watchAwStatus() {
+  if (awStatusUnsub) { renderAwStatus(); return; }
+  awStatusUnsub = db.collection('screen_status').onSnapshot(snap => {
+    awStatus = {};
+    snap.forEach(d => { awStatus[d.id] = d.data(); });
+    renderAwStatus();
+  }, err => {
+    const el = document.getElementById('aw-status-table');
+    if (el) el.innerHTML = `<div class="empty-state"><div>❌</div>${err.message}</div>`;
+  });
+}
+
+function awState(st) {
+  if (!st) return { key: 'never', html: '<span class="badge badge-amber">⏳ Not checked yet</span>' };
+  if (st.connected) return { key: 'ok', html: `<span class="badge badge-green">✅ Connected</span>${st.web ? '' : ' <span class="badge badge-amber">no website extension</span>'}` };
+  return { key: 'off', html: '<span class="badge badge-red">❌ Not connected</span>' };
+}
+
+function renderAwStatus() {
+  const el = document.getElementById('aw-status-table');
+  if (!el) return;
+  const emps = (cache.employees || []).filter(e => e.status === 'active');
+  if (!emps.length) { el.innerHTML = '<div class="empty-state"><div>👥</div>No active employees</div>'; return; }
+  el.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>Employee</th><th>Status</th><th>Last checked</th><th>Device</th><th></th></tr></thead>
+    <tbody>${emps.map(e => {
+      const st = awStatus[e.id];
+      const s = awState(st);
+      const when = st && st.at ? new Date(st.at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+      const dev = st && st.device ? `${st.device.os || ''} ${st.device.browser || ''}`.trim() : '—';
+      const btn = s.key === 'ok' && st.web ? '' : `<button class="btn btn-sm btn-edit" onclick="sendAwSetup('${e.id}')">📲 Send setup link</button>`;
+      return `<tr><td><b>${e.name}</b> <span style="color:var(--muted)">(${e.id})</span></td><td>${s.html}</td><td>${when}</td><td>${dev}</td><td>${btn}</td></tr>`;
+    }).join('')}</tbody></table></div>`;
+}
+
+// Personal WhatsApp with the setup link, sent by the PC automation (report_requests type 'aw-setup')
+async function sendAwSetup(empIdToSend, quiet = false) {
+  const emp = (cache.employees || []).find(e => e.id === empIdToSend);
+  try {
+    const ref = await db.collection('report_requests').add({
+      type: 'aw-setup', empId: empIdToSend, status: 'pending', requestedAt: Date.now(), requestedBy: auth.currentUser?.email || 'admin'
+    });
+    if (!quiet) toast(`⏳ Sending setup link to ${emp ? emp.name : empIdToSend}…`, 'info');
+    const unsub = ref.onSnapshot(snap => {
+      const d = snap.data() || {};
+      if (d.status === 'sent') { unsub(); toast(`✅ Setup link sent to ${emp ? emp.name : empIdToSend} on WhatsApp`, 'success'); }
+      else if (d.status === 'failed') { unsub(); toast(`❌ ${d.error || 'Not sent'}`, 'error'); }
+    });
+    setTimeout(unsub, 45000);
+  } catch (e) {
+    toast('Request could not be saved: ' + e.message, 'error');
+  }
+}
+
+async function sendAwSetupToAll() {
+  const pending = (cache.employees || []).filter(e => e.status === 'active' && !(awStatus[e.id] && awStatus[e.id].connected && awStatus[e.id].web));
+  if (!pending.length) { toast('Everyone is connected 🎉', 'success'); return; }
+  if (!confirm(`Send the ActivityWatch setup link on WhatsApp to: ${pending.map(e => e.name).join(', ')}?`)) return;
+  for (const e of pending) await sendAwSetup(e.id, true);
+  toast(`⏳ Sending setup link to ${pending.length} employee(s)…`, 'info');
 }
 
 // ── KPI chips ──────────────────────────────────────────────────

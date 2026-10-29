@@ -66,12 +66,57 @@ async function catchUpMissed(db) {
   return results;
 }
 
+const AW_SETUP_URL = 'https://growthapex.in/EMS_login/tools/activitywatch-setup.bat';
+
+function awSetupMessage(emp) {
+  return `🖥️ *ActivityWatch Setup Reminder*
+
+` +
+    `Hi ${(emp.name || emp.id).split(' ')[0]}, ActivityWatch is not connected to the EMS on your laptop yet.
+
+` +
+    `*Please set it up (about 5 min):*
+` +
+    `1️⃣ Install ActivityWatch (free): https://activitywatch.net/downloads/
+` +
+    `2️⃣ In Chrome, add the "ActivityWatch Web Watcher" extension
+` +
+    `3️⃣ Download and run this file once (if Windows/Chrome warns, choose "Keep" → "Run anyway"): ${AW_SETUP_URL}
+` +
+    `4️⃣ Open the EMS dashboard → Attendance. It should say "🖥️ Screen activity: connected". If Chrome asks to allow local network access, click *Allow*.
+
+` +
+    `_GrowthApex EMS_`;
+}
+
+// Admin "send setup link" -> personal WhatsApp to that employee
+async function sendAwSetupReminder(db, doc, req) {
+  const { toChatId } = require('./reminders');
+  const empDoc = await db.collection('employees').doc(String(req.empId || '')).get();
+  const emp = empDoc.exists ? { id: empDoc.id, ...empDoc.data() } : null;
+  const chatId = emp && toChatId(emp.phone);
+  if (!chatId) {
+    await doc.ref.update({ status: 'failed', error: emp ? `${emp.name} has no valid phone number` : 'Employee not found', doneAt: Date.now() });
+    return;
+  }
+  await doc.ref.update({ status: 'sending', pickedAt: Date.now() });
+  console.log(`📨 Admin request: ActivityWatch setup link for ${emp.name}`);
+  const result = await deliver(db, { id: `aw-setup_${emp.id}_${doc.id}`, type: 'reminder', message: awSetupMessage(emp), chatId });
+  await doc.ref.update({
+    status: result === 'sent' ? 'sent' : 'failed',
+    result,
+    error: result === 'sent' ? null : 'Not sent — the message is queued and will go out once internet/WhatsApp is back.',
+    doneAt: Date.now()
+  });
+}
+
 const REQUEST_TYPES = { daily: 'daily', morning: 'login', login: 'login', weekly: 'weekly', monthly: 'monthly' };
 
 async function processReportRequests(db) {
   const snap = await db.collection('report_requests').where('status', '==', 'pending').get();
   for (const doc of snap.docs) {
     const req = doc.data();
+    if (req.type === 'aw-setup') { await sendAwSetupReminder(db, doc, req); continue; }
     const type = REQUEST_TYPES[req.type];
     const date = /^\d{4}-\d{2}-\d{2}$/.test(req.date || '') ? req.date : todayIST();
     if (!type) {
@@ -94,4 +139,4 @@ async function processReportRequests(db) {
   return snap.size;
 }
 
-module.exports = { catchUpMissed, processReportRequests };
+module.exports = { catchUpMissed, processReportRequests, awSetupMessage };
