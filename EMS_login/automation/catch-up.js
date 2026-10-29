@@ -66,7 +66,7 @@ async function catchUpMissed(db) {
   return results;
 }
 
-const REQUEST_TYPES = { daily: 'daily', morning: 'login', login: 'login' };
+const REQUEST_TYPES = { daily: 'daily', morning: 'login', login: 'login', weekly: 'weekly', monthly: 'monthly' };
 
 async function processReportRequests(db) {
   const snap = await db.collection('report_requests').where('status', '==', 'pending').get();
@@ -81,7 +81,7 @@ async function processReportRequests(db) {
     await doc.ref.update({ status: 'sending', pickedAt: Date.now() });
     // Own id per request: using the scheduled id (daily_<date>) made a manual send during the day
     // mark that evening's automatic report as "already sent", so it never went out.
-    const id = `manual_${type === 'login' ? 'morning' : 'daily'}_${date}_${doc.id}`;
+    const id = `manual_${type === 'login' ? 'morning' : type}_${date}_${doc.id}`;
     console.log(`📨 Admin request: ${req.type} report for ${date}`);
     const result = await deliver(db, { id, type, date }, { force: true });
     await doc.ref.update({

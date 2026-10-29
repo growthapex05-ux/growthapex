@@ -550,7 +550,7 @@
         <button class="rpt-tab active" onclick="selectRptType('daily',this)">📢 Daily</button>
         <button class="rpt-tab" onclick="selectRptType('weekly',this)">📊 Weekly</button>
         <button class="rpt-tab" onclick="selectRptType('monthly',this)">🏆 Monthly</button>
-        <button class="rpt-tab" onclick="selectRptType('login',this)">🔑 Login</button>
+        <button class="rpt-tab" onclick="selectRptType('login',this)">🌅 Morning</button>
       </div>
 
       <!-- Report Preview -->
@@ -976,6 +976,7 @@
 </script>
 <script src="/EMS_login/ems-firebase.js"></script>
 <script src="/EMS_login/ems-payroll.js"></script>
+<script src="/EMS_login/ems-reports.js"></script>
 <script>
 // ─── Auth Guard ───────────────────────────────────────────────
 const sess = EMS_DB.getSession();
@@ -3539,12 +3540,7 @@ function logout() { EMS_DB.clearSession(); window.location.href = '/EMS_login/';
 // ─── WhatsApp Reports Module ──────────────────────────────────
 // ══════════════════════════════════════════════════════════════
 
-const WA_CONFIG = {
-  GREEN_API_INSTANCE_ID: '710722717591',
-  GREEN_API_TOKEN: '585dd13708e94c6f8f424252765f46f924dde228378049fe8b',
-  GROUP_JID: '120363412057920447@g.us',
-};
-
+// Sending goes through the PC automation (report_requests) — no WhatsApp API token in the page.
 let currentRptType = 'daily';
 let currentRptText = '';
 const rptHistory = [];
@@ -3589,342 +3585,15 @@ function selectRptType(type, btn) {
   refreshRptPreview();
 }
 
-// ── Generate report text from Firestore cache ──────────────────
+// ── Report text: same builders the automation uses (ems-reports.js) ──
 async function generateReportText(type) {
-  const emps    = cache.employees || [];
-  const att     = cache.attendance || [];
-  const tasks   = cache.tasks || [];
-  const leaves  = cache.leaves || [];
-  const today   = emsToday();
-  const active  = emps.filter(e => e.status === 'active');
-
-  const getDateStr = (offsetDays) => {
-    const d = new Date(); d.setDate(d.getDate() + offsetDays);
-    return d.toISOString().split('T')[0];
-  };
-
-  const checkEmpOnLeave = (emp, leavesList, dateStr) => {
-    if (!leavesList || !leavesList.length) return false;
-    const empIdNorm = (emp.id || '').toString().trim().toUpperCase();
-    const empNameNorm = (emp.name || '').toString().trim().toLowerCase();
-    const empEmailNorm = (emp.email || '').toString().trim().toLowerCase();
-
-    return leavesList.some(l => {
-      const st = (l.status || '').toString().toLowerCase().trim();
-      if (st !== 'approved') return false;
-
-      let lFrom = l.startDate || l.from || l.fromDate || l.date || '';
-      let lTo = l.endDate || l.to || l.toDate || lFrom;
-      if (typeof lFrom === 'object' && lFrom && typeof lFrom.toDate === 'function') lFrom = lFrom.toDate().toISOString().split('T')[0];
-      if (typeof lTo === 'object' && lTo && typeof lTo.toDate === 'function') lTo = lTo.toDate().toISOString().split('T')[0];
-      if (typeof lFrom === 'string' && lFrom.includes('T')) lFrom = lFrom.split('T')[0];
-      if (typeof lTo === 'string' && lTo.includes('T')) lTo = lTo.split('T')[0];
-
-      if (!lFrom || !lTo) return false;
-      if (dateStr < lFrom || dateStr > lTo) return false;
-
-      const lEmpId = (l.empId || '').toString().trim().toUpperCase();
-      const lEmpName = (l.empName || l.employeeName || l.name || '').toString().trim().toLowerCase();
-      const lEmail = (l.email || '').toString().trim().toLowerCase();
-
-      if (empIdNorm && lEmpId && empIdNorm === lEmpId) return true;
-      if (empEmailNorm && lEmail && empEmailNorm === lEmail) return true;
-      if (empNameNorm && lEmpName && (empNameNorm === lEmpName || empNameNorm.includes(lEmpName) || lEmpName.includes(empNameNorm))) return true;
-
-      return false;
-    });
-  };
-
-  // ── DAILY ──────────────────────────────────────────────────
-  if (type === 'daily') {
-    const presentList = [];
-    const lateList    = [];
-    const absentList  = [];
-    const onLeaveList = [];
-
-    active.forEach(e => {
-      const eIdNorm = (e.id || '').trim().toUpperCase();
-      const attRec  = att.find(a => a.date === today && ((a.empId || '').trim().toUpperCase() === eIdNorm || a.empId === e.id));
-      
-      const isPresent  = attRec && (attRec.status === 'present' || attRec.checkIn);
-      const isAttLeave = attRec && (attRec.status === 'leave' || attRec.status === 'on-leave' || attRec.status === 'on_leave');
-      const isOnLeave  = isAttLeave || checkEmpOnLeave(e, leaves, today);
-
-      if (isPresent) {
-        if (attRec.checkIn && attRec.checkIn > '10:00:00') {
-          lateList.push(`${e.name} (Late: ${attRec.checkIn})`);
-        } else {
-          presentList.push(`${e.name} (In: ${attRec.checkIn || 'Present'})`);
-        }
-      } else if (isOnLeave) {
-        onLeaveList.push(e.name);
-      } else {
-        absentList.push(e.name);
-      }
-    });
-
-    const todoTasks = tasks.filter(t => t.status === 'todo' || t.status === 'doing' || t.status === 'in-progress');
-    const doneToday = tasks.filter(t => (t.status === 'done' || t.status === 'completed') && ((t.updatedAt && t.updatedAt.startsWith(today)) || (t.createdAt && t.createdAt.startsWith(today))));
-
-    const FUNNY_ABSENT_ROASTS = [
-      "Looks like they are busy in dreamland! 😴💤",
-      "Deeply committed to the bed today! 🛏️✨",
-      "The snooze button betrayed them today! ⏰🛑",
-      "Unannounced day off? Probably on the way to Goa! 🏖️🍹",
-      "Work-from-Pillow mode is ON today! 🛋️✨"
-    ];
-
-    let msg = `🚀 *GROWTHAPEX EMS - DAILY VIBE CHECK* ⚡\n`;
-    msg += `📅 *Date:* ${today} | *Gen-Z Mode Active* 🔥\n`;
-    msg += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
-    msg += `👥 *SQUAD ATTENDANCE BREAKDOWN:*\n`;
-    msg += `• Total Squad Strength: ${active.length} 💼\n`;
-    msg += `• Present & Grinding: ${presentList.length + lateList.length} ⚡\n`;
-    msg += `• Absent / Ghosting: ${absentList.length} 👻\n`;
-    if (onLeaveList.length > 0) {
-      msg += `• On Approved Leave: ${onLeaveList.length} 🌴\n`;
-    }
-    msg += `\n`;
-
-    if (presentList.length > 0) {
-      msg += `👑 *ON-TIME CHAMPIONS (Slayed Punctuality)*: \n${presentList.map(n => ` - ${n} ✨`).join('\n')}\n\n`;
-    }
-
-    if (lateList.length > 0) {
-      msg += `⏰ *LATE COMERS (Don't Blame the Traffic 🚗💨)*: \n${lateList.map(n => ` - ${n} ⚠️`).join('\n')}\n\n`;
-    }
-
-    if (onLeaveList.length > 0) {
-      msg += `🌴 *APPROVED LEAVE VIBES (Enjoying Leave 😎)*: \n${onLeaveList.map(n => ` - ${n} 🍹`).join('\n')}\n\n`;
-    }
-
-    if (absentList.length > 0) {
-      msg += `❌ *ABSENT:*\n${absentList.map((n, idx) => ` - *${n}*: ${FUNNY_ABSENT_ROASTS[idx % FUNNY_ABSENT_ROASTS.length]}`).join('\n')}\n\n`;
-    }
-    msg += `📝 *TASK SLAYS & ONGOING GRIND:*\n`;
-    if (doneToday.length > 0) {
-      msg += `✅ *Slayed Today (${doneToday.length}):*\n`;
-      doneToday.forEach(t => {
-        const empName = active.find(e => e.id === t.empId)?.name || t.empId;
-        msg += ` - ${t.title} (by ${empName})\n`;
-      });
-    }
-    if (todoTasks.length > 0) {
-      msg += `${doneToday.length > 0 ? '\n' : ''}📌 *Active Grind (${todoTasks.length}):*\n`;
-      todoTasks.forEach(t => {
-        const empName = active.find(e => e.id === t.empId)?.name || t.empId;
-        const dueStr = t.deadline ? ` | Due: ${t.deadline}` : '';
-        msg += ` - ${t.title} (assigned to ${empName}${dueStr})\n`;
-      });
-    }
-    if (doneToday.length === 0 && todoTasks.length === 0) {
-      msg += `• No active or completed tasks recorded today.\n`;
-    }
-    msg += `\n📊 *SQUAD EFFICIENCY SCOREBAR:*\n`;
-    active.forEach(e => {
-      const empTasks = tasks.filter(t => t.empId === e.id);
-      const done     = empTasks.filter(t => t.status === 'done' || t.status === 'completed').length;
-      const total    = empTasks.length;
-      if (total === 0) {
-        msg += ` • *${e.name}*: ➖ *N/A* (No tasks assigned)\n`;
-      } else {
-        const pct      = Math.round(done / total * 100);
-        const filled   = Math.round(pct / 10);
-        const bar      = '█'.repeat(filled) + '░'.repeat(10 - filled);
-        const star     = pct === 100 ? ' ⭐ [Pro Player 👑]' : '';
-        msg += ` • *${e.name}*: ${bar} ${pct}% (${done}/${total})${star}\n`;
-      }
-    });
-    msg += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    msg += `🔥 _GrowthApex Gen-Z Automation Engine • Stay Grinding!_ 🔥`;
-    return msg;
-  }
-
-  if (type === 'login') {
-    let entriesMap = new Map();
-    try {
-      const [loginSnap, attSnap] = await Promise.all([
-        db.collection('logins').where('date', '==', today).get(),
-        db.collection('attendance').where('date', '==', today).get()
-      ]);
-      loginSnap.forEach(d => {
-        const data = d.data();
-        const key = (data.empId || data.name || d.id).toUpperCase();
-        entriesMap.set(key, { name: data.name, role: (data.role || 'employee').toUpperCase(), time: data.loginTime || 'Logged in' });
-      });
-      attSnap.forEach(d => {
-        const data = d.data();
-        const key = (data.empId || d.id).toUpperCase();
-        if (!entriesMap.has(key)) {
-          const emp = active.find(e => e.id === key) || (cache.employees || []).find(e => e.id === key);
-          entriesMap.set(key, { name: emp ? emp.name : key, role: 'EMPLOYEE', time: data.checkIn ? `${data.checkIn} (Check-in)` : 'Checked in' });
-        }
-      });
-    } catch (_) {}
-    const entries = Array.from(entriesMap.values());
-    let msg = `🔑 *GROWTHAPEX EMS - LOGIN REPORT* 🔑\n📅 *Date:* ${today}\n`;
-    msg += `━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
-    if (!entries.length) {
-      msg += `ℹ️ No system logins or check-ins recorded for this date.\n`;
-    } else {
-      entries.forEach(l => {
-        msg += `👤 *${l.name}* (${l.role}) — ⏰ ${l.time}\n`;
-      });
-    }
-    msg += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
-    return msg;
-  }
-
-  // ── WEEKLY ─────────────────────────────────────────────────
-  if (type === 'weekly') {
-    const days = [...Array(7)].map((_, i) => getDateStr(-6 + i));
-    const periodStart = days[0], periodEnd = days[6];
-    const weekAtt   = att.filter(a => days.includes(a.date));
-    const weekTasks = tasks.filter(t => t.createdAt && days.some(d => t.createdAt.startsWith(d)));
-    const weekLeaves= leaves.filter(l => l.status === 'approved' && days.some(d => d >= (l.startDate||'') && d <= (l.endDate||'')));
-
-    const totalCheckins = weekAtt.filter(a => a.status === 'present').length;
-    const lateCheckins  = weekAtt.filter(a => a.checkIn && a.checkIn > '10:00:00').length;
-    const doneTasks     = weekTasks.filter(t => t.status === 'done');
-
-    // Achiever: employee with most completed tasks
-    const taskByEmp = {};
-    doneTasks.forEach(t => { taskByEmp[t.empId] = (taskByEmp[t.empId]||0) + 1; });
-    const achieverId = Object.entries(taskByEmp).sort((a,b) => b[1]-a[1])[0]?.[0];
-    const achiever   = emps.find(e => e.id === achieverId);
-
-    let msg = `📊 *GROWTHAPEX EMS - WEEKLY REPORT* 📊\n`;
-    msg += `📅 *Period:* ${periodStart} to ${periodEnd}\n`;
-    msg += `━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
-    msg += `👥 *Team Engagement:*\n`;
-    msg += `• Active Employees: ${active.length}\n`;
-    msg += `• Total Present Check-ins: ${totalCheckins}\n`;
-    msg += `• Late Check-ins: ${lateCheckins} ⏰\n`;
-    msg += `• Total Leaves Taken: ${weekLeaves.length} days\n\n`;
-    msg += `👥 *Employee Attendance Summary:*\n`;
-    active.forEach(e => {
-      const empAtt   = weekAtt.filter(a => a.empId === e.id);
-      const present  = empAtt.filter(a => a.status === 'present').length;
-      const absent   = days.length - present;
-      const late     = empAtt.filter(a => a.checkIn && a.checkIn > '10:00:00').length;
-      const lv       = weekLeaves.filter(l => l.empId === e.id).length;
-      msg += ` • *${e.name}*: Present: ${present}d | Absent: ${absent}d | Leaves: ${lv}d (⏰ ${late} Late)\n`;
-    });
-    msg += `\n📝 *Task Execution summary:*\n`;
-    msg += `• Total Tasks Logged: ${weekTasks.length}\n`;
-    msg += `• Total Tasks Completed: ${doneTasks.length}\n`;
-    const rate = weekTasks.length ? Math.round(doneTasks.length / weekTasks.length * 100) : 0;
-    msg += `• Completion Success Rate: ${rate}%\n`;
-    if (achiever) {
-      msg += `\n🥇 *Weekly Task Achievers:*\n`;
-      msg += ` 🥇 *${achiever.name}* - Completed ${taskByEmp[achieverId]} tasks\n`;
-    }
-    // Per-employee weekly task completion %
-    msg += `\n📊 *Task Completion % (This Week):*\n`;
-    const anyWeekTasks = active.some(e => weekTasks.filter(t => t.empId === e.id).length > 0);
-    if (!anyWeekTasks) {
-      msg += `• No tasks logged this week.\n`;
-    } else {
-      active.forEach(e => {
-        const empT  = weekTasks.filter(t => t.empId === e.id);
-        const done  = empT.filter(t => t.status === 'done').length;
-        const total = empT.length;
-        const pct   = total ? Math.round(done / total * 100) : 0;
-        const filled = Math.round(pct / 10);
-        const bar   = '█'.repeat(filled) + '░'.repeat(10 - filled);
-        const star  = pct === 100 ? ' ⭐' : '';
-        msg += ` • *${e.name}*: ${bar} ${pct}% (${done}/${total})${star}\n`;
-      });
-    }
-    msg += `\n📌 *System Note:* Keep logging daily tasks and checking in before 10:00 AM.\n\n`;
-    msg += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
-    return msg;
-  }
-
-  // ── MONTHLY ────────────────────────────────────────────────
-  if (type === 'monthly') {
-    const now      = new Date();
-    const year     = now.getFullYear();
-    const month    = now.getMonth();
-    const monthName = now.toLocaleString('en-IN', { month: 'long' });
-
-    // Days in month
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const monthDays = [...Array(daysInMonth)].map((_, i) => {
-      const d = new Date(year, month, i + 1);
-      return d.toISOString().split('T')[0];
-    });
-    const workingDays = monthDays.filter(d => { const wd = new Date(d).getDay(); return wd !== 0; }).length;
-
-    const monAtt   = att.filter(a => monthDays.includes(a.date));
-    const monTasks = tasks.filter(t => t.createdAt && monthDays.some(d => t.createdAt.startsWith(d)));
-    const monLeaves= leaves.filter(l => l.status === 'approved' && monthDays.some(d => d >= (l.startDate||'') && d <= (l.endDate||'')));
-    const doneTasks= monTasks.filter(t => t.status === 'done');
-    const rate     = monTasks.length ? Math.round(doneTasks.length / monTasks.length * 100) : 100;
-
-    // Avg attendance
-    const avgAtt = active.length ? Math.round(monAtt.filter(a => a.status === 'present').length / active.length) : 0;
-
-    // Employee of month: most completed tasks, least late
-    const empScores = active.map(e => {
-      const eDone = doneTasks.filter(t => t.empId === e.id).length;
-      const eLate = monAtt.filter(a => a.empId === e.id && a.checkIn && a.checkIn > '10:00:00').length;
-      return { emp: e, done: eDone, late: eLate };
-    }).sort((a, b) => b.done - a.done || a.late - b.late);
-    const eotm = empScores[0];
-
-    // Indian holidays this month
-    const HOLIDAYS_ALL = [
-      { month:1,day:1,name:"New Year's Day",emoji:"🎊"},{month:1,day:26,name:"Republic Day",emoji:"🇮🇳"},
-      {month:8,day:15,name:"Independence Day",emoji:"🇮🇳"},{month:8,day:28,name:"Raksha Bandhan (Rakhi)",emoji:"🪢"},
-      {month:10,day:2,name:"Gandhi Jayanti",emoji:"🕊️"},{month:10,day:20,name:"Dussehra",emoji:"🏹"},
-      {month:11,day:8,name:"Diwali",emoji:"🪔"},{month:12,day:25,name:"Christmas",emoji:"🎄"},
-    ];
-    const thisMonthHols = HOLIDAYS_ALL.filter(h => h.month === month + 1);
-
-    let msg = `🏆 *GROWTHAPEX EMS - MONTHLY PERFORMANCE* 🏆\n`;
-    msg += `📅 *Month:* ${monthName} ${year}\n`;
-    msg += `━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
-    msg += `🌟 *Key performance indicators (KPIs):*\n`;
-    msg += `• Total Tasks Assigned: ${monTasks.length}\n`;
-    msg += `• Total Tasks Completed: ${doneTasks.length}\n`;
-    msg += `• Average Task Completion: ${rate}%\n`;
-    msg += `• Total Approved Leave Days: ${monLeaves.length} days\n`;
-    msg += `• Avg Attendance Check-ins: ${avgAtt} days (out of ${workingDays} working days)\n\n`;
-    if (eotm && eotm.done >= 0) {
-      msg += `🎉 *EMPLOYEE OF THE MONTH* 🎉\n`;
-      msg += `⭐ *${eotm.emp.name}* (${eotm.emp.department})\n`;
-      msg += `💪 Completed *${eotm.done} tasks* with only *${eotm.late} late check-ins*!\n\n`;
-    }
-    msg += `👥 *Employee Breakdown:*\n`;
-    empScores.forEach(({ emp, done, late }) => {
-      const empAtt   = monAtt.filter(a => a.empId === emp.id);
-      const present  = empAtt.filter(a => a.status === 'present').length;
-      const absent   = workingDays - present;
-      const lv       = monLeaves.filter(l => l.empId === emp.id).length;
-      const assigned = monTasks.filter(t => t.empId === emp.id).length;
-      const pct      = assigned ? Math.round(done / assigned * 100) : 0;
-      const filled   = Math.round(pct / 10);
-      const bar      = '█'.repeat(filled) + '░'.repeat(10 - filled);
-      const star     = pct === 100 ? ' ⭐' : '';
-      msg += ` • *${emp.name}* (${emp.department || 'N/A'})\n`;
-      msg += `   Tasks: ${bar} ${pct}% — ${done}/${assigned} done${star}\n`;
-      msg += `   Att: ${present}d Present | ${absent}d Absent | ${lv}d Leave | ⏰ ${late} Late\n`;
-    });
-    if (thisMonthHols.length) {
-      msg += `\n🗓️ *Notable Holidays & Festivals This Month:*\n`;
-      thisMonthHols.forEach(h => { msg += ` • *${h.day} ${monthName.slice(0,3)}* - ${h.name} ${h.emoji}\n`; });
-    }
-    msg += `\n━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    msg += `🚀 Great job team! Let's hit new heights next month!\n\n`;
-    msg += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
-    return msg;
-  }
-
-  return 'Unknown report type.';
+  if (type === 'daily') return EMS_REPORTS.buildAttendanceReport(db, emsToday(), { mode: 'evening' });
+  if (type === 'login') return EMS_REPORTS.buildAttendanceReport(db, emsToday(), { mode: 'morning' });
+  if (type === 'weekly') return EMS_REPORTS.generateWeeklyReport(db);
+  if (type === 'monthly') return (await EMS_REPORTS.generateMonthlyReport(db)) + (await EMS_REPORTS.groupSection(db));
+  throw new Error('Unknown report type ' + type);
 }
 
-// ── Refresh preview box ────────────────────────────────────────
 async function refreshRptPreview() {
   refreshRptKPIs();
   const box = document.getElementById('rpt-preview');
@@ -3945,34 +3614,43 @@ async function refreshRptPreview() {
   }
 }
 
-// ── Send via Green API ────────────────────────────────────────
+// ── Send: the PC automation (listener, instant / 15-min task) builds and sends this report ──
 async function sendWhatsAppReport() {
   if (!currentRptText) { toast('Generate a report first.','warning'); return; }
   const btn = document.getElementById('btn-send-wa');
   if (btn) btn.disabled = true;
   setRptStatus('sending', '⏳ Sending report to WhatsApp group…');
-
-  const { GREEN_API_INSTANCE_ID, GREEN_API_TOKEN, GROUP_JID } = WA_CONFIG;
-  const url = `https://api.green-api.com/waInstance${GREEN_API_INSTANCE_ID}/sendMessage/${GREEN_API_TOKEN}`;
+  const type = currentRptType === 'login' ? 'morning' : currentRptType;
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chatId: GROUP_JID, message: currentRptText })
+    const ref = await db.collection('report_requests').add({
+      type, date: emsToday(), status: 'pending', requestedAt: Date.now(), requestedBy: auth.currentUser?.email || 'admin'
     });
-    const data = await res.json();
-    if (data && data.idMessage) {
-      setRptStatus('success', `✅ Report sent! Message ID: ${data.idMessage}`);
-      toast('WhatsApp report sent successfully! 🚀', 'success');
-      addRptHistory(currentRptType, data.idMessage);
-    } else {
-      throw new Error(JSON.stringify(data));
-    }
+    let settled = false;
+    const unsub = ref.onSnapshot(snap => {
+      const d = snap.data() || {};
+      if (d.status === 'sent') {
+        settled = true; unsub();
+        setRptStatus('success', '✅ Report sent to the WhatsApp group!');
+        toast('WhatsApp report sent successfully! 🚀', 'success');
+        addRptHistory(currentRptType, ref.id);
+        if (btn) btn.disabled = false;
+      } else if (d.status === 'failed') {
+        settled = true; unsub();
+        setRptStatus('error', '❌ ' + (d.error || 'Report was not sent'));
+        if (btn) btn.disabled = false;
+      }
+    });
+    // Nobody picked it up quickly -> the office PC automation is off; the request stays queued
+    setTimeout(() => {
+      if (settled) return;
+      unsub();
+      setRptStatus('sending', 'ℹ️ Queued — the office PC automation seems to be off. The report will go out automatically once the PC is on (within 15 min).');
+      if (btn) btn.disabled = false;
+    }, 45000);
   } catch (err) {
-    setRptStatus('error', '❌ Failed to send: ' + err.message);
-    toast('Failed to send report: ' + err.message, 'error');
+    setRptStatus('error', '❌ Request could not be saved: ' + err.message);
+    if (btn) btn.disabled = false;
   }
-  if (btn) btn.disabled = false;
 }
 
 // ── Status helper ──────────────────────────────────────────────
@@ -3985,7 +3663,7 @@ function setRptStatus(type, msg = '') {
 
 // ── History table ─────────────────────────────────────────────
 function addRptHistory(type, msgId) {
-  const typeLabels = { daily:'📢 Daily', weekly:'📊 Weekly', monthly:'🏆 Monthly', login:'🔑 Login' };
+  const typeLabels = { daily:'📢 Daily', weekly:'📊 Weekly', monthly:'🏆 Monthly', login:'🌅 Morning' };
   rptHistory.unshift({
     type: typeLabels[type] || type,
     msgId,

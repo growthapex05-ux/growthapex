@@ -3,52 +3,14 @@
 //  - groupSection(): attendance + leave balance per employee (no salaries — the group has employees in it)
 //  - sendPersonalSalarySummaries(): each employee gets their own salary breakdown on their own number
 
-const P = require('../ems-payroll');
-const { deliver, todayIST } = require('./outbox');
+const { deliver } = require('./outbox');
 const { toChatId } = require('./reminders');
 
 const money = n => '₹' + Math.round(Number(n) || 0).toLocaleString('en-IN');
 const num = n => (Number.isInteger(n) ? String(n) : Number(n).toFixed(1));
 
-// Same month rule as generateMonthlyReport: first 5 days of a month report on the previous month
-function reportMonth(today = todayIST()) {
-  const [y, m, d] = today.split('-').map(Number);
-  const dt = new Date(y, m - 1 - (d <= 5 ? 1 : 0), 1);
-  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
-}
-
-async function loadSummaries(db, monthVal) {
-  const [empSnap, attSnap, leaveSnap, cfgDoc] = await Promise.all([
-    db.collection('employees').get(),
-    db.collection('attendance').get(),
-    db.collection('leaves').get(),
-    db.collection('admin').doc('config').get()
-  ]);
-  const holidays = (cfgDoc.exists && cfgDoc.data().holidays) || [];
-  const att = attSnap.docs.map(d => d.data());
-  const leaves = leaveSnap.docs.map(d => d.data());
-  return empSnap.docs
-    .map(d => ({ id: d.id, ...d.data() }))
-    .filter(e => e.status === 'active')
-    .map(emp => ({
-      emp,
-      s: P.monthSummary(emp, monthVal, att.filter(a => a.empId === emp.id),
-                        leaves.filter(l => l.empId === emp.id), todayIST(), { holidays, team: P.teamCalendar(att) })
-    }))
-    .filter(x => x.s.joined);
-}
-
-async function groupSection(db, monthVal = reportMonth()) {
-  const rows = await loadSummaries(db, monthVal);
-  if (!rows.length) return '';
-  const lines = rows.map(({ emp, s }) =>
-    `👤 *${emp.name}*\n` +
-    `   ✅ Present ${num(s.present)} · 🌗 Half ${num(s.halfDays)} · 🌴 Leave ${num(s.paidLeave + s.unpaidLeave)} · ❌ Absent ${num(s.absent)} · ⏰ Late ${num(s.late)}\n` +
-    `   🏦 Leave balance: ${num(s.leave.balance)} days`
-  );
-  return `\n\n📋 *ATTENDANCE & LEAVE (${monthVal})*\n` + lines.join('\n') +
-         `\n_Absent = working day with no check-in and no approved leave._`;
-}
+// reportMonth / loadSummaries / groupSection live in ../ems-reports.js (shared with the admin dashboard)
+const { reportMonth, loadSummaries, groupSection } = require('../ems-reports');
 
 function personalMessage(emp, s) {
   const monthName = new Date(`${s.monthVal}-01T12:00:00`).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
