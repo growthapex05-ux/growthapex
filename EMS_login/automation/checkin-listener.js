@@ -275,7 +275,7 @@ async function startListener() {
 
   // 6. Employees who went offline / were auto-checked-out during office hours -> personal WhatsApp
   let checkingOffline = false;
-  setInterval(async () => {
+  const runOfflineCheck = async () => {
     if (checkingOffline) return;
     checkingOffline = true;
     try {
@@ -285,7 +285,9 @@ async function startListener() {
     } finally {
       checkingOffline = false;
     }
-  }, 5 * 60 * 1000);
+  };
+  runOfflineCheck();
+  setInterval(runOfflineCheck, 60 * 1000); // every minute
 
   // 5. "Send report now" button in the admin portal -> report_requests -> sent instantly
   // Requests that arrive while others are being sent are picked up straight after (not dropped)

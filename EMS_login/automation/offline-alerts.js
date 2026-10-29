@@ -1,4 +1,5 @@
-// Personal WhatsApp to an employee who stops working during office hours without checking out:
+// WhatsApp to an employee (and a copy in the team group) who stops working during office hours
+// without checking out — checked every minute by the listener:
 //  • offline       — checked in, but the dashboard has sent no heartbeat for OFFLINE_ALERT_MINUTES
 //                    (60 min when they checked in from a phone: a locked phone stops heartbeats)
 //  • auto check-out — the system checked them out (PC closed / disconnected) and they have not
@@ -12,9 +13,9 @@ const P = require('../ems-payroll');
 const { deliver, todayIST } = require('./outbox');
 const { toChatId } = require('./reminders');
 
-const OFFLINE_MIN = parseInt(process.env.OFFLINE_ALERT_MINUTES, 10) || 15;
+const OFFLINE_MIN = parseInt(process.env.OFFLINE_ALERT_MINUTES, 10) || 10;
 const OFFLINE_MOBILE_MIN = parseInt(process.env.OFFLINE_ALERT_MOBILE_MINUTES, 10) || 60;
-const AUTO_OUT_MIN = parseInt(process.env.AUTO_CHECKOUT_ALERT_MINUTES, 10) || 10;
+const AUTO_OUT_MIN = parseInt(process.env.AUTO_CHECKOUT_ALERT_MINUTES, 10) || 5;
 const INACTIVE_MIN = parseInt(process.env.INACTIVE_ALERT_MINUTES, 10) || 30;
 const MAX_ALERTS = parseInt(process.env.MAX_OFFLINE_ALERTS, 10) || 3;
 const WORK_START = process.env.WORK_START_TIME || '10:00';
