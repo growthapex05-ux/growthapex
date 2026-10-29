@@ -118,6 +118,88 @@ function emsWorkedSeconds(rec, nowMs = Date.now()) {
   return Math.max(0, Math.floor(base + live));
 }
 
+/**
+ * App / website usage since `sinceMs`, read from ActivityWatch running on this laptop
+ * (http://localhost:5600 — the employee installs it; its cors_origins must allow growthapex.in).
+ * Only active (not-AFK) time counts. Browser time is split into websites when the
+ * "ActivityWatch Web Watcher" extension is installed.
+ * Returns { apps: [{ name, secs }], activeSecs, idleSecs, web: bool } or { error: 'not-running' | ... } — never throws.
+ */
+const EMS_AW_URL = 'http://localhost:5600/api/0';
+const EMS_BROWSERS = ['chrome.exe', 'msedge.exe', 'firefox.exe', 'brave.exe', 'opera.exe', 'vivaldi.exe',
+  'Google Chrome', 'Microsoft Edge', 'Firefox', 'Brave Browser', 'Safari', 'Opera', 'Arc'];
+async function emsScreenActivity(sinceMs, nowMs = Date.now()) {
+  const awFetch = async (url, opts = {}) => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 8000);
+    try { return await fetch(url, { ...opts, signal: ctrl.signal }); } finally { clearTimeout(t); }
+  };
+  let buckets;
+  try {
+    const res = await awFetch(`${EMS_AW_URL}/buckets/`);
+    if (!res.ok) return { error: `http-${res.status}` };
+    buckets = Object.keys(await res.json());
+  } catch (_) {
+    return { error: 'not-running' }; // not installed, not running, or growthapex.in not in cors_origins
+  }
+  const pick = prefix => buckets.find(b => b.startsWith(prefix));
+  const win = pick('aw-watcher-window_'), afk = pick('aw-watcher-afk_');
+  if (!win || !afk) return { error: 'no-watchers' };
+  const webBuckets = buckets.filter(b => b.startsWith('aw-watcher-web'));
+
+  const q = JSON.stringify;
+  const query = [
+    `afk = flood(query_bucket(${q(afk)}));`,
+    `not_afk = filter_keyvals(afk, "status", ["not-afk"]);`,
+    `events = filter_period_intersect(flood(query_bucket(${q(win)})), not_afk);`,
+    `apps = sort_by_duration(merge_events_by_keys(events, ["app"]));`,
+    `afk_total = merge_events_by_keys(afk, ["status"]);`,
+    `web = [];`,
+    ...(webBuckets.length ? [
+      `browser = filter_keyvals(events, "app", ${q(EMS_BROWSERS)});`,
+      `web_raw = [];`,
+      ...webBuckets.map(b => `web_raw = concat(web_raw, flood(query_bucket(${q(b)})));`),
+      `web = sort_by_duration(merge_events_by_keys(split_url_events(filter_period_intersect(web_raw, browser)), ["$domain"]));`
+    ] : []),
+    `RETURN = {"apps": apps, "afk": afk_total, "web": web};`
+  ];
+  const iso = ms => new Date(ms).toISOString();
+  let out;
+  try {
+    const res = await awFetch(`${EMS_AW_URL}/query/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ timeperiods: [`${iso(sinceMs)}/${iso(nowMs)}`], query })
+    });
+    if (!res.ok) return { error: `query-${res.status}` };
+    out = (await res.json())[0];
+  } catch (_) {
+    return { error: 'query-failed' };
+  }
+
+  const status = s => (out.afk || []).filter(e => e.data.status === s).reduce((t, e) => t + e.duration, 0);
+  const tally = {};
+  const add = (name, secs) => { if (name && secs > 0) tally[name] = (tally[name] || 0) + secs; };
+  const webSecs = (out.web || []).reduce((t, e) => t + e.duration, 0);
+  (out.apps || []).forEach(e => {
+    const app = String(e.data.app || '');
+    // With the web watcher, browser time is shown per website instead (rest stays under the browser name)
+    if (webSecs && EMS_BROWSERS.includes(app)) return;
+    add(app.replace(/\.exe$/i, ''), e.duration);
+  });
+  (out.web || []).forEach(e => add(String(e.data.$domain || '').replace(/^www\./, ''), e.duration));
+  if (webSecs) {
+    const browserSecs = (out.apps || []).filter(e => EMS_BROWSERS.includes(String(e.data.app))).reduce((t, e) => t + e.duration, 0);
+    add('Browser (other)', browserSecs - webSecs);
+  }
+  const apps = Object.entries(tally)
+    .map(([name, secs]) => ({ name, secs: Math.round(secs) }))
+    .filter(a => a.secs >= 60)
+    .sort((a, b) => b.secs - a.secs)
+    .slice(0, 15);
+  return { apps, activeSecs: Math.round(status('not-afk')), idleSecs: Math.round(status('afk')), web: webBuckets.length > 0 };
+}
+
 /** "01 : 05 : 09" */
 function emsClock(totalSecs) {
   const s = Math.max(0, Math.floor(totalSecs));

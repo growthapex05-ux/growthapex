@@ -41,6 +41,26 @@ function onlineSeconds(rec) {
   return Math.floor(secs);
 }
 
+// "2h 40m" / "45m"
+function shortDuration(secs) {
+  const m = Math.round(secs / 60);
+  return m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m}m`;
+}
+
+const SCREEN_TOP = 5;
+// App / website usage from ActivityWatch, saved on the attendance record by the employee dashboard
+function screenLines(rec) {
+  const act = rec.screenActivity;
+  if (act && Array.isArray(act.apps) && act.apps.length) {
+    const lines = ['   🖥️ Screen time (top apps/sites):'];
+    act.apps.slice(0, SCREEN_TOP).forEach(a => lines.push(`      • ${a.name} — ${shortDuration(a.secs)}`));
+    if (act.idleSecs) lines.push(`   💤 Idle: ${shortDuration(act.idleSecs)}`);
+    return lines;
+  }
+  if (rec.checkInDevice && rec.checkInDevice.type !== 'desktop') return ['   🖥️ Screen time: not tracked (mobile check-in)'];
+  return ['   🖥️ ⚠️ No screen activity data (ActivityWatch not running)'];
+}
+
 function deviceText(d) {
   if (!d || !d.type) return null;
   const icon = d.type === 'desktop' ? '💻' : '📱';
@@ -157,6 +177,7 @@ async function buildAttendanceReport(db, date = todayIST(), { mode = 'evening' }
       }
       if (rec.checkInNetwork === 'outside') lines.push(`   🌐 Outside office network (${rec.checkInIP})`);
       if (!rec.checkInDevice && !rec.checkInLocation) lines.push(`   _Device/location: old check-in (before tracking)_`);
+      if (!isMorning) lines.push(...screenLines(rec));
     }
 
     if (!isMorning && (day.status === 'present' || day.status === 'half-day')) {

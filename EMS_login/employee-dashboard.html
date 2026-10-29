@@ -403,7 +403,8 @@
         <div id="live-pulse-badge"></div>
       </div>
       <div id="today-att-info" style="font-size:13px;color:var(--muted)"></div>
-      <div style="font-size:11px;color:var(--muted);margin-top:8px">📍 Your location is taken only at Check-In and Check-Out for attendance — there is no tracking during the day.</div>
+      <div id="screen-activity-status" style="font-size:12px;color:var(--muted);margin-top:8px"></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px">📍 Your location is taken only at Check-In and Check-Out. 🖥️ While you are checked in, the names of the apps and websites you use (and for how long) are recorded from ActivityWatch on your laptop — no screenshots, keystrokes or message contents.</div>
     </div>
     <div class="section-card">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
@@ -1061,8 +1062,48 @@
     window.addEventListener(evt, markUserActive, { passive: true });
   });
 
+  // ── Screen activity (ActivityWatch on this laptop) ─────────
+  // Every 10 min while checked in (and at check-out) the app/website usage since check-in is saved
+  // on today's attendance record; the evening WhatsApp report lists it.
+  const SCREEN_SYNC_MS = 10 * 60 * 1000;
+  let screenSyncInterval = null;
+
+  async function syncScreenActivity(rec) {
+    if (IS_MOBILE_DEVICE) return; // ActivityWatch runs on laptops / desktops only
+    try {
+      rec = rec || await EMS_DB.getTodayAttendance(empId);
+      if (!rec || !rec.checkIn || rec.checkIn === '—') return;
+      const since = getCheckInDateObj(rec.checkIn, rec.date).getTime();
+      const act = await emsScreenActivity(since);
+      const update = { empId, date: rec.date };
+      if (act.error) update.screenActivityError = { reason: act.error, at: new Date().toISOString() };
+      else { update.screenActivity = { ...act, updatedAt: new Date().toISOString() }; update.screenActivityError = null; }
+      await EMS_DB.markAttendance(update);
+      renderScreenActivityStatus(act);
+    } catch (e) { console.warn('Screen activity sync:', e.message); }
+  }
+
+  function renderScreenActivityStatus(act) {
+    const el = document.getElementById('screen-activity-status');
+    if (!el) return;
+    el.innerHTML = act.error
+      ? '🖥️ Screen activity: <b style="color:var(--danger)">ActivityWatch not connected</b> — please open ActivityWatch on this laptop (see the setup guide from the admin).'
+      : `🖥️ Screen activity: <b style="color:#16a34a">connected</b>${act.web ? '' : ' · add the "ActivityWatch Web Watcher" browser extension to see websites'}`;
+  }
+
+  function startScreenSync() {
+    stopScreenSync();
+    syncScreenActivity();
+    screenSyncInterval = setInterval(() => syncScreenActivity(), SCREEN_SYNC_MS);
+  }
+
+  function stopScreenSync() {
+    if (screenSyncInterval) { clearInterval(screenSyncInterval); screenSyncInterval = null; }
+  }
+
   function startHeartbeatEngine() {
     stopHeartbeatEngine();
+    startScreenSync();
     emsBeat(currentActivityState);
     updateLiveStatusBadgeUI(currentActivityState);
 
@@ -1075,6 +1116,7 @@
   }
 
   function stopHeartbeatEngine() {
+    stopScreenSync();
     if (heartbeatInterval) {
       clearInterval(heartbeatInterval);
       heartbeatInterval = null;
@@ -1489,6 +1531,7 @@
         if (!rec || !rec.checkIn) { toast('You must check in first', 'error'); return; }
         if (rec.checkOut && rec.checkOut !== '—') { toast('Check-out already marked for today', 'info'); return; }
 
+        await syncScreenActivity(rec); // final screen-activity snapshot up to check-out
         const geo = await emsLocationWithHome(empId);
         const updatedRec = {
           empId, date:today, status:rec.status, checkIn:rec.checkIn, checkOut:time,
