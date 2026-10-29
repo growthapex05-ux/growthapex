@@ -74,31 +74,54 @@ async function checkOfflineEmployees(db, { dryRun = false } = {}) {
     const key = `${emp.id}_${date}`;
     if ((sentToday.get(key) || 0) >= MAX_ALERTS) continue;
     const chatId = toChatId(emp.phone);
-    if (!chatId) continue;
     const first = (emp.name || emp.id).split(' ')[0];
+    const who = `*${emp.name}* (${emp.id})`;
 
-    let item = null;
+    let alert = null;
     if (!has(rec.checkOut)) {
       const hb = Date.parse(rec.lastHeartbeat || '');
       if (isNaN(hb)) continue;
       const mins = Math.floor((Date.now() - hb) / 60000);
       const limit = rec.lastDevice && rec.lastDevice !== 'desktop' ? OFFLINE_MOBILE_MIN : OFFLINE_MIN;
       if (mins < limit) continue;
-      item = { id: `offline_${emp.id}_${date}_${rec.lastHeartbeat}`, message: offlineMessage(first, mins, timeIST(hb)) };
+      alert = {
+        id: `offline_${emp.id}_${date}_${rec.lastHeartbeat}`,
+        personal: offlineMessage(first, mins, timeIST(hb)),
+        group: `⚠️ *EMS Offline Alert*
+
+${who} is checked in, but their EMS dashboard has been offline for *${mins} min* (last seen ${timeIST(hb)}).
+
+_GrowthApex EMS_`
+      };
     } else if (/^Auto-Checkout/.test(rec.checkoutReason || '')) {
       const outMin = P.timeToMinutes(rec.checkOut);
       if (outMin == null || now - outMin < AUTO_OUT_MIN || outMin >= minutesOf(WORK_END)) continue;
-      item = { id: `autoout_${emp.id}_${date}_${rec.checkOut}`, message: autoCheckoutMessage(first, rec.checkOut, rec.checkoutReason) };
+      const reason = rec.checkoutReason.replace(/^Auto-Checkout (|)$/g, '');
+      alert = {
+        id: `autoout_${emp.id}_${date}_${rec.checkOut}`,
+        personal: autoCheckoutMessage(first, rec.checkOut, rec.checkoutReason),
+        group: `🔌 *Auto Check-Out Alert*
+
+${who} was automatically checked out at *${rec.checkOut}* (${reason}) during office hours and has not resumed work.
+
+_GrowthApex EMS_`
+      };
     }
-    if (!item) continue;
+    if (!alert) continue;
     if (dryRun) { console.log(`[dry-run] → ${emp.name}
-${item.message}
+${alert.personal}
+
+[dry-run] → group
+${alert.group}
 `); continue; }
 
-    const result = await deliver(db, { ...item, type: 'reminder', chatId });
-    if (result === 'sent') {
+    // Personal message to the employee + a copy in the team group (each sent once per episode)
+    const results = [];
+    if (chatId) results.push(await deliver(db, { id: alert.id, type: 'reminder', message: alert.personal, chatId }));
+    results.push(await deliver(db, { id: `${alert.id}_group`, type: 'alert', message: alert.group }));
+    if (results.includes('sent')) {
       sentToday.set(key, (sentToday.get(key) || 0) + 1);
-      console.log(`📲 [Offline alert] ${emp.name}: ${item.id}`);
+      console.log(`📲 [Offline alert] ${emp.name}: ${alert.id}`);
       sent++;
     }
   }
