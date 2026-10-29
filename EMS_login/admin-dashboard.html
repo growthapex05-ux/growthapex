@@ -1639,6 +1639,15 @@ function getDeviceInfoHtml(a) {
     const m = Math.round(a.activeSeconds / 60);
     parts.push(`⏱ Active ${Math.floor(m / 60)}h ${m % 60}m`);
   }
+  // ActivityWatch: setup status + top apps/sites so far
+  if (!awStatusUnsub) watchAwStatus();
+  const aw = awStatus[a.empId];
+  const top = a.screenActivity && Array.isArray(a.screenActivity.apps) ? a.screenActivity.apps.slice(0, 3) : [];
+  const fmtMin = secs => { const mm = Math.round(secs / 60); return mm >= 60 ? `${Math.floor(mm / 60)}h ${mm % 60}m` : `${mm}m`; };
+  if (top.length) parts.push(`🖥️ ${top.map(x => `${x.name} ${fmtMin(x.secs)}`).join(' · ')}`);
+  else if (aw && aw.connected) parts.push('<span style="color:#34d399">🖥️ ActivityWatch connected</span>');
+  else if (aw) parts.push(`<span style="color:#f87171">🖥️ ActivityWatch not connected (${aw.device ? aw.device.os : '?'})</span>`);
+  else if (type === 'desktop') parts.push('<span style="color:#fbbf24">🖥️ ActivityWatch not set up</span>');
   return parts.length ? `<div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5">${parts.join('<br>')}</div>` : '';
 }
 
@@ -3580,6 +3589,7 @@ function watchAwStatus() {
     awStatus = {};
     snap.forEach(d => { awStatus[d.id] = d.data(); });
     renderAwStatus();
+    if (document.getElementById('page-attendance')?.classList.contains('active') && typeof renderAdminAtt === 'function') renderAdminAtt();
   }, err => {
     const el = document.getElementById('aw-status-table');
     if (el) el.innerHTML = `<div class="empty-state"><div>❌</div>${err.message}</div>`;
