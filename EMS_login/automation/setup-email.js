@@ -17,9 +17,11 @@ function savePassword(password) {
   const raw = fs.existsSync(ENV_FILE) ? fs.readFileSync(ENV_FILE, 'utf8') : '';
   const eol = raw.includes('\r\n') ? '\r\n' : '\n';
   const lines = raw.split(/\r?\n/);
+  // Quoted, so characters like # or spaces in the password are kept (unquoted, # starts a comment)
+  const quoted = password.includes("'") ? `"${password.replace(/"/g, '\\"')}"` : `'${password}'`;
   const i = lines.findIndex(l => /^EMAIL_APP_PASSWORD=/.test(l));
-  if (i >= 0) lines[i] = `EMAIL_APP_PASSWORD=${password}`;
-  else lines.push(`EMAIL_APP_PASSWORD=${password}`);
+  if (i >= 0) lines[i] = `EMAIL_APP_PASSWORD=${quoted}`;
+  else lines.push(`EMAIL_APP_PASSWORD=${quoted}`);
   fs.writeFileSync(ENV_FILE, lines.join(eol), 'utf8');
 }
 
