@@ -50,14 +50,14 @@ async function sendReminders(db, kind, date = todayIST(), { dryRun = false } = {
     if (kind === 'checkin') {
       if (checkedIn || (att && att.status === 'leave') || isOnLeave(leaves, emp.id, date)) continue;
       message = `⏰ *Check-In Reminder*\n\n` +
-                `Hi ${firstName}, aapne aaj (${date}) abhi tak EMS par check-in nahi kiya hai.\n` +
-                `👉 Please dashboard kholkar *Mark Check-In* karein.\n\n` +
+                `Hi ${firstName}, you have not checked in on EMS yet today (${date}).\n` +
+                `👉 Please open the dashboard and tap *Mark Check-In*.\n\n` +
                 `_GrowthApex EMS_`;
     } else {
       if (!checkedIn || checkedOut) continue;
       message = `🔔 *Check-Out Reminder*\n\n` +
-                `Hi ${firstName}, aap abhi bhi checked-in dikh rahe hain (Check-In: ${att.checkIn}).\n` +
-                `👉 Kaam khatam ho gaya ho to please *Check-Out* aur EOD report bhar dein.\n\n` +
+                `Hi ${firstName}, you are still shown as checked in (Check-In: ${att.checkIn}).\n` +
+                `👉 If you are done for the day, please *Check-Out* and submit your EOD report.\n\n` +
                 `_GrowthApex EMS_`;
     }
 

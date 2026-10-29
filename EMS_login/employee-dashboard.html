@@ -326,7 +326,7 @@
       <div class="stat-card purple">
         <div class="stat-icon">📅</div>
         <div class="stat-val" id="stat-present">0</div>
-        <div class="stat-label">Days Present (Is Mahine)</div>
+        <div class="stat-label">Days Present (This Month)</div>
       </div>
       <div class="stat-card cyan">
         <div class="stat-icon">✅</div>
@@ -336,12 +336,12 @@
       <div class="stat-card green">
         <div class="stat-icon">🌴</div>
         <div class="stat-val" id="stat-leaves">0</div>
-        <div class="stat-label">Leave Balance (din)</div>
+        <div class="stat-label">Leave Balance (days)</div>
       </div>
       <div class="stat-card amber">
         <div class="stat-icon">💰</div>
         <div class="stat-val" id="stat-salary">₹0</div>
-        <div class="stat-label">Ab Tak Kamaya (Is Mahine)</div>
+        <div class="stat-label">Earned So Far (This Month)</div>
       </div>
     </div>
     
@@ -403,11 +403,11 @@
         <div id="live-pulse-badge"></div>
       </div>
       <div id="today-att-info" style="font-size:13px;color:var(--muted)"></div>
-      <div style="font-size:11px;color:var(--muted);margin-top:8px">📍 Attendance ke liye sirf Check-In aur Check-Out ke time aapki location li jaati hai — din bhar tracking nahi hoti.</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px">📍 Your location is taken only at Check-In and Check-Out for attendance — there is no tracking during the day.</div>
     </div>
     <div class="section-card">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
-        <h3 style="margin:0">📊 Mera Hisaab — Attendance, Leave &amp; Salary</h3>
+        <h3 style="margin:0">📊 My Summary — Attendance, Leave &amp; Salary</h3>
         <select id="month-summary-select" class="filter-select" onchange="renderMonthSummary()"></select>
       </div>
       <div id="month-summary-box"></div>
@@ -832,7 +832,19 @@
     }
     renderDashboard();
   }
-  initEmployee();
+
+  // Firestore rules need a Firebase sign-in, not just the localStorage session. If the sign-in is
+  // gone (expired, cleared, signed out in another tab) every read/write is denied and the portal
+  // showed zeros and silently failed check-in. Send the employee back to log in instead.
+  const unsubAuthGate = firebase.auth().onAuthStateChanged((user) => {
+    unsubAuthGate();
+    if (!user) {
+      localStorage.removeItem('ems_session');
+      window.location.href = '/EMS_login/?expired=1';
+      return;
+    }
+    initEmployee();
+  });
 
   // Clock
   function updateClock() {
@@ -1354,7 +1366,7 @@
       }
     }
 
-    box.innerHTML = '<div style="color:var(--muted);padding:12px">⏳ Hisaab ban raha hai…</div>';
+    box.innerHTML = '<div style="color:var(--muted);padding:12px">⏳ Preparing your summary…</div>';
     try {
       const [att, leaves, cfg, fresh] = await Promise.all([
         EMS_DB.getAttendance(empId), EMS_DB.getLeaves(empId),
@@ -1364,7 +1376,7 @@
                                                { holidays: cfg.holidays || [], team: await getTeamCalendar() });
       box.innerHTML = EMS_PAYROLL.summaryHtml(summary);
     } catch (e) {
-      box.innerHTML = `<div style="color:var(--danger);padding:12px">Hisaab load nahi hua: ${e.message}</div>`;
+      box.innerHTML = `<div style="color:var(--danger);padding:12px">Could not load summary: ${e.message}</div>`;
     }
   }
 
@@ -1415,6 +1427,17 @@
   }
 
   async function markAtt(type) {
+    try {
+      await doMarkAtt(type);
+    } catch (e) {
+      console.error('markAtt error:', e);
+      toast(e && e.code === 'permission-denied'
+        ? 'Your session has expired — please log in again.'
+        : 'Attendance could not be saved: ' + (e && e.message || e), 'error');
+    }
+  }
+
+  async function doMarkAtt(type) {
     const today = emsToday();
     const time  = new Date().toLocaleTimeString('en-IN', { hour12: false });
     const rec   = await EMS_DB.getTodayAttendance(empId);
@@ -1430,7 +1453,7 @@
         const checkInTime = isReCheckIn ? rec.checkIn : time;
 
         const device = emsDevice();
-        toast('📍 Location check ho rahi hai…', 'info');
+        toast('📍 Checking your location…', 'info');
         const [net, geo] = await Promise.all([emsNetwork(), emsLocationWithHome(empId)]);
         const updatedRec = {
           empId,
@@ -1453,7 +1476,7 @@
           updatedRec.checkInDistanceFromHomeKm = geo.distanceFromHomeKm;
         }
         if (geo.location.error === 'denied') {
-          toast('⚠️ Location permission band hai — admin ko "Location denied" dikhega.', 'error');
+          toast('⚠️ Location permission is off — the admin will see "Location denied".', 'error');
         }
 
         await EMS_DB.markAttendance(updatedRec);

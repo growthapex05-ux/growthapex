@@ -79,13 +79,15 @@ async function processReportRequests(db) {
       continue;
     }
     await doc.ref.update({ status: 'sending', pickedAt: Date.now() });
-    const id = `${type === 'login' ? 'morning' : 'daily'}_${date}`;
+    // Own id per request: using the scheduled id (daily_<date>) made a manual send during the day
+    // mark that evening's automatic report as "already sent", so it never went out.
+    const id = `manual_${type === 'login' ? 'morning' : 'daily'}_${date}_${doc.id}`;
     console.log(`📨 Admin request: ${req.type} report for ${date}`);
     const result = await deliver(db, { id, type, date }, { force: true });
     await doc.ref.update({
       status: result === 'sent' ? 'sent' : 'failed',
       result,
-      error: result === 'sent' ? null : 'Send nahi hua — message queue mein hai, internet/WhatsApp theek hote hi chala jaayega.',
+      error: result === 'sent' ? null : 'Not sent — the message is queued and will go out once internet/WhatsApp is back.',
       doneAt: Date.now()
     });
   }

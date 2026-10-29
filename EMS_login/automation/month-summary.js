@@ -44,28 +44,28 @@ async function groupSection(db, monthVal = reportMonth()) {
   const lines = rows.map(({ emp, s }) =>
     `👤 *${emp.name}*\n` +
     `   ✅ Present ${num(s.present)} · 🌗 Half ${num(s.halfDays)} · 🌴 Leave ${num(s.paidLeave + s.unpaidLeave)} · ❌ Absent ${num(s.absent)} · ⏰ Late ${num(s.late)}\n` +
-    `   🏦 Leave balance: ${num(s.leave.balance)} din`
+    `   🏦 Leave balance: ${num(s.leave.balance)} days`
   );
   return `\n\n📋 *ATTENDANCE & LEAVE (${monthVal})*\n` + lines.join('\n') +
-         `\n_Absent = working din bina check-in aur bina approved leave._`;
+         `\n_Absent = working day with no check-in and no approved leave._`;
 }
 
 function personalMessage(emp, s) {
   const monthName = new Date(`${s.monthVal}-01T12:00:00`).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
   const sal = s.salary;
-  return `📊 *Aapka Monthly Hisaab — ${monthName}*\n\n` +
+  return `📊 *Your Monthly Summary — ${monthName}*\n\n` +
     `Hi ${(emp.name || '').split(' ')[0]},\n\n` +
     `*Attendance*\n` +
     `✅ Present: ${num(s.present)} · 🌗 Half day: ${num(s.halfDays)}\n` +
     `🌴 Leave: ${num(s.paidLeave)} paid, ${num(s.unpaidLeave)} unpaid\n` +
     `❌ Absent: ${num(s.absent)} · ⏰ Late: ${num(s.late)}\n` +
-    `🏦 Leave balance: ${num(s.leave.balance)} din\n\n` +
+    `🏦 Leave balance: ${num(s.leave.balance)} days\n\n` +
     `*Salary*\n` +
-    `Monthly salary: ${money(s.baseSalary)} (${money(s.perDay)}/din)\n` +
-    `Katauti (${num(s.unpaidDays)} unpaid din): -${money(sal.deduction)}\n` +
+    `Monthly salary: ${money(s.baseSalary)} (${money(s.perDay)}/day)\n` +
+    `Deduction (${num(s.unpaidDays)} unpaid days): -${money(sal.deduction)}\n` +
     `Advance: -${money(sal.advance)}\n` +
     `*Net payable: ${money(sal.netPayable)}*\n\n` +
-    `_Salary slip release hone par EMS portal par dikhegi. Koi sawaal ho to HR se baat karein._`;
+    `_Your salary slip will appear on the EMS portal once released. For any questions, please contact HR._`;
 }
 
 async function sendPersonalSalarySummaries(db, monthVal = reportMonth(), { dryRun = false } = {}) {

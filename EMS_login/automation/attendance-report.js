@@ -49,9 +49,9 @@ function deviceText(d) {
 
 function locationText(label, loc, distKm) {
   if (!loc) return null;
-  if (loc.error) return `📍 ${label}: ❌ ${loc.error === 'denied' ? 'Location permission band' : 'Location nahi mili'}`;
+  if (loc.error) return `📍 ${label}: ❌ ${loc.error === 'denied' ? 'Location permission denied' : 'Location not available'}`;
   let home = '';
-  if (distKm != null) home = distKm > HOME_RADIUS_KM ? ` · 🏠 Ghar se *${distKm} km door* ⚠️` : ' · 🏠 Ghar se';
+  if (distKm != null) home = distKm > HOME_RADIUS_KM ? ` · 🏠 *${distKm} km from home* ⚠️` : ' · 🏠 From home';
   const approx = loc.accuracy > 1000 ? ` (±${(loc.accuracy / 1000).toFixed(1)} km)` : '';
   return `📍 ${label}: https://maps.google.com/?q=${loc.lat},${loc.lng}${approx}${home}`;
 }
@@ -90,8 +90,8 @@ async function buildAttendanceReport(db, date = todayIST(), { mode = 'evening' }
     ? `🌅 *GROWTHAPEX — MORNING ATTENDANCE*`
     : `🚀 *GROWTHAPEX — DAILY ATTENDANCE REPORT*`;
   let msg = `${header}\n📅 *${prettyDate(date)}*\n`;
-  if (sentLate) msg += `⏰ _Ye report time par auto-send nahi ho payi thi — ab bheji ja rahi hai._\n`;
-  if (holidays.includes(date)) msg += `🎉 _Aaj office holiday hai._\n`;
+  if (sentLate) msg += `⏰ _This report could not be auto-sent on time — sending it now._\n`;
+  if (holidays.includes(date)) msg += `🎉 _Today is an office holiday._\n`;
 
   const counts = { present: 0, late: 0, leave: 0, absent: 0, pending: 0 };
   const blocks = [];
@@ -119,10 +119,10 @@ async function buildAttendanceReport(db, date = todayIST(), { mode = 'evening' }
       status = '🎉 Holiday';
     } else if (day.status === 'absent') {
       counts.absent++;
-      status = '❌ Absent — check-in nahi, approved leave nahi';
+      status = '❌ Absent — no check-in, no approved leave';
     } else {
       counts.pending++;
-      status = '⏳ Abhi tak check-in nahi';
+      status = '⏳ Not checked in yet';
     }
 
     lines.push(`${NUM_EMOJI[i] || '•'} *${emp.name}* (${emp.id}) — ${status}`);
@@ -137,7 +137,7 @@ async function buildAttendanceReport(db, date = todayIST(), { mode = 'evening' }
           const worked = online != null ? duration(online / 60) : duration(outMin - inMin);
           timing += ` → Out *${rec.checkOut}*${worked ? ` · ⌛ ${worked}${online != null ? ' online' : ''}` : ''}`;
         } else {
-          timing += ` → ⚠️ Check-out nahi kiya`;
+          timing += ` → ⚠️ Did not check out`;
           if (online != null) timing += ` · ⌛ ${duration(online / 60)} online`;
         }
       } else if (online != null) {
@@ -155,8 +155,8 @@ async function buildAttendanceReport(db, date = todayIST(), { mode = 'evening' }
         const outLoc = locationText('Check-out', rec.checkOutLocation, rec.checkOutDistanceFromHomeKm);
         if (outLoc) lines.push(`   ${outLoc}`);
       }
-      if (rec.checkInNetwork === 'outside') lines.push(`   🌐 Office network se bahar (${rec.checkInIP})`);
-      if (!rec.checkInDevice && !rec.checkInLocation) lines.push(`   _Device/location: purana check-in (tracking se pehle)_`);
+      if (rec.checkInNetwork === 'outside') lines.push(`   🌐 Outside office network (${rec.checkInIP})`);
+      if (!rec.checkInDevice && !rec.checkInLocation) lines.push(`   _Device/location: old check-in (before tracking)_`);
     }
 
     if (!isMorning && (day.status === 'present' || day.status === 'half-day')) {
@@ -167,7 +167,7 @@ async function buildAttendanceReport(db, date = todayIST(), { mode = 'evening' }
         const rate = wl.completionRate !== undefined ? wl.completionRate : (tasks.length ? Math.round(done / tasks.length * 100) : null);
         lines.push(`   📝 EOD: ${rate != null ? `${rate}% done` : 'submitted'}${tasks.length ? ` (${done}/${tasks.length} tasks)` : ''}${wl.hours ? ` · ${wl.hours}h` : ''}`);
       } else {
-        lines.push(`   📝 ⚠️ EOD report nahi bhara`);
+        lines.push(`   📝 ⚠️ EOD report not submitted`);
       }
     }
 
@@ -177,11 +177,11 @@ async function buildAttendanceReport(db, date = todayIST(), { mode = 'evening' }
 
   msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
   msg += `👥 Team: *${employees.length}* · ✅ Present *${counts.present}* · ⏰ Late *${counts.late}* · 🌴 Leave *${counts.leave}* · ` +
-         (isMorning ? `⏳ Baaki *${counts.pending}*` : `❌ Absent *${counts.absent}*`) + `\n`;
+         (isMorning ? `⏳ Pending *${counts.pending}*` : `❌ Absent *${counts.absent}*`) + `\n`;
   msg += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
   msg += blocks.join('\n\n');
   msg += `\n\n━━━━━━━━━━━━━━━━━━━━━━\n`;
-  msg += `_Late = 10:00 ke baad check-in · ⌛ = sirf online time (offline gap nahi gina jaata) · Absent = working din bina check-in aur bina approved leave · Location sirf check-in/out ke time li jaati hai._`;
+  msg += `_Late = check-in after 10:00 · ⌛ = online time only (offline gaps not counted) · Absent = working day with no check-in and no approved leave · Location is taken only at check-in/out._`;
   return msg;
 }
 

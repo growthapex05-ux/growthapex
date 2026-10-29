@@ -8,8 +8,9 @@
 //  • Salary per day = monthly salary ÷ working days in that month.
 //  • Present = 1 day, Half-day = ½ worked + ½ leave.
 //  • A past working day with no check-in and no approved leave = ABSENT (unpaid).
-//  • Leave: 1.5 days credited every month from the joining month (+ admin's customLeaveCredit once).
-//    Approved leave is PAID while balance lasts; leave beyond the balance is UNPAID.
+//  • Leave: 1.5 days every month, reset at the start of each month — unused leave does not carry
+//    over (admin's customLeaveCredit is added once, in the joining month).
+//    Approved leave is PAID while that month's balance lasts; leave beyond it is UNPAID.
 //    Absent days do not use the leave balance — they are always unpaid.
 //  • Holidays (admin/config.holidays) are paid days off, never absent.
 //  • Days before the attendance system was in use, and days on which nobody in the team has any
@@ -169,8 +170,8 @@
     const startStr = joinDate || monthStart;
     const cur = new Date(`${startStr}T12:00:00`);
     const last = new Date(`${monthEnd}T12:00:00`);
-    let balance = Number(emp.customLeaveCredit || 0);
-    let accrued = balance;
+    let balance = 0;
+    let accrued = 0;
     let used = 0;
     let lastCreditMonth = '';
 
@@ -179,9 +180,11 @@
       const ym = ds.slice(0, 7);
       cur.setDate(cur.getDate() + 1);
 
+      // Leave resets every month: unused leave does not carry over
       if (ym !== lastCreditMonth) {
-        balance += MONTHLY_LEAVE_CREDIT;
-        accrued += MONTHLY_LEAVE_CREDIT;
+        const extra = lastCreditMonth ? 0 : Number(emp.customLeaveCredit || 0);
+        balance = accrued = MONTHLY_LEAVE_CREDIT + extra;
+        used = 0;
         lastCreditMonth = ym;
       }
       if (!isWorkingDay(ds)) {
@@ -271,8 +274,8 @@
     'half-leave':     ['#06b6d4', 'Half leave'],
     absent:           ['#ef4444', 'Absent'],
     holiday:          ['#8b5cf6', 'Holiday'],
-    'office-closed':  ['#a78bfa', 'Office band (koi record nahi)'],
-    'not-tracked':    ['#94a3b8', 'System chalu hone se pehle'],
+    'office-closed':  ['#a78bfa', 'Office closed (no records)'],
+    'not-tracked':    ['#94a3b8', 'Before system start'],
     sunday:           ['#475569', 'Sunday'],
     pending:          ['#64748b', 'Today'],
     upcoming:         ['#cbd5e1', 'Upcoming'],
@@ -283,7 +286,7 @@
   function num(n) { return Number.isInteger(n) ? String(n) : Number(n).toFixed(1); }
 
   function summaryHtml(r) {
-    if (!r.joined) return '<div style="padding:16px;color:var(--muted,#94a3b8)">Is mahine join nahi kiya tha.</div>';
+    if (!r.joined) return '<div style="padding:16px;color:var(--muted,#94a3b8)">Not joined yet in this month.</div>';
     const monthName = new Date(`${r.monthVal}-01T12:00:00`).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
     const s = r.salary;
     const stat = (label, value, color, sub) => `
@@ -311,32 +314,32 @@
 
     return `
       <div style="font-size:13px">
-        <div style="font-weight:700;margin-bottom:10px">📅 ${monthName} ${s.monthOver ? '' : `<span style="font-size:11px;color:var(--muted,#94a3b8);font-weight:400">(aaj tak ka hisaab · ${r.upcomingWorkingDays} working din baaki)</span>`}</div>
+        <div style="font-weight:700;margin-bottom:10px">📅 ${monthName} ${s.monthOver ? '' : `<span style="font-size:11px;color:var(--muted,#94a3b8);font-weight:400">(summary till today · ${r.upcomingWorkingDays} working days left)</span>`}</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:12px">
-          ${stat('✅ Present', num(r.present), '#059669', `${doneDays} working din mein`)}
+          ${stat('✅ Present', num(r.present), '#059669', `of ${doneDays} working days`)}
           ${stat('🌗 Half day', num(r.halfDays), '#d97706')}
           ${stat('🌴 Leave', num(r.paidLeave + r.unpaidLeave), '#0891b2', `${num(r.paidLeave)} paid · ${num(r.unpaidLeave)} unpaid`)}
-          ${stat('❌ Absent', num(r.absent), '#dc2626', 'Check-in nahi, leave nahi')}
-          ${stat('⏰ Late', num(r.late), '#d97706', '10:00 ke baad')}
+          ${stat('❌ Absent', num(r.absent), '#dc2626', 'No check-in, no leave')}
+          ${stat('⏰ Late', num(r.late), '#d97706', 'After 10:00')}
           ${r.holidays ? stat('🎉 Holiday', num(r.holidays), '#7c3aed', 'Paid') : ''}
-          ${r.officeClosed ? stat('🏢 Office band', num(r.officeClosed), '#7c3aed', 'Kisi ka record nahi · paid') : ''}
-          ${r.notTracked ? stat('🕓 Tracking se pehle', num(r.notTracked), '#64748b', 'System chalu nahi tha · paid') : ''}
-          ${stat('🏦 Leave balance', num(r.leave.balance), '#2563eb', `${num(r.leave.accrued)} mile · ${num(r.leave.used)} use`)}
+          ${r.officeClosed ? stat('🏢 Office closed', num(r.officeClosed), '#7c3aed', 'No records · paid') : ''}
+          ${r.notTracked ? stat('🕓 Before tracking', num(r.notTracked), '#64748b', 'System not in use · paid') : ''}
+          ${stat('🏦 Leave balance', num(r.leave.balance), '#2563eb', `${num(r.leave.accrued)} credited · ${num(r.leave.used)} used`)}
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${strip}</div>
         <div style="font-size:11px;color:var(--muted,#94a3b8);margin-bottom:14px">${legend}${activeH ? ` · ⏱ ${activeH}` : ''}</div>
         <div style="max-width:480px">
           ${row('Monthly salary', money(r.baseSalary))}
           ${row(`Per day (${r.totalWorkingDays} working days)`, money(r.perDay))}
-          ${row(s.monthOver ? 'Earned this month' : 'Ab tak kamaya', money(s.earnedSoFar), '#059669')}
-          ${row(`Katauti (${num(r.unpaidDays)} unpaid din)`, s.deduction ? '-' + money(s.deduction) : '₹0', s.deduction ? '#dc2626' : '')}
+          ${row(s.monthOver ? 'Earned this month' : 'Earned so far', money(s.earnedSoFar), '#059669')}
+          ${row(`Deduction (${num(r.unpaidDays)} unpaid days)`, s.deduction ? '-' + money(s.deduction) : '₹0', s.deduction ? '#dc2626' : '')}
           ${row('Advance deduction', s.advance ? '-' + money(s.advance) : '₹0', s.advance ? '#dc2626' : '')}
-          ${row(s.monthOver ? 'Net payable' : 'Net (ab tak)', money(s.netSoFar), '#059669', true)}
-          ${s.monthOver ? '' : row('Poora mahina aaye to (estimate)', money(s.netPayable), 'var(--cyan,#22d3ee)')}
+          ${row(s.monthOver ? 'Net payable' : 'Net (so far)', money(s.netSoFar), '#059669', true)}
+          ${s.monthOver ? '' : row('If full month attended (estimate)', money(s.netPayable), 'var(--cyan,#22d3ee)')}
         </div>
         <div style="font-size:11px;color:var(--muted,#94a3b8);margin-top:10px;line-height:1.5">
-          Niyam: Mon–Sat working · Sunday aur holiday paid · bina check-in aur bina approved leave = absent (unpaid) ·
-          har mahine ${MONTHLY_LEAVE_CREDIT} leave milti hai, balance tak leave paid · late = 10:00 ke baad check-in.
+          Rules: Mon–Sat working · Sundays and holidays paid · no check-in and no approved leave = absent (unpaid) ·
+          ${MONTHLY_LEAVE_CREDIT} leave every month (resets monthly), leave paid up to balance · late = check-in after 10:00.
         </div>
       </div>`;
   }
@@ -346,13 +349,13 @@
     const d = r.days.find(x => x.date === r.today);
     if (d && d.status === 'sunday') return { label: 'Sunday', color: '#64748b', bg: '#f1f5f9' };
     if (d && d.status === 'holiday') return { label: 'Holiday', color: '#7c3aed', bg: '#ede9fe' };
-    if (d && (d.status === 'leave' || d.status === 'upcoming-leave')) return { label: 'Leave par', color: '#0891b2', bg: '#cffafe' };
+    if (d && (d.status === 'leave' || d.status === 'upcoming-leave')) return { label: 'On leave', color: '#0891b2', bg: '#cffafe' };
     if (todayRec && todayRec.checkIn && todayRec.checkIn !== '—') {
       const out = todayRec.checkOut && todayRec.checkOut !== '—';
       return out ? { label: `Checked out ${todayRec.checkOut}`, color: '#475569', bg: '#f1f5f9' }
                  : { label: `Working · In ${todayRec.checkIn}`, color: '#16a34a', bg: '#dcfce7' };
     }
-    return { label: 'Check-in nahi', color: '#dc2626', bg: '#fee2e2' };
+    return { label: 'Not checked in', color: '#dc2626', bg: '#fee2e2' };
   }
 
   // Compact card for the admin "Team ka Hisaab" grid
@@ -377,9 +380,9 @@
           <div><b style="color:#0891b2">${num(r.paidLeave + r.unpaidLeave)}</b><span>Leave</span></div>
           <div><b style="color:#2563eb">${num(r.leave.balance)}</b><span>Balance</span></div>
         </div>
-        <div class="hx-row"><span>Ab tak kamaya</span><b>${money(s.earnedSoFar)} <span style="font-weight:500;color:var(--muted)">/ ${money(s.gross)}</span></b></div>
+        <div class="hx-row"><span>Earned so far</span><b>${money(s.earnedSoFar)} <span style="font-weight:500;color:var(--muted)">/ ${money(s.gross)}</span></b></div>
         <div class="hx-bar"><div style="width:${pct}%"></div></div>
-        <div class="hx-row"><span>Katauti ${s.deduction ? `<b style="color:#dc2626">-${money(s.deduction)}</b>` : '₹0'} · Late ${r.late}</span><span>Net (est.) <b>${money(s.netPayable)}</b></span></div>
+        <div class="hx-row"><span>Deduction ${s.deduction ? `<b style="color:#dc2626">-${money(s.deduction)}</b>` : '₹0'} · Late ${r.late}</span><span>Net (est.) <b>${money(s.netPayable)}</b></span></div>
       </div>`;
   }
 
@@ -393,11 +396,11 @@
       <div class="hx-hero">
         <div>
           <h3>${greet}, ${(emp.name || '').split(' ')[0] || 'there'} 👋</h3>
-          <p>Aaj: <b>${st.label}</b> · Is mahine ${num(r.present + r.halfDays * 0.5)} din present · ${r.upcomingWorkingDays} working din baaki</p>
+          <p>Today: <b>${st.label}</b> · This month ${num(r.present + r.halfDays * 0.5)} days present · ${r.upcomingWorkingDays} working days left</p>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <span class="hx-pill">🏦 ${num(r.leave.balance)} leave baaki</span>
-          <span class="hx-pill">💰 ${money(s.earnedSoFar)} kamaya</span>
+          <span class="hx-pill">🏦 ${num(r.leave.balance)} leave left</span>
+          <span class="hx-pill">💰 ${money(s.earnedSoFar)} earned</span>
         </div>
       </div>`;
   }

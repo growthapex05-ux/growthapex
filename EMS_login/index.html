@@ -465,6 +465,10 @@
       }
     });
 
+    if (new URLSearchParams(location.search).get('expired')) {
+      showError('⚠️ Your login has expired. Please log in again to check in and see your data.');
+    }
+
     // ── Restore existing session ──────────────────────────────
     const sess = getSession();
     if (sess && sess.role) {

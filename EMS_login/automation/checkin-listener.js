@@ -67,7 +67,7 @@ function locationLine(att) {
   if (loc.error) return `📍 *Location:* ❌ ${loc.error === 'denied' ? 'Permission denied' : 'Not available'}\n`;
   const dist = att.checkInDistanceFromHomeKm;
   const home = dist == null ? ''
-    : dist > HOME_RADIUS_KM ? ` · 🏠 Ghar se ${dist} km door ⚠️` : ' · 🏠 Ghar se';
+    : dist > HOME_RADIUS_KM ? ` · 🏠 ${dist} km from home ⚠️` : ' · 🏠 From home';
   return `📍 *Location:* https://www.google.com/maps?q=${loc.lat},${loc.lng}${home}\n`;
 }
 
