@@ -1,7 +1,7 @@
 {
   "name": "growthapex-tracker",
   "productName": "GrowthApex Tracker",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "GrowthApex EMS desktop tracker: attendance, app/website time, screenshots and project timesheets",
   "main": "main.js",
   "author": "GrowthApex",

@@ -71,6 +71,9 @@ button:disabled { opacity: .4; cursor: default; }
 .update.show { display: flex; }
 .update b { display: block; font-size: 13px; }
 .update button { margin-left: auto; padding: 8px 12px; font-size: 12.5px; background: var(--green); flex: none; }
+.siren { background: #fef2f2; border-color: #fecaca; color: #991b1b; animation: shake .5s 3; }
+.siren button { background: var(--red); }
+@keyframes shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 .bar { height: 5px; border-radius: 9px; background: #d1fae5; overflow: hidden; margin-top: 6px; }
 .bar i { display: block; height: 100%; background: var(--green); width: 0; transition: width .3s; }
 
@@ -85,3 +88,19 @@ button:disabled { opacity: .4; cursor: default; }
 .login-hero img { width: 68px; height: 68px; }
 .login-hero .wordmark { font-size: 26px; margin-top: 10px; }
 .login-hero p { color: var(--muted); margin: 6px 0 0; font-size: 13px; }
+
+/* Mini widget (always on top) */
+.mini-body { background: transparent; overflow: hidden; }
+.mini { -webkit-app-region: drag; height: 56px; margin: 4px; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 10px;
+  border-radius: 16px; background: rgba(255, 255, 255, .97); border: 1px solid var(--border); box-shadow: 0 6px 20px rgba(15, 27, 51, .18); }
+.mini button { -webkit-app-region: no-drag; }
+.mini-logo { width: 30px; height: 30px; flex: none; }
+.mini-info { flex: 1; min-width: 0; }
+.mini-time { font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: .5px; line-height: 1.1; }
+.mini-status { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); font-weight: 600; }
+.mini-status i { width: 7px; height: 7px; border-radius: 50%; background: #cbd5e1; display: inline-block; }
+.mini-status i.dot-on { background: var(--green); } .mini-status i.dot-break { background: var(--amber); }
+.mini-status i.dot-idle { background: #93c5fd; } .mini-status i.dot-bad { background: var(--red); }
+.mini-btn { padding: 8px 10px; font-size: 12.5px; border-radius: 10px; flex: none; }
+.mini-btn[hidden] { display: none; }
+.mini-open { background: #f1f5f9; color: var(--text); padding: 6px 9px; font-size: 15px; border-radius: 10px; flex: none; }

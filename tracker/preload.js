@@ -9,10 +9,12 @@ contextBridge.exposeInMainWorld('tracker', {
   startProject: (project, note) => ipcRenderer.invoke('project-start', { project, note }),
   stopProject: () => ipcRenderer.invoke('project-stop'),
   state: () => ipcRenderer.invoke('state'),
+  openMain: () => ipcRenderer.invoke('open-main'),
   permissions: () => ipcRenderer.invoke('permissions'),
   onState: cb => ipcRenderer.on('state', (_e, s) => cb(s)),
   updateState: () => ipcRenderer.invoke('update-state'),
   checkUpdate: () => ipcRenderer.invoke('update-check'),
   installUpdate: () => ipcRenderer.invoke('update-install'),
-  onUpdate: cb => ipcRenderer.on('update', (_e, u) => cb(u))
+  onUpdate: cb => ipcRenderer.on('update', (_e, u) => cb(u)),
+  onSiren: cb => ipcRenderer.on('siren', (_e, msg) => cb(msg))
 });

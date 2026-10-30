@@ -19,7 +19,8 @@ function render(s) {
   const out = s.checkOut && s.checkOut !== '—';
   $('inout').textContent = !s.checkIn || s.checkIn === '—' ? 'Not checked in yet'
     : `Checked in ${s.checkIn}${out ? ` · Out ${s.checkOut}` : ''}${s.breakSecs >= 60 ? ` · Break ${mins(s.breakSecs)}` : ''}`;
-  $('worked').textContent = clock(s.workedSecs || 0);
+  const live = s.running && !s.onBreak && !s.paused && s.beatAt ? Math.min(120, Math.max(0, (Date.now() - s.beatAt) / 1000)) : 0;
+  $('worked').textContent = clock((s.workedSecs || 0) + live);
   $('checkin').disabled = s.running;
   $('checkout').disabled = !s.running;
   $('break').disabled = !s.running;
@@ -35,6 +36,7 @@ function render(s) {
   const dl = $('projects');
   if (dl.childElementCount !== (s.projects || []).length) dl.innerHTML = (s.projects || []).map(p => `<option value="${String(p).replace(/"/g, '&quot;')}">`).join('');
   $('err').textContent = s.lastError ? `⚠️ ${s.lastError}` : '';
+  if (s.running && !s.idle && !s.lastError) $('siren').classList.remove('show');
 }
 
 const act = (fn) => async () => { try { await fn(); } catch (e) { $('err').textContent = String(e.message || e); } render(await window.tracker.state()); };
@@ -48,7 +50,7 @@ $('upd-check').onclick = e => window.checkForUpdates(e.currentTarget);
 
 window.tracker.onState(render);
 window.tracker.state().then(render);
-setInterval(() => { if (last && last.projectTimer) render(last); }, 1000);
+setInterval(() => { if (last) render(last); }, 1000);
 
 window.tracker.permissions().then(p => {
   if (!p.mac) return;

@@ -538,11 +538,40 @@
       <div id="trk-timesheet"></div>
     </div>
     <div class="section-card">
+      <div class="section-head"><h3>⚙️ Tracker Settings</h3></div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Applies to every employee's Tracker app within 1 hour — no reinstall needed.</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:12px">
+        <div class="form-group">
+          <label>📸 Screenshot every (minutes)</label>
+          <input id="trk-set-shot" class="search-input" type="number" min="2" max="120" style="width:100%">
+        </div>
+        <div class="form-group">
+          <label>📍 Location every (minutes)</label>
+          <input id="trk-set-loc" class="search-input" type="number" min="1" max="120" style="width:100%">
+        </div>
+        <div class="form-group">
+          <label>🚨 Siren on employee laptop after (minutes idle / offline) — 0 = off</label>
+          <input id="trk-set-siren" class="search-input" type="number" min="0" max="120" style="width:100%">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:12px">
+        <div class="form-group">
+          <label>🚩 Flagged websites / apps — a screenshot every 2 min while open (one per line)</label>
+          <textarea id="trk-set-flag" class="search-input" rows="6" style="width:100%;font-family:inherit" placeholder="youtube.com"></textarea>
+        </div>
+        <div class="form-group">
+          <label>⏱ Projects for the project timer (one per line)</label>
+          <textarea id="trk-set-proj" class="search-input" rows="6" style="width:100%;font-family:inherit" placeholder="Client X — Instagram"></textarea>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="trk-set-save" onclick="saveTrackerSettings()">💾 Save settings</button>
+    </div>
+    <div class="section-card">
       <div class="section-head"><h3>⬇ Download the app for employees</h3></div>
       <div style="font-size:13px;line-height:1.7">
         Windows: <a href="https://github.com/growthapex05-ux/growthapex/releases/latest/download/GrowthApex-Tracker-Setup.exe" style="color:var(--cyan)">GrowthApex-Tracker-Setup.exe</a><br>
         Mac: <a href="https://github.com/growthapex05-ux/growthapex/releases/latest/download/GrowthApex-Tracker.dmg" style="color:var(--cyan)">GrowthApex-Tracker.dmg</a><br>
-        <span style="color:var(--muted)">Screenshots are kept for 7 days. Settings (screenshot interval, flagged sites, project list) live in Firestore admin/config.tracker.</span>
+        <span style="color:var(--muted)">Screenshots are kept for 7 days.</span>
       </div>
     </div>
   </div>
@@ -2481,7 +2510,44 @@ function payrollFor(emp, monthVal) {
 
 // Popup with the same "Mera Hisaab" card the employee sees
 // ── Tracker page: screenshots + timesheet for one employee / day (desktop app data) ──
+// Tracker app settings: admin/config.tracker (read by every Tracker app once an hour).
+// Defaults match tracker/src/tracker.js.
+const TRACKER_DEFAULTS = { screenshotMinutes: 10, locationMinutes: 5, sirenMinutes: 10, projects: [],
+  flaggedSites: ['youtube.com', 'instagram.com', 'facebook.com', 'netflix.com', 'hotstar.com', 'primevideo.com', 'x.com', 'reddit.com'] };
+let trackerSettingsLoaded = false;
+async function loadTrackerSettings() {
+  try {
+    const t = { ...TRACKER_DEFAULTS, ...((await EMS_DB.getAdmin()).tracker || {}) };
+    document.getElementById('trk-set-shot').value = t.screenshotMinutes;
+    document.getElementById('trk-set-loc').value = t.locationMinutes;
+    document.getElementById('trk-set-siren').value = t.sirenMinutes;
+    document.getElementById('trk-set-flag').value = (t.flaggedSites || []).join('\n');
+    document.getElementById('trk-set-proj').value = (t.projects || []).join('\n');
+    trackerSettingsLoaded = true;
+  } catch (e) { toast('Could not load Tracker settings: ' + e.message, 'error'); }
+}
+async function saveTrackerSettings() {
+  const lines = id => [...new Set(document.getElementById(id).value.split('\n').map(x => x.trim()).filter(Boolean))];
+  const num = (id, min, max, def) => { const n = parseInt(document.getElementById(id).value, 10); return isNaN(n) ? def : Math.min(max, Math.max(min, n)); };
+  const tracker = {
+    screenshotMinutes: num('trk-set-shot', 2, 120, TRACKER_DEFAULTS.screenshotMinutes),
+    locationMinutes: num('trk-set-loc', 1, 120, TRACKER_DEFAULTS.locationMinutes),
+    sirenMinutes: num('trk-set-siren', 0, 120, TRACKER_DEFAULTS.sirenMinutes),
+    flaggedSites: lines('trk-set-flag').map(x => x.toLowerCase()),
+    projects: lines('trk-set-proj')
+  };
+  const btn = document.getElementById('trk-set-save');
+  btn.disabled = true;
+  try {
+    await EMS_DB.updateAdmin({ tracker });
+    toast('Tracker settings saved — apps pick them up within 1 hour', 'success');
+    trackerSettingsLoaded = false; loadTrackerSettings();
+  } catch (e) { toast('Save failed: ' + e.message, 'error'); }
+  btn.disabled = false;
+}
+
 function initTrackerPage() {
+  if (!trackerSettingsLoaded) loadTrackerSettings();
   const sel = document.getElementById('trk-emp');
   const emps = (cache.employees || []).filter(e => e.status === 'active');
   if (sel.childElementCount !== emps.length) sel.innerHTML = emps.map(e => `<option value="${e.id}">${e.name} (${e.id})</option>`).join('');

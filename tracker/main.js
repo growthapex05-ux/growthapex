@@ -1,5 +1,5 @@
 // GrowthApex Tracker — Electron main process: login, tray, panel window, auto check-in/out.
-const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, powerMonitor, desktopCapturer, screen, safeStorage, systemPreferences, dialog } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, powerMonitor, desktopCapturer, screen, safeStorage, systemPreferences, dialog, Notification } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const ems = require('./src/ems');
@@ -9,6 +9,8 @@ const updater = require('./src/updater');
 
 // Windows: use the Windows Location service for navigator.geolocation (Wi-Fi / GPS based)
 app.commandLine.appendSwitch('enable-features', 'WinrtGeolocationImplementation');
+// The siren must play without a click in the window
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
 if (!app.requestSingleInstanceLock()) { app.quit(); process.exit(0); }
 
@@ -27,6 +29,7 @@ process.on('unhandledRejection', err => {
 const dataDir = app.getPath('userData');
 const credFile = path.join(dataDir, 'login.bin');
 let win = null;
+let mini = null;          // small always-on-top widget shown while the main window is minimised / closed
 let tray = null;
 let tracker = null;
 let quitting = false;
@@ -53,20 +56,55 @@ function showWindow(page) {
       icon: path.join(__dirname, 'assets', 'icon.png'),
       webPreferences: { preload: path.join(__dirname, 'preload.js'), backgroundThrottling: false }
     });
-    // Closing the window keeps the tracker running in the tray
-    win.on('close', e => { if (!quitting) { e.preventDefault(); win.hide(); } });
+    // Always in front of other apps (files, browser, …); minimise / close → the mini widget
+    win.setAlwaysOnTop(true, 'floating');
+    win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    win.on('close', e => { if (!quitting) { e.preventDefault(); win.hide(); showMini(); } });
+    win.on('minimize', e => { e.preventDefault(); win.hide(); showMini(); });
     win.webContents.on('render-process-gone', () => { if (!quitting && win && !win.isDestroyed()) win.reload(); });
     // Windows shutdown / sign-out: check out and let Windows close the app
     win.on('session-end', () => { quitApp(true); });
   }
   if (page) win.loadFile(path.join(__dirname, 'ui', page));
+  if (mini && !mini.isDestroyed()) mini.hide();
   win.show();
   win.focus();
+}
+
+// ── Mini widget: timer + Check-In / Check-Out, on top of everything, draggable ──
+const miniPosFile = path.join(dataDir, 'mini-position.json');
+function showMini() {
+  const s = tracker && tracker.state();
+  if (!s || !s.me) return; // only once logged in
+  if (!mini || mini.isDestroyed()) {
+    let pos = null;
+    try { pos = JSON.parse(fs.readFileSync(miniPosFile, 'utf8')); } catch (_) {}
+    const area = screen.getPrimaryDisplay().workArea;
+    const W = 300, H = 64;
+    const visible = pos && screen.getAllDisplays().some(d => pos.x >= d.workArea.x && pos.y >= d.workArea.y && pos.x + 40 <= d.workArea.x + d.workArea.width && pos.y + 20 <= d.workArea.y + d.workArea.height);
+    mini = new BrowserWindow({
+      width: W, height: H, x: visible ? pos.x : area.x + area.width - W - 16, y: visible ? pos.y : area.y + 16,
+      frame: false, resizable: false, maximizable: false, minimizable: false, fullscreenable: false, skipTaskbar: true,
+      transparent: true, hasShadow: true, show: false, title: 'GrowthApex Tracker',
+      webPreferences: { preload: path.join(__dirname, 'preload.js'), backgroundThrottling: false }
+    });
+    mini.setAlwaysOnTop(true, 'screen-saver');
+    mini.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    mini.loadFile(path.join(__dirname, 'ui', 'mini.html'));
+    mini.once('ready-to-show', () => { mini.showInactive(); pushState(); });
+    mini.on('moved', () => { try { const [x, y] = mini.getPosition(); fs.writeFileSync(miniPosFile, JSON.stringify({ x, y })); } catch (_) {} });
+    mini.on('close', e => { if (!quitting) { e.preventDefault(); } }); // stays while the app runs
+    mini.webContents.on('render-process-gone', () => { if (!quitting && mini && !mini.isDestroyed()) mini.reload(); });
+    return;
+  }
+  mini.showInactive();
+  mini.setAlwaysOnTop(true, 'screen-saver'); // re-assert: some full-screen apps push it down
 }
 
 function pushState() {
   const s = tracker ? tracker.state() : null;
   if (win && !win.isDestroyed()) { win.webContents.send('state', s); win.webContents.send('update', updater.state()); }
+  if (mini && !mini.isDestroyed()) mini.webContents.send('state', s);
   const up = updater.state();
   if (tray) {
     const label = !s || !s.me ? 'Not logged in' : !s.running ? 'Checked out' : s.onBreak ? 'On break' : s.paused ? 'Paused (screen locked)' : s.idle ? 'Idle' : 'Working — tracking on';
@@ -124,6 +162,19 @@ async function doUpdate() {
   return r;
 }
 
+// Siren: every 10 min while tracker.alarm() reports a problem — window to the front + sound + notification
+const SIREN_EVERY_MS = 10 * 60 * 1000;
+let lastSirenAt = 0;
+function checkSiren() {
+  const msg = tracker && tracker.alarm();
+  if (!msg) { lastSirenAt = 0; return; }
+  if (Date.now() - lastSirenAt < SIREN_EVERY_MS) return;
+  lastSirenAt = Date.now();
+  showWindow();
+  if (win && !win.isDestroyed()) win.webContents.send('siren', msg);
+  try { new Notification({ title: '🚨 GrowthApex Tracker', body: msg, urgency: 'critical' }).show(); } catch (_) {}
+}
+
 // force: PC shutting down / logging off — check out and close even while checked in
 async function quitApp(force = false) {
   if (tracker && tracker.state().running && !force) {
@@ -150,10 +201,12 @@ ipcMain.handle('logout', async () => {
   await doCheckOut('Logged out');
   clearCreds();
   await ems.logout();
+  if (mini && !mini.isDestroyed()) mini.hide();
   showWindow('login.html');
   pushState();
 });
 ipcMain.handle('checkin', () => doCheckIn());
+ipcMain.handle('open-main', () => showWindow());
 ipcMain.handle('checkout', () => doCheckOut());
 ipcMain.handle('break', (_e, on) => { tracker.setBreak(on); pushState(); });
 ipcMain.handle('project-start', (_e, { project, note }) => tracker.startProject(project, note));
@@ -174,9 +227,10 @@ app.on('before-quit', e => { if (!quitting) { e.preventDefault(); quitApp(); } }
 app.whenReady().then(async () => {
   if (process.platform === 'darwin' && app.dock) app.dock.hide();
   allowGeolocation();
-  tracker = createTracker({ powerMonitor, desktopCapturer, screen, dataDir, onChange: pushState });
+  tracker = createTracker({ powerMonitor, desktopCapturer, screen, safeStorage, dataDir, onChange: pushState });
   createTray();
   setInterval(pushState, 5000);
+  setInterval(checkSiren, 30000);
   const checkUpdate = () => updater.check().then(pushState);
   setTimeout(checkUpdate, 15000);
   setInterval(checkUpdate, 6 * 60 * 60 * 1000);

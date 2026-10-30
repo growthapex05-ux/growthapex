@@ -1141,14 +1141,15 @@
   let trackerLatest = null;
   async function showTrackerUpdateBanner() {
     try {
+      // Latest version is cached for 10 min (GitHub allows 60 API calls an hour per network)
       let ver = null;
-      try { ver = sessionStorage.getItem('ems_tracker_ver'); } catch (_) {}
+      try { const c = JSON.parse(sessionStorage.getItem('ems_tracker_latest') || 'null'); if (c && Date.now() - c.at < 10 * 60000) ver = c.ver; } catch (_) {}
       if (!ver) {
         const res = await fetch('https://api.github.com/repos/growthapex05-ux/growthapex/releases?per_page=10');
         const rel = (await res.json()).find(r => !r.draft && !r.prerelease && /^tracker-v/.test(r.tag_name));
         if (!rel) return;
         ver = rel.tag_name.replace('tracker-v', '');
-        try { sessionStorage.setItem('ems_tracker_ver', ver); } catch (_) {}
+        try { sessionStorage.setItem('ems_tracker_latest', JSON.stringify({ ver, at: Date.now() })); } catch (_) {}
       }
       if (ver === '1.0.0') return; // first release — nothing to update from
       trackerLatest = ver;
@@ -1165,6 +1166,7 @@
     try { if (trackerLatest) localStorage.setItem('ems_tracker_banner_hidden', trackerLatest); } catch (_) {}
   }
   showTrackerUpdateBanner();
+  setInterval(showTrackerUpdateBanner, 30 * 60000); // a release made while the portal is open shows up too
 
   function renderScreenActivityStatus(act) {
     const el = document.getElementById('screen-activity-status');

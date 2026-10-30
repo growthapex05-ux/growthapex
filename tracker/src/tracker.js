@@ -14,32 +14,68 @@ const SAVE_EVERY_MS = 5 * 60 * 1000;
 const HEARTBEAT_MS = 60 * 1000;
 const DEFAULT_FLAGGED = ['youtube.com', 'instagram.com', 'facebook.com', 'netflix.com', 'hotstar.com', 'primevideo.com', 'x.com', 'reddit.com'];
 
-function createTracker({ powerMonitor, desktopCapturer, screen, dataDir, onChange = () => {} }) {
+const KEEP_DAYS = 7;          // local day files older than this are deleted
+const OFFLINE_SIREN_MIN = 2;  // siren when the EMS has not confirmed a heartbeat for this long
+
+function createTracker({ powerMonitor, desktopCapturer, screen, safeStorage, dataDir, onChange = () => {} }) {
   let day = null;           // today's totals (persisted to disk)
   let running = false;
   let onBreak = false;
   let paused = false;       // screen locked / PC asleep
   let current = null;
   let idleSince = null;
-  let settings = { screenshotMinutes: 10, locationMinutes: 5, flaggedSites: DEFAULT_FLAGGED, projects: [] };
+  let settings = { screenshotMinutes: 10, locationMinutes: 5, sirenMinutes: 10, flaggedSites: DEFAULT_FLAGGED, projects: [] };
   let location = null;      // last location sent to the EMS
+  let lastBeatOkAt = 0;     // last heartbeat the EMS confirmed (no internet = Firestore just waits, never fails)
+  let autoCheckedOut = false; // the EMS checked this employee out (not the employee)
   let lastLocAt = 0;
   let lastShotAt = 0;
   let lastSaveAt = 0;
   let timers = [];
   let lastError = null;
 
-  const file = date => path.join(dataDir, `day-${date}.json`);
+  // Today's totals are kept on disk encrypted with the OS keychain (safeStorage), so they cannot be
+  // read from the app folder; day-<date>.json is the older plain-text format, read once and removed.
+  const file = date => path.join(dataDir, `day-${date}.bin`);
+  const legacyFile = date => path.join(dataDir, `day-${date}.json`);
   const timerFile = path.join(dataDir, 'project-timer.json');
+  const canEncrypt = () => safeStorage && safeStorage.isEncryptionAvailable();
+
+  function readDayFile(date) {
+    try {
+      const buf = fs.readFileSync(file(date));
+      return JSON.parse(canEncrypt() ? safeStorage.decryptString(buf) : buf.toString());
+    } catch (_) {}
+    try { return JSON.parse(fs.readFileSync(legacyFile(date), 'utf8')); } catch (_) { return null; }
+  }
 
   function loadDay() {
     const date = ems.todayIST();
     if (day && day.date === date) return day;
-    try { day = JSON.parse(fs.readFileSync(file(date), 'utf8')); } catch (_) { day = null; }
+    day = readDayFile(date);
     if (!day || day.date !== date) day = { date, programs: {}, sites: {}, titles: {}, combined: {}, activeSecs: 0, idleSecs: 0, breakSecs: 0 };
     return day;
   }
-  const persist = () => { try { fs.writeFileSync(file(day.date), JSON.stringify(day)); } catch (_) {} };
+  const persist = () => {
+    try {
+      const json = JSON.stringify(day);
+      fs.writeFileSync(file(day.date), canEncrypt() ? safeStorage.encryptString(json) : Buffer.from(json));
+      fs.rmSync(legacyFile(day.date), { force: true });
+    } catch (_) {}
+  };
+
+  // Delete day files older than KEEP_DAYS (and every old plain-text day file)
+  function cleanupDays() {
+    const cutoff = new Date(Date.now() - KEEP_DAYS * 864e5).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    const today = ems.todayIST();
+    try {
+      for (const f of fs.readdirSync(dataDir)) {
+        const m = /^day-(\d{4}-\d{2}-\d{2})\.(json|bin)$/.exec(f);
+        if (m && (m[1] < cutoff || (m[2] === 'json' && m[1] !== today))) fs.rmSync(path.join(dataDir, f), { force: true });
+      }
+    } catch (_) {}
+  }
+  cleanupDays();
   const addTo = (obj, key, secs) => { if (key) obj[key] = (obj[key] || 0) + secs; };
 
   async function sample() {
@@ -100,9 +136,12 @@ function createTracker({ powerMonitor, desktopCapturer, screen, dataDir, onChang
     if (!running) return;
     const state = onBreak ? 'break' : paused ? 'idle' : (idleSince ? 'idle' : 'active');
     try {
-      const rec = await ems.heartbeat(state);
-      lastError = null;
-      if (rec && !ems.isOpen(rec)) { await stop(false); } // checked out on the website / by admin
+      const rec = await Promise.race([ems.heartbeat(state), new Promise((_, rej) => setTimeout(() => rej(new Error('no connection')), 30000))]);
+      lastError = null; lastBeatOkAt = Date.now();
+      if (rec && !ems.isOpen(rec)) { // checked out on the website / by admin / by the system
+        autoCheckedOut = /^Auto-Checkout/.test(rec.checkoutReason || '');
+        await stop(false);
+      }
     } catch (e) { lastError = e.message; }
     onChange();
   }
@@ -184,7 +223,7 @@ function createTracker({ powerMonitor, desktopCapturer, screen, dataDir, onChang
   async function start() {
     if (running) return;
     await ems.checkIn();
-    running = true; onBreak = false; paused = false;
+    running = true; onBreak = false; paused = false; autoCheckedOut = false; lastBeatOkAt = Date.now();
     loadDay();
     await loadSettings();
     ems.saveStatus({}).catch(() => {});
@@ -192,7 +231,7 @@ function createTracker({ powerMonitor, desktopCapturer, screen, dataDir, onChang
       setInterval(() => sample().catch(() => {}), SAMPLE_S * 1000),
       setInterval(() => beat(), HEARTBEAT_MS),
       setInterval(() => { if (Date.now() - lastSaveAt >= SAVE_EVERY_MS) save(); intervalShot(); intervalLocate(); }, 30 * 1000),
-      setInterval(() => loadSettings(), 60 * 60 * 1000)
+      setInterval(() => { loadSettings(); cleanupDays(); }, 60 * 60 * 1000)
     ];
     setTimeout(() => takeScreenshot('check-in'), 60 * 1000);
     locate('checkin');
@@ -210,8 +249,33 @@ function createTracker({ powerMonitor, desktopCapturer, screen, dataDir, onChang
     onChange();
   }
 
+  // Siren on the employee's laptop (settings.sirenMinutes, 0 = off), office hours Mon–Sat only:
+  // offline (no confirmed heartbeat for OFFLINE_SIREN_MIN), idle while checked in, or checked out
+  // by the system. → message or null
+  function alarm() {
+    const lim = Number(settings.sirenMinutes ?? 10);
+    if (!lim || !ems.me()) return null;
+    const [h, m] = ems.timeIST().split(':').map(Number);
+    const mins = h * 60 + m;
+    const sunday = new Date(`${ems.todayIST()}T12:00:00`).getDay() === 0;
+    if (sunday || mins < 10 * 60 || mins >= 19 * 60) return null;
+    const ago = since => Math.floor((Date.now() - since) / 60000);
+    if (running && !paused && lastBeatOkAt && ago(lastBeatOkAt) >= OFFLINE_SIREN_MIN)
+      return `You are OFFLINE for ${ago(lastBeatOkAt)} min — your work time is not being counted. Please check your internet connection.`;
+    if (running && !onBreak && !paused && idleSince && ago(Date.parse(idleSince)) >= lim)
+      return `No activity for ${ago(Date.parse(idleSince))} min — please get back to work, or start a break.`;
+    if (!running && autoCheckedOut)
+      return 'You were checked out automatically — tap Check-In to continue working.';
+    return null;
+  }
+
   function setBreak(on) { onBreak = !!on; beat(); onChange(); }
-  function setPaused(on) { paused = !!on; if (on) beat(); else locate(); onChange(); }
+  function setPaused(on) {
+    paused = !!on;
+    if (on) beat();
+    else { lastBeatOkAt = Date.now(); beat(); locate(); } // back from sleep / lock: grace before the offline siren
+    onChange();
+  }
 
   function state() {
     const d = loadDay();
@@ -223,11 +287,12 @@ function createTracker({ powerMonitor, desktopCapturer, screen, dataDir, onChang
       running, onBreak, paused, idle: !!idleSince, lastError: lastError ? 'Connection problem — retrying…' : null,
       me: me && { empId: me.empId, name: me.name, email: me.email },
       checkIn: rec && rec.checkIn, checkOut: rec && rec.checkOut, workedSecs: rec ? Number(rec.workedSeconds || 0) : 0,
+      beatAt: rec && rec.lastHeartbeat ? Date.parse(rec.lastHeartbeat) : null,
       breakSecs: d.breakSecs, projectTimer: readTimer(), projects: settings.projects || []
     };
   }
 
-  return { start, stop, setBreak, setPaused, state, save, startProject, stopProject, takeScreenshot };
+  return { start, stop, setBreak, setPaused, state, save, startProject, stopProject, takeScreenshot, alarm };
 }
 
 module.exports = { createTracker };
