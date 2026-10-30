@@ -151,7 +151,7 @@
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
     /* ── Sliding "new Tracker version" banner ── */
-    .upd-banner { display:none; align-items:center; gap:10px; margin:0 0 16px; padding:0 0 0 14px; height:44px; border-radius:12px; overflow:hidden;
+    .upd-banner { display:none; align-items:center; gap:10px; margin:0 0 16px; padding:0 14px; height:44px; border-radius:12px; overflow:hidden;
       background:linear-gradient(90deg,#1e40af,#0e7fb8 55%,#10b981); color:#fff; font-weight:700; font-size:14px; box-shadow:0 6px 18px rgba(14,127,184,.25); }
     .upd-banner.show { display:flex; }
     .upd-banner .tag { flex:none; background:rgba(255,255,255,.2); padding:4px 10px; border-radius:999px; font-size:12px; letter-spacing:.3px; }
@@ -159,7 +159,6 @@
     .upd-track > span { display:inline-block; padding-left:100%; animation:updSlide 22s linear infinite; }
     .upd-banner:hover .upd-track > span { animation-play-state:paused; }
     .upd-banner a { color:#fff; text-decoration:underline; text-underline-offset:3px; margin:0 6px; }
-    .upd-banner .x { flex:none; height:100%; padding:0 14px; background:rgba(0,0,0,.12); border:0; color:#fff; font-size:16px; cursor:pointer; }
     @keyframes updSlide { from { transform:translateX(0); } to { transform:translateX(-100%); } }
     @media (prefers-reduced-motion: reduce) { .upd-track > span { animation:none; padding-left:0; } }
 
@@ -336,7 +335,6 @@
   <div class="upd-banner" id="upd-banner" role="status">
     <span class="tag">🎉 NEW</span>
     <div class="upd-track"><span id="upd-text"></span></div>
-    <button class="x" title="Hide" onclick="hideTrackerUpdateBanner()">✕</button>
   </div>
 
   <!-- Dashboard -->
@@ -1136,7 +1134,7 @@
     saveScreenStatus(act);
   }
 
-  // Sliding banner: latest GrowthApex Tracker release (tags tracker-vX.Y.Z). Hidden per version once closed.
+  // Sliding banner: latest GrowthApex Tracker release (tags tracker-vX.Y.Z). Always shown — no close button.
   const TRACKER_DL = 'https://github.com/growthapex05-ux/growthapex/releases/latest/download/';
   let trackerLatest = null;
   async function showTrackerUpdateBanner() {
@@ -1153,17 +1151,12 @@
       }
       if (ver === '1.0.0') return; // first release — nothing to update from
       trackerLatest = ver;
-      try { if (localStorage.getItem('ems_tracker_banner_hidden') === ver) return; } catch (_) {}
       const links = `<a href="${TRACKER_DL}GrowthApex-Tracker-Setup.exe">⬇ Download for Windows</a> · <a href="${TRACKER_DL}GrowthApex-Tracker.dmg">⬇ Download for Mac</a>`;
       document.getElementById('upd-text').innerHTML =
         `New GrowthApex Tracker v${ver} is available — please install it on your laptop: ${links} ` +
         `&nbsp;&nbsp;•&nbsp;&nbsp; Already on the new version? Use <b>Check for updates</b> in the app.`;
       document.getElementById('upd-banner').classList.add('show');
     } catch (_) { /* no banner if GitHub is unreachable */ }
-  }
-  function hideTrackerUpdateBanner() {
-    document.getElementById('upd-banner').classList.remove('show');
-    try { if (trackerLatest) localStorage.setItem('ems_tracker_banner_hidden', trackerLatest); } catch (_) {}
   }
   showTrackerUpdateBanner();
   setInterval(showTrackerUpdateBanner, 30 * 60000); // a release made while the portal is open shows up too
