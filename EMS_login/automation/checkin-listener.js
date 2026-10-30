@@ -4,6 +4,7 @@ const { deliver, flush } = require('./outbox');
 const { sendReminders } = require('./reminders');
 const { catchUpMissed, processReportRequests } = require('./catch-up');
 const { checkOfflineEmployees } = require('./offline-alerts');
+const { deleteOldScreenshots } = require('./cleanup');
 
 // Keep the 24/7 listener alive through network drops / unexpected errors
 process.on('unhandledRejection', (err) => console.error('⚠️ Unhandled rejection:', err && err.message ? err.message : err));
@@ -289,6 +290,11 @@ async function startListener() {
   };
   runOfflineCheck();
   setInterval(runOfflineCheck, 60 * 1000); // every minute
+
+  // 7. Tracker screenshots older than 7 days are deleted (once at start, then daily)
+  const cleanup = () => deleteOldScreenshots(db).catch(err => console.error('❌ [Cleanup] Error:', err.message));
+  setTimeout(cleanup, 2 * 60 * 1000);
+  setInterval(cleanup, 24 * 60 * 60 * 1000);
 
   // 5. "Send report now" button in the admin portal -> report_requests -> sent instantly
   // Requests that arrive while others are being sent are picked up straight after (not dropped)

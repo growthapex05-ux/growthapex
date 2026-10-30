@@ -325,6 +325,7 @@
     <div class="nav-item" onclick="showPage('worklogs',this)"><span class="nav-icon">📝</span><span>EOD Work Logs</span></div>
     <div class="nav-item" onclick="showPage('expenses',this)"><span class="nav-icon">💸</span><span>Expenses &amp; Claims</span></div>
     <div class="nav-item" onclick="showPage('noticeboard',this)"><span class="nav-icon">📢</span><span>Notice Board</span></div>
+    <div class="nav-item" onclick="showPage('tracker',this)"><span class="nav-icon">💻</span><span>Tracker (Screenshots)</span></div>
 
   </div>
   <div class="sidebar-footer">
@@ -517,6 +518,34 @@
   </div>
 
   <!-- ── WhatsApp Reports ── -->
+  <div class="page" id="page-tracker">
+    <div class="section-card">
+      <div class="section-head">
+        <h3>💻 GrowthApex Tracker</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <select id="trk-emp" onchange="renderTrackerPage()"></select>
+          <input type="date" id="trk-date" onchange="renderTrackerPage()">
+          <button class="btn btn-primary" onclick="renderTrackerPage()">🔄 Refresh</button>
+        </div>
+      </div>
+      <div id="trk-summary" style="font-size:13px;margin-bottom:12px"></div>
+      <h4 style="margin:6px 0">📸 Screenshots</h4>
+      <div id="trk-shots" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px"></div>
+    </div>
+    <div class="section-card">
+      <div class="section-head"><h3>⏱ Timesheet (project time)</h3></div>
+      <div id="trk-timesheet"></div>
+    </div>
+    <div class="section-card">
+      <div class="section-head"><h3>⬇ Download the app for employees</h3></div>
+      <div style="font-size:13px;line-height:1.7">
+        Windows: <a href="https://github.com/growthapex05-ux/growthapex/releases/latest/download/GrowthApex-Tracker-Setup.exe" style="color:var(--cyan)">GrowthApex-Tracker-Setup.exe</a><br>
+        Mac: <a href="https://github.com/growthapex05-ux/growthapex/releases/latest/download/GrowthApex-Tracker.dmg" style="color:var(--cyan)">GrowthApex-Tracker.dmg</a><br>
+        <span style="color:var(--muted)">Screenshots are kept for 7 days. Settings (screenshot interval, flagged sites, project list) live in Firestore admin/config.tracker.</span>
+      </div>
+    </div>
+  </div>
+
   <div class="page" id="page-reports">
 
     <!-- KPI Summary Row -->
@@ -1203,7 +1232,7 @@ function toggleSidebar() {
 }
 
 // ─── Page Navigation ──────────────────────────────────────────
-const titles = { overview:'Overview', employees:'Employees', attendance:'Attendance', tasks:'Tasks', leaves:'Leave Requests', salary:'Payroll', letterpad:'Letter Pad & Documents', reports:'WhatsApp Reports', worklogs:'EOD Work Logs', expenses:'Expense Claims', noticeboard:'Company Notice Board', analytics:'AI Performance & Productivity Analytics' };
+const titles = { overview:'Overview', employees:'Employees', attendance:'Attendance', tasks:'Tasks', leaves:'Leave Requests', salary:'Payroll', letterpad:'Letter Pad & Documents', reports:'WhatsApp Reports', worklogs:'EOD Work Logs', expenses:'Expense Claims', noticeboard:'Company Notice Board', tracker:'GrowthApex Tracker', analytics:'AI Performance & Productivity Analytics' };
 function showPage(id, el) {
   // Close sidebar on mobile navigation
   const sidebar = document.querySelector('.sidebar');
@@ -1222,6 +1251,7 @@ function showPage(id, el) {
   if (id==='letterpad') initLetterPadPage();
   if (id==='leaves') renderAdminHolidays();
   if (id==='reports') initReportsPage();
+  if (id==='tracker') initTrackerPage();
   if (id==='analytics') renderAnalyticsPage();
   if (id==='worklogs') renderWorkLogs();
   if (id==='expenses') renderExpenses();
@@ -2440,6 +2470,68 @@ function payrollFor(emp, monthVal) {
 }
 
 // Popup with the same "Mera Hisaab" card the employee sees
+// ── Tracker page: screenshots + timesheet for one employee / day (desktop app data) ──
+function initTrackerPage() {
+  const sel = document.getElementById('trk-emp');
+  const emps = (cache.employees || []).filter(e => e.status === 'active');
+  if (sel.childElementCount !== emps.length) sel.innerHTML = emps.map(e => `<option value="${e.id}">${e.name} (${e.id})</option>`).join('');
+  const d = document.getElementById('trk-date');
+  if (!d.value) d.value = emsToday();
+  renderTrackerPage();
+}
+
+function openScreenshot(img) {
+  const w = window.open('', '_blank');
+  if (w) w.document.body.innerHTML = '<img style="max-width:100%">', w.document.querySelector('img').src = img.src;
+}
+
+async function renderTrackerPage() {
+  const empIdSel = document.getElementById('trk-emp').value;
+  const date = document.getElementById('trk-date').value || emsToday();
+  const shotsEl = document.getElementById('trk-shots');
+  const tsEl = document.getElementById('trk-timesheet');
+  const sumEl = document.getElementById('trk-summary');
+  if (!empIdSel) { shotsEl.innerHTML = '<div class="empty-state"><div>👥</div>No employees</div>'; return; }
+  const time = iso => new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+  const dur = secs => { const m = Math.round(secs / 60); return m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m}m`; };
+  const esc = v => String(v || '').replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+
+  const rec = (cache.attendance || []).find(r => r.empId === empIdSel && r.date === date);
+  const act = rec && rec.screenActivity;
+  sumEl.innerHTML = rec
+    ? `📅 In <b>${rec.checkIn || '—'}</b> · Out <b>${rec.checkOut || '—'}</b>${act ? ` · 🟢 Active <b>${dur(act.activeSecs || 0)}</b> · 💤 Idle <b>${dur(act.idleSecs || 0)}</b>${act.breakSecs ? ` · ☕ Break <b>${dur(act.breakSecs)}</b>` : ''} · <a href="#" onclick="showScreenTime('${empIdSel}','${date}');return false" style="color:var(--cyan)">Apps &amp; websites</a>` : ''}${act && act.source === 'tracker' ? ' · 💻 Tracker app' : ''}`
+    : 'No attendance record for this day.';
+
+  shotsEl.innerHTML = '<div style="color:var(--muted)">⏳ Loading…</div>';
+  tsEl.innerHTML = '<div style="color:var(--muted)">⏳ Loading…</div>';
+  try {
+    const [shots, ts] = await Promise.all([
+      db.collection('screenshots').where('empId', '==', empIdSel).where('date', '==', date).get(),
+      db.collection('timesheets').where('empId', '==', empIdSel).where('date', '==', date).get()
+    ]);
+    const list = shots.docs.map(d => d.data()).sort((a, b) => (a.at < b.at ? -1 : 1));
+    shotsEl.innerHTML = list.length ? list.map(x => `
+      <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--soft,rgba(255,255,255,.03))">
+        <img src="${x.img}" alt="" loading="lazy" style="width:100%;display:block;cursor:zoom-in" onclick="openScreenshot(this)">
+        <div style="padding:6px 8px;font-size:11px;line-height:1.4">
+          <b>${time(x.at)}</b> ${x.reason === 'flagged' ? '<span class="badge badge-red">flagged</span>' : ''}<br>
+          <span style="color:var(--muted)">${esc(x.site || x.app)}${x.title ? ' — ' + esc(x.title) : ''}</span>
+        </div>
+      </div>`).join('') : '<div class="empty-state"><div>📸</div>No screenshots for this day (the Tracker app takes them while checked in)</div>';
+
+    const rows = ts.docs.map(d => d.data()).sort((a, b) => (a.start < b.start ? -1 : 1));
+    const total = rows.reduce((t, r) => t + (r.secs || 0), 0);
+    tsEl.innerHTML = rows.length ? `<div class="table-wrap"><table>
+      <thead><tr><th>Project</th><th>Work</th><th>Start</th><th>End</th><th>Time</th></tr></thead>
+      <tbody>${rows.map(r => `<tr><td><b>${esc(r.project)}</b></td><td>${esc(r.note) || '—'}</td><td>${time(r.start)}</td><td>${time(r.end)}</td><td>${dur(r.secs || 0)}</td></tr>`).join('')}
+      <tr><td colspan="4" style="text-align:right"><b>Total</b></td><td><b>${dur(total)}</b></td></tr></tbody></table></div>`
+      : '<div class="empty-state"><div>⏱</div>No project time logged this day</div>';
+  } catch (e) {
+    shotsEl.innerHTML = `<div class="empty-state"><div>❌</div>${esc(e.message)}</div>`;
+    tsEl.innerHTML = '';
+  }
+}
+
 // Full app / website list for one employee's day (from ActivityWatch via the employee dashboard)
 function showScreenTime(empIdToShow, date) {
   const emp = cache.employees.find(e => e.id === empIdToShow) || { name: empIdToShow, id: empIdToShow };
@@ -2476,6 +2568,7 @@ function showScreenTime(empIdToShow, date) {
         ${away}
       </div>
       ${sections}
+      ${act.titles && act.titles.length ? head('🪟 Windows / pages') + bars(act.titles.slice(0, 25)) : ''}
       <div style="font-size:11px;color:var(--muted);margin-top:12px">Since check-in · updated ${when(act.updatedAt)} · time on screen, not counting idle time</div>`;
   }
   let overlay = document.getElementById('screen-time-overlay');

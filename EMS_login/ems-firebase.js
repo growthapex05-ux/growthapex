@@ -280,6 +280,12 @@ async function emsScreenActivity(sinceMs, nowMs = Date.now()) {
   return { apps, programs, sites, activeSecs: Math.round(status('not-afk')), idleSecs: Math.round(status('afk')), web: webBuckets.length > 0, afkSince, current };
 }
 
+/** The GrowthApex Tracker desktop app is running for this record (it sends a heartbeat every minute) */
+function emsTrackerActive(rec) {
+  const t = Date.parse((rec && rec.trackerHeartbeat) || '');
+  return !isNaN(t) && Date.now() - t < 150 * 1000;
+}
+
 /** "01 : 05 : 09" */
 function emsClock(totalSecs) {
   const s = Math.max(0, Math.floor(totalSecs));
@@ -456,6 +462,8 @@ const EMS_DB = {
     if (!snap.empty) {
       const doc = snap.docs[0];
       const data = doc.data();
+      // The desktop tracker keeps this record's heartbeat and worked time — don't count it twice
+      if (emsTrackerActive(data)) return { ...data };
       // Only heartbeat if employee is checked in and not checked out
       if (data.checkIn && (!data.checkOut || data.checkOut === '—')) {
         // Time since the previous heartbeat counts only if we were connected the whole time
@@ -498,6 +506,8 @@ const EMS_DB = {
     if (!snap.empty) {
       const doc = snap.docs[0];
       const data = doc.data();
+      // Closing the EMS tab must not check out someone whose desktop tracker is still running
+      if (emsTrackerActive(data)) return { success: false };
       if (data.checkIn && (!data.checkOut || data.checkOut === '—')) {
         let outTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
         if (data.lastHeartbeat) {

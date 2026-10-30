@@ -1,0 +1,172 @@
+// GrowthApex Tracker — Electron main process: login, tray, panel window, auto check-in/out.
+const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, powerMonitor, desktopCapturer, screen, safeStorage, systemPreferences, dialog } = require('electron');
+const fs = require('fs');
+const path = require('path');
+const ems = require('./src/ems');
+const { createTracker } = require('./src/tracker');
+
+if (!app.requestSingleInstanceLock()) { app.quit(); process.exit(0); }
+
+// The tracker must keep running while the employee is checked in: restart after an unexpected error
+process.on('uncaughtException', err => {
+  try { fs.appendFileSync(path.join(app.getPath('userData'), 'crash.log'), `${new Date().toISOString()} ${err.stack || err}
+`); } catch (_) {}
+  app.relaunch();
+  app.exit(0);
+});
+process.on('unhandledRejection', err => {
+  try { fs.appendFileSync(path.join(app.getPath('userData'), 'crash.log'), `${new Date().toISOString()} rejection ${err && err.stack || err}
+`); } catch (_) {}
+});
+
+const dataDir = app.getPath('userData');
+const credFile = path.join(dataDir, 'login.bin');
+let win = null;
+let tray = null;
+let tracker = null;
+let quitting = false;
+
+// ── Saved login (encrypted with the OS keychain via safeStorage) ──
+function saveCreds(id, password) {
+  const json = JSON.stringify({ id, password });
+  const data = safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(json) : Buffer.from(json);
+  fs.writeFileSync(credFile, data);
+}
+function readCreds() {
+  try {
+    const data = fs.readFileSync(credFile);
+    return JSON.parse(safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(data) : data.toString());
+  } catch (_) { return null; }
+}
+const clearCreds = () => { try { fs.unlinkSync(credFile); } catch (_) {} };
+
+// ── Window + tray ──
+function showWindow(page) {
+  if (!win) {
+    win = new BrowserWindow({
+      width: 420, height: 640, resizable: false, title: 'GrowthApex Tracker', autoHideMenuBar: true,
+      icon: path.join(__dirname, 'assets', 'icon.png'),
+      webPreferences: { preload: path.join(__dirname, 'preload.js'), backgroundThrottling: false }
+    });
+    // Closing the window keeps the tracker running in the tray
+    win.on('close', e => { if (!quitting) { e.preventDefault(); win.hide(); } });
+    win.webContents.on('render-process-gone', () => { if (!quitting && win && !win.isDestroyed()) win.reload(); });
+    // Windows shutdown / sign-out: check out and let Windows close the app
+    win.on('session-end', () => { quitApp(true); });
+  }
+  if (page) win.loadFile(path.join(__dirname, 'ui', page));
+  win.show();
+  win.focus();
+}
+
+function pushState() {
+  const s = tracker ? tracker.state() : null;
+  if (win && !win.isDestroyed()) win.webContents.send('state', s);
+  if (tray) {
+    const label = !s || !s.me ? 'Not logged in' : !s.running ? 'Checked out' : s.onBreak ? 'On break' : s.paused ? 'Paused (screen locked)' : s.idle ? 'Idle' : 'Working — tracking on';
+    tray.setToolTip(`GrowthApex Tracker — ${label}`);
+    tray.setContextMenu(Menu.buildFromTemplate([
+      { label, enabled: false },
+      { type: 'separator' },
+      { label: 'Open GrowthApex Tracker', click: () => showWindow() },
+      ...(s && s.me ? [
+        s.running ? { label: 'Check-Out', click: () => doCheckOut() } : { label: 'Check-In', click: () => doCheckIn() },
+        ...(s.running ? [{ label: s.onBreak ? 'End break' : 'Start break', click: () => { tracker.setBreak(!s.onBreak); } }] : [])
+      ] : []),
+      { type: 'separator' },
+      // While checked in the app stays on: it can only be closed after checking out
+      s && s.running ? { label: 'Check out first to quit', enabled: false } : { label: 'Quit', click: () => quitApp() }
+    ]));
+  }
+}
+
+function createTray() {
+  tray = new Tray(nativeImage.createFromPath(path.join(__dirname, 'assets', 'tray.png')).resize({ width: 16, height: 16 }));
+  tray.on('click', () => showWindow());
+  pushState();
+}
+
+// ── Actions ──
+async function doCheckIn() {
+  try { await tracker.start(); } catch (e) { dialog.showErrorBox('Check-in failed', e.message); }
+  pushState();
+}
+async function doCheckOut(reason = '') {
+  try { await tracker.stop(true, reason); } catch (e) { dialog.showErrorBox('Check-out failed', e.message); }
+  pushState();
+}
+
+async function startSession(me) {
+  app.setLoginItemSettings({ openAtLogin: true }); // start with the PC
+  if (process.platform === 'darwin') {
+    systemPreferences.isTrustedAccessibilityClient(true); // asks for Accessibility (window titles)
+  }
+  await doCheckIn(); // auto check-in when the app starts
+  showWindow('panel.html');
+  return me;
+}
+
+// force: PC shutting down / logging off — check out and close even while checked in
+async function quitApp(force = false) {
+  if (tracker && tracker.state().running && !force) {
+    showWindow();
+    dialog.showMessageBox(win, { type: 'info', title: 'GrowthApex Tracker', message: 'Please check out first.',
+      detail: 'The tracker stays on while you are checked in. Tap Check-Out, then you can quit.' });
+    return;
+  }
+  quitting = true;
+  if (tracker && tracker.state().running) {
+    await Promise.race([tracker.stop(true, 'PC shut down'), new Promise(r => setTimeout(r, 8000))]);
+  }
+  app.quit();
+}
+
+// ── IPC from the window ──
+ipcMain.handle('login', async (_e, { id, password, remember }) => {
+  const me = await ems.login(id, password);
+  if (remember !== false) saveCreds(id, password);
+  await startSession(me);
+  return me;
+});
+ipcMain.handle('logout', async () => {
+  await doCheckOut('Logged out');
+  clearCreds();
+  await ems.logout();
+  showWindow('login.html');
+  pushState();
+});
+ipcMain.handle('checkin', () => doCheckIn());
+ipcMain.handle('checkout', () => doCheckOut());
+ipcMain.handle('break', (_e, on) => { tracker.setBreak(on); pushState(); });
+ipcMain.handle('project-start', (_e, { project, note }) => tracker.startProject(project, note));
+ipcMain.handle('project-stop', () => tracker.stopProject());
+ipcMain.handle('state', () => (tracker ? tracker.state() : null));
+ipcMain.handle('permissions', () => (process.platform === 'darwin'
+  ? { mac: true, screen: systemPreferences.getMediaAccessStatus('screen'), accessibility: systemPreferences.isTrustedAccessibilityClient(false) }
+  : { mac: false }));
+
+// ── App lifecycle ──
+app.on('second-instance', () => showWindow());
+app.on('window-all-closed', e => e.preventDefault && e.preventDefault()); // stay in the tray
+app.on('before-quit', e => { if (!quitting) { e.preventDefault(); quitApp(); } });
+
+app.whenReady().then(async () => {
+  if (process.platform === 'darwin' && app.dock) app.dock.hide();
+  tracker = createTracker({ powerMonitor, desktopCapturer, screen, dataDir, onChange: pushState });
+  createTray();
+  setInterval(pushState, 5000);
+
+  // Locked screen / sleep: pause tracking (heartbeats stop while asleep; the EMS marks offline)
+  powerMonitor.on('lock-screen', () => tracker.setPaused(true));
+  powerMonitor.on('suspend', () => tracker.setPaused(true));
+  powerMonitor.on('unlock-screen', () => tracker.setPaused(false));
+  powerMonitor.on('resume', () => tracker.setPaused(false));
+  powerMonitor.on('shutdown', () => { quitApp(true); });
+
+  const creds = readCreds();
+  if (creds) {
+    try { await startSession(await ems.login(creds.id, creds.password)); return; }
+    catch (e) { if (/auth\/(wrong-password|invalid-credential|user-not-found)/.test(e.code || e.message)) clearCreds(); }
+  }
+  showWindow('login.html');
+});

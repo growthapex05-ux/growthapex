@@ -1,0 +1,74 @@
+{
+  "name": "growthapex-tracker",
+  "productName": "GrowthApex Tracker",
+  "version": "1.0.0",
+  "description": "GrowthApex EMS desktop tracker: attendance, app/website time, screenshots and project timesheets",
+  "main": "main.js",
+  "author": "GrowthApex",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test-activity": "node scripts/test-activity.js",
+    "dist:win": "electron-builder --win --publish never",
+    "dist:mac": "electron-builder --mac --publish never"
+  },
+  "dependencies": {
+    "firebase": "12.19.0",
+    "koffi": "3.3.3"
+  },
+  "devDependencies": {
+    "electron": "44.7.2",
+    "electron-builder": "26.17.0"
+  },
+  "build": {
+    "appId": "in.growthapex.tracker",
+    "productName": "GrowthApex Tracker",
+    "npmRebuild": false,
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**",
+      "ui/**",
+      "assets/**",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "artifactName": "GrowthApex-Tracker-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "GrowthApex Tracker"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "category": "public.app-category.productivity",
+      "artifactName": "GrowthApex-Tracker.${ext}",
+      "extendInfo": {
+        "NSAppleEventsUsageDescription": "GrowthApex Tracker reads the website open in your browser to record work time.",
+        "NSScreenCaptureUsageDescription": "GrowthApex Tracker takes periodic screenshots for your employer while you are checked in."
+      },
+      "x64ArchFiles": "**/node_modules/{koffi,@koromix}/**"
+    }
+  }
+}

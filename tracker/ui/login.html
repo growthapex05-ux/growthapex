@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self'">
+  <title>GrowthApex Tracker — Login</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand"><img src="../assets/icon.png" alt=""><div><b>GrowthApex Tracker</b><span>Employee login</span></div></div>
+    <div class="card">
+      <form id="f">
+        <label for="id">Employee ID or email</label>
+        <input id="id" autocomplete="username" placeholder="EMP003 or name@gmail.com" required>
+        <label for="pw">Password (same as the EMS portal)</label>
+        <input id="pw" type="password" autocomplete="current-password" required>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:12px"><input id="remember" type="checkbox" checked style="width:auto"> Keep me logged in on this computer</label>
+        <button id="btn" type="submit" style="width:100%;margin-top:14px">Login &amp; Check-In</button>
+        <div class="err" id="err"></div>
+      </form>
+    </div>
+    <div class="note">
+      While you are checked in, this app records your check-in / check-out time, which apps and websites
+      (window titles) you use and for how long, idle time, and a screenshot every few minutes. It is visible
+      to the GrowthApex admin. It runs in the tray (near the clock) and checks you out when you quit it.
+    </div>
+  </div>
+  <script src="login.js"></script>
+</body>
+</html>

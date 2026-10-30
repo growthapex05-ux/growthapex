@@ -404,6 +404,13 @@
       </div>
       <div id="today-att-info" style="font-size:13px;color:var(--muted)"></div>
       <div id="screen-activity-status" style="font-size:12px;color:var(--muted);margin-top:8px"></div>
+      <div style="margin-top:12px;padding:12px;border:1px dashed var(--border);border-radius:10px;font-size:13px">
+        💻 <b>GrowthApex Tracker</b> — desktop app: log in once, it checks you in when the laptop starts and records your work time.
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+          <a class="btn btn-green" href="https://github.com/growthapex05-ux/growthapex/releases/latest/download/GrowthApex-Tracker-Setup.exe">⬇ Download for Windows</a>
+          <a class="btn btn-green" href="https://github.com/growthapex05-ux/growthapex/releases/latest/download/GrowthApex-Tracker.dmg">⬇ Download for Mac</a>
+        </div>
+      </div>
       <div style="font-size:11px;color:var(--muted);margin-top:8px">📍 Your location is taken only at Check-In and Check-Out. 🖥️ While you are checked in, the names of the apps and websites you use (and for how long) are recorded from ActivityWatch on your laptop — no screenshots, keystrokes or message contents.</div>
     </div>
     <div class="section-card">
@@ -1075,6 +1082,8 @@
     try {
       rec = rec || await EMS_DB.getTodayAttendance(empId);
       if (!rec || !rec.checkIn || rec.checkIn === '—') return;
+      // The desktop tracker records screen activity itself — don't overwrite it with ActivityWatch data
+      if (typeof emsTrackerActive === 'function' && emsTrackerActive(rec)) { renderScreenActivityStatus({ tracker: true }); return; }
       const since = getCheckInDateObj(rec.checkIn, rec.date).getTime();
       const act = await emsScreenActivity(since);
       const update = { empId, date: rec.date };
@@ -1098,6 +1107,9 @@
   // On opening the dashboard (laptop only): is ActivityWatch connected? Shown to the employee and the admin.
   async function checkScreenSetup() {
     if (IS_MOBILE_DEVICE) return;
+    try {
+      if (emsTrackerActive(await EMS_DB.getTodayAttendance(empId))) { renderScreenActivityStatus({ tracker: true }); return; }
+    } catch (_) {}
     const act = await emsScreenActivity(Date.now() - 60 * 1000);
     renderScreenActivityStatus(act);
     saveScreenStatus(act);
@@ -1111,6 +1123,7 @@
       : act.error === 'chrome-blocked'
         ? 'Chrome is blocking it. Click the icon left of the address bar → Site settings → set <b>Local network access</b> to <b>Allow</b>, then refresh this page.'
         : 'please open ActivityWatch on this laptop (check: <a href="http://localhost:5600" target="_blank" rel="noopener">localhost:5600</a> should open). If Chrome asks to allow local network access, click Allow.';
+    if (act.tracker) { el.innerHTML = '🖥️ Screen activity: <b style="color:#16a34a">GrowthApex Tracker app running</b>'; return; }
     el.innerHTML = act.error
       ? `🖥️ Screen activity: <b style="color:var(--danger)">ActivityWatch not connected</b> — ${why}`
       : `🖥️ Screen activity: <b style="color:#16a34a">connected</b>${act.web ? '' : ' · add the "ActivityWatch Web Watcher" browser extension to see websites'}`;
