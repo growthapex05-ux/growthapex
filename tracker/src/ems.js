@@ -6,8 +6,9 @@
 const { initializeApp } = require('firebase/app');
 const { getAuth, signInWithEmailAndPassword, signOut } = require('firebase/auth');
 const {
-  getFirestore, doc, getDoc, getDocs, addDoc, updateDoc, setDoc, collection, query, where, increment
+  getFirestore, doc, getDoc, getDocs, addDoc, updateDoc, setDoc, collection, query, where, increment, arrayUnion
 } = require('firebase/firestore');
+const { distanceKm } = require('./location');
 const firebaseConfig = require('./firebase-config');
 
 const app = initializeApp(firebaseConfig);
@@ -36,7 +37,7 @@ async function login(idOrEmail, password) {
   if (!staff.exists()) { await signOut(auth); throw new Error('This account is not registered as an employee'); }
   const empId = staff.data().empId;
   const emp = await getDoc(doc(db, 'employees', empId));
-  me = { empId, email, name: (emp.exists() && emp.data().name) || empId };
+  me = { empId, email, name: (emp.exists() && emp.data().name) || empId, home: (emp.exists() && emp.data().homeLocation) || null };
   today = null;
   return me;
 }
@@ -126,6 +127,31 @@ async function saveActivity(screenActivity) {
   await updateDoc(t.ref, { screenActivity, screenActivityError: null });
 }
 
+// Live location (trackerLocation) + the day's route (locationTrail: a point when the laptop moved
+// 100 m+ or every 30 min). The first fix also fills checkInLocation, the last one checkOutLocation,
+// in the same shape the website stores, so the admin "📍 In / Out" links work for tracker check-ins.
+async function saveLocation(loc, kind = 'live') {
+  const t = await getToday();
+  if (!t.ref) return;
+  const upd = { trackerLocation: loc };
+  if (!loc.error) {
+    const point = { lat: +loc.lat.toFixed(5), lng: +loc.lng.toFixed(5), acc: loc.accuracy, src: loc.source, at: loc.at, place: loc.place || null };
+    const trail = t.data.locationTrail || [];
+    const prev = trail[trail.length - 1];
+    if (!prev || distanceKm(prev, point) >= 0.1 || Date.parse(point.at) - Date.parse(prev.at) >= 30 * 60000 || kind !== 'live') {
+      upd.locationTrail = arrayUnion(point);
+      t.data.locationTrail = [...trail, point];
+    }
+    const field = { lat: loc.lat, lng: loc.lng, accuracy: loc.accuracy, place: loc.place || null, source: loc.source, at: loc.at };
+    const home = me.home ? distanceKm(me.home, loc) : null;
+    if (kind === 'checkout') Object.assign(upd, { checkOutLocation: field, checkOutDistanceFromHomeKm: home });
+    else if (!t.data.checkInLocation || t.data.checkInLocation.error) Object.assign(upd, { checkInLocation: field, checkInDistanceFromHomeKm: home });
+  }
+  await updateDoc(t.ref, upd);
+  const { locationTrail, ...rest } = upd;
+  Object.assign(t.data, rest);
+}
+
 async function saveScreenshot(shot) {
   await addDoc(collection(db, 'screenshots'), { empId: me.empId, name: me.name, date: todayIST(), ...shot });
 }
@@ -149,6 +175,6 @@ async function getSettings() {
 }
 
 module.exports = {
-  login, logout, checkIn, checkOut, heartbeat, getToday, saveActivity, saveScreenshot, saveTimesheet,
+  login, logout, checkIn, checkOut, heartbeat, getToday, saveActivity, saveLocation, saveScreenshot, saveTimesheet,
   saveStatus, getSettings, isOpen, todayIST, timeIST, me: () => me, cached: () => today && today.data
 };

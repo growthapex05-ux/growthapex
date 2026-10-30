@@ -8,24 +8,32 @@
 </head>
 <body>
   <div class="wrap">
-    <div class="brand"><img src="../assets/icon.png" alt=""><div><b>GrowthApex Tracker</b><span>Employee login</span></div></div>
+    <div class="login-hero">
+      <img src="../assets/mark.png" alt="GrowthApex">
+      <div class="wordmark"><span class="g">Growth</span><span class="a">Apex</span></div>
+      <p>Attendance tracker · Employee login</p>
+    </div>
+
+    <div class="update" id="update"></div>
+
     <div class="card">
       <form id="f">
         <label for="id">Employee ID or email</label>
         <input id="id" autocomplete="username" placeholder="EMP003 or name@gmail.com" required>
-        <label for="pw">Password (same as the EMS portal)</label>
+        <label for="pw">Password <span class="light">(same as the EMS portal)</span></label>
         <input id="pw" type="password" autocomplete="current-password" required>
-        <label style="display:flex;align-items:center;gap:8px;margin-top:12px"><input id="remember" type="checkbox" checked style="width:auto"> Keep me logged in on this computer</label>
-        <button id="btn" type="submit" style="width:100%;margin-top:14px">Login &amp; Check-In</button>
+        <label class="check"><input id="remember" type="checkbox" checked> Keep me logged in on this computer</label>
+        <button id="btn" class="btn-brand full mt" type="submit">Login &amp; Check-In</button>
         <div class="err" id="err"></div>
       </form>
     </div>
-    <div class="note">
-      While you are checked in, this app records your check-in / check-out time, which apps and websites
-      (window titles) you use and for how long, idle time, and a screenshot every few minutes. It is visible
-      to the GrowthApex admin. It runs in the tray (near the clock) and checks you out when you quit it.
-    </div>
+
+    <div class="note"><span>🔒</span><span>While you are checked in, this app records your attendance and work activity
+      (apps and websites used, idle time, location and periodic screenshots) for the GrowthApex admin.
+      Nothing is recorded after you check out.</span></div>
+    <div class="foot"><span id="ver"></span><span></span></div>
   </div>
+  <script src="update.js"></script>
   <script src="login.js"></script>
 </body>
 </html>

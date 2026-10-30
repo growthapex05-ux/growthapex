@@ -10,5 +10,9 @@ contextBridge.exposeInMainWorld('tracker', {
   stopProject: () => ipcRenderer.invoke('project-stop'),
   state: () => ipcRenderer.invoke('state'),
   permissions: () => ipcRenderer.invoke('permissions'),
-  onState: cb => ipcRenderer.on('state', (_e, s) => cb(s))
+  onState: cb => ipcRenderer.on('state', (_e, s) => cb(s)),
+  updateState: () => ipcRenderer.invoke('update-state'),
+  checkUpdate: () => ipcRenderer.invoke('update-check'),
+  installUpdate: () => ipcRenderer.invoke('update-install'),
+  onUpdate: cb => ipcRenderer.on('update', (_e, u) => cb(u))
 });

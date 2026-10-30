@@ -8,45 +8,52 @@
 </head>
 <body>
   <div class="wrap">
-    <div class="brand"><img src="../assets/icon.png" alt=""><div><b id="name">GrowthApex Tracker</b><span id="sub">—</span></div></div>
-
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <span class="status s-off" id="status">Checked out</span>
-        <span class="muted" id="inout"></span>
-      </div>
-      <div class="big" id="worked">00:00:00</div>
-      <div class="muted" id="split">Active 0m · Idle 0m · Break 0m</div>
-      <div class="row" style="margin-top:12px">
-        <button class="btn-green" id="checkin">✅ Check-In</button>
-        <button class="btn-red" id="checkout">⏹ Check-Out</button>
-      </div>
-      <button class="btn-amber" id="break" style="width:100%;margin-top:8px">☕ Start Break</button>
+    <div class="brand">
+      <img src="../assets/mark.png" alt="">
+      <div><div class="wordmark"><span class="g">Growth</span><span class="a">Apex</span></div><small>Attendance tracker</small></div>
+      <div class="avatar" id="avatar" title="">—</div>
     </div>
 
+    <div class="update" id="update"></div>
+
+    <div class="card hero">
+      <div class="hero-top">
+        <span class="hello" id="hello">Hello</span>
+        <span class="status" id="status">Checked out</span>
+      </div>
+      <div class="big" id="worked">00:00:00</div>
+      <div class="meta" id="inout">Not checked in yet</div>
+    </div>
+
+    <div class="row actions">
+      <button class="btn-green" id="checkin">Check-In</button>
+      <button class="btn-red" id="checkout">Check-Out</button>
+    </div>
+    <button class="btn-amber full mb" id="break">☕ Start break</button>
+
     <div class="card">
-      <b>⏱ Project timer</b>
-      <div id="timer-running" class="muted" style="margin:6px 0">No project running</div>
-      <label for="project">Project / client</label>
-      <input id="project" list="projects" placeholder="e.g. Client X — Instagram posts">
-      <datalist id="projects"></datalist>
-      <label for="note">What are you working on? (optional)</label>
-      <input id="note" placeholder="e.g. 5 reels editing">
-      <div class="row" style="margin-top:10px">
-        <button id="pstart">▶ Start</button>
+      <h3>⏱ Project timer</h3>
+      <div id="timer-running" class="chip">No project running</div>
+      <div class="stack">
+        <input id="project" list="projects" aria-label="Project / client" placeholder="Project / client — e.g. Client X Instagram">
+        <datalist id="projects"></datalist>
+        <input id="note" aria-label="What are you working on" placeholder="What are you working on? (optional)">
+      </div>
+      <div class="row mt">
+        <button class="btn-brand" id="pstart">▶ Start</button>
         <button class="btn-ghost" id="pstop">■ Stop</button>
       </div>
     </div>
 
-    <div class="card">
-      <b>🖥️ Now</b> <span class="muted" id="now">—</span>
-      <div class="list" id="top" style="margin-top:6px"></div>
-    </div>
-
     <div class="err" id="err"></div>
-    <div id="perm" class="note"></div>
-    <button class="btn-ghost" id="logout" style="width:100%;margin-top:8px">Log out</button>
+    <div id="perm" class="note mb"></div>
+    <div class="note"><span>🔒</span><span id="privacy">Work tracking is on while you are checked in. Your activity is shared with the GrowthApex admin.</span></div>
+    <div class="foot">
+      <span id="ver"></span>
+      <span><button class="btn-link" id="upd-check">Check for updates</button><button class="btn-link" id="logout">Log out</button></span>
+    </div>
   </div>
+  <script src="update.js"></script>
   <script src="panel.js"></script>
 </body>
 </html>

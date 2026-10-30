@@ -1,7 +1,7 @@
 {
   "name": "growthapex-tracker",
   "productName": "GrowthApex Tracker",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "GrowthApex EMS desktop tracker: attendance, app/website time, screenshots and project timesheets",
   "main": "main.js",
   "author": "GrowthApex",
@@ -66,7 +66,9 @@
       "artifactName": "GrowthApex-Tracker.${ext}",
       "extendInfo": {
         "NSAppleEventsUsageDescription": "GrowthApex Tracker reads the website open in your browser to record work time.",
-        "NSScreenCaptureUsageDescription": "GrowthApex Tracker takes periodic screenshots for your employer while you are checked in."
+        "NSScreenCaptureUsageDescription": "GrowthApex Tracker takes periodic screenshots for your employer while you are checked in.",
+        "NSLocationUsageDescription": "GrowthApex Tracker shares your laptop's location with your employer while you are checked in.",
+        "NSLocationWhenInUseUsageDescription": "GrowthApex Tracker shares your laptop's location with your employer while you are checked in."
       },
       "x64ArchFiles": "**/node_modules/{koffi,@koromix}/**"
     }

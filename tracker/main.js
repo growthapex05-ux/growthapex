@@ -4,6 +4,11 @@ const fs = require('fs');
 const path = require('path');
 const ems = require('./src/ems');
 const { createTracker } = require('./src/tracker');
+const { allowGeolocation } = require('./src/location');
+const updater = require('./src/updater');
+
+// Windows: use the Windows Location service for navigator.geolocation (Wi-Fi / GPS based)
+app.commandLine.appendSwitch('enable-features', 'WinrtGeolocationImplementation');
 
 if (!app.requestSingleInstanceLock()) { app.quit(); process.exit(0); }
 
@@ -44,7 +49,7 @@ const clearCreds = () => { try { fs.unlinkSync(credFile); } catch (_) {} };
 function showWindow(page) {
   if (!win) {
     win = new BrowserWindow({
-      width: 420, height: 640, resizable: false, title: 'GrowthApex Tracker', autoHideMenuBar: true,
+      width: 400, height: 740, resizable: false, backgroundColor: '#f4f7fb', title: 'GrowthApex Tracker', autoHideMenuBar: true,
       icon: path.join(__dirname, 'assets', 'icon.png'),
       webPreferences: { preload: path.join(__dirname, 'preload.js'), backgroundThrottling: false }
     });
@@ -61,7 +66,8 @@ function showWindow(page) {
 
 function pushState() {
   const s = tracker ? tracker.state() : null;
-  if (win && !win.isDestroyed()) win.webContents.send('state', s);
+  if (win && !win.isDestroyed()) { win.webContents.send('state', s); win.webContents.send('update', updater.state()); }
+  const up = updater.state();
   if (tray) {
     const label = !s || !s.me ? 'Not logged in' : !s.running ? 'Checked out' : s.onBreak ? 'On break' : s.paused ? 'Paused (screen locked)' : s.idle ? 'Idle' : 'Working — tracking on';
     tray.setToolTip(`GrowthApex Tracker — ${label}`);
@@ -69,6 +75,7 @@ function pushState() {
       { label, enabled: false },
       { type: 'separator' },
       { label: 'Open GrowthApex Tracker', click: () => showWindow() },
+      ...(up.available ? [{ label: `⬆ Update to v${up.available.version}`, click: () => { showWindow(); doUpdate(); } }] : []),
       ...(s && s.me ? [
         s.running ? { label: 'Check-Out', click: () => doCheckOut() } : { label: 'Check-In', click: () => doCheckIn() },
         ...(s.running ? [{ label: s.onBreak ? 'End break' : 'Start break', click: () => { tracker.setBreak(!s.onBreak); } }] : [])
@@ -106,6 +113,17 @@ async function startSession(me) {
   return me;
 }
 
+// Update: the installer replaces the app; the employee stays checked in and the new version
+// carries on (it finds today's open attendance record on start)
+async function doUpdate() {
+  const r = await updater.install(async () => {
+    quitting = true;
+    if (tracker) await Promise.race([tracker.save(), new Promise(res => setTimeout(res, 5000))]);
+  });
+  pushState();
+  return r;
+}
+
 // force: PC shutting down / logging off — check out and close even while checked in
 async function quitApp(force = false) {
   if (tracker && tracker.state().running && !force) {
@@ -141,6 +159,9 @@ ipcMain.handle('break', (_e, on) => { tracker.setBreak(on); pushState(); });
 ipcMain.handle('project-start', (_e, { project, note }) => tracker.startProject(project, note));
 ipcMain.handle('project-stop', () => tracker.stopProject());
 ipcMain.handle('state', () => (tracker ? tracker.state() : null));
+ipcMain.handle('update-state', () => updater.state());
+ipcMain.handle('update-check', async () => { const r = await updater.check(); pushState(); return r; });
+ipcMain.handle('update-install', () => doUpdate());
 ipcMain.handle('permissions', () => (process.platform === 'darwin'
   ? { mac: true, screen: systemPreferences.getMediaAccessStatus('screen'), accessibility: systemPreferences.isTrustedAccessibilityClient(false) }
   : { mac: false }));
@@ -152,9 +173,13 @@ app.on('before-quit', e => { if (!quitting) { e.preventDefault(); quitApp(); } }
 
 app.whenReady().then(async () => {
   if (process.platform === 'darwin' && app.dock) app.dock.hide();
+  allowGeolocation();
   tracker = createTracker({ powerMonitor, desktopCapturer, screen, dataDir, onChange: pushState });
   createTray();
   setInterval(pushState, 5000);
+  const checkUpdate = () => updater.check().then(pushState);
+  setTimeout(checkUpdate, 15000);
+  setInterval(checkUpdate, 6 * 60 * 60 * 1000);
 
   // Locked screen / sleep: pause tracking (heartbeats stop while asleep; the EMS marks offline)
   powerMonitor.on('lock-screen', () => tracker.setPaused(true));

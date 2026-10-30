@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const ems = require('./ems');
 const { currentActivity } = require('./activity');
+const { getLocation } = require('./location');
 
 const SAMPLE_S = 5;
 const IDLE_AFTER_S = 180;              // no mouse/keyboard for 3 min = idle
@@ -20,7 +21,9 @@ function createTracker({ powerMonitor, desktopCapturer, screen, dataDir, onChang
   let paused = false;       // screen locked / PC asleep
   let current = null;
   let idleSince = null;
-  let settings = { screenshotMinutes: 10, flaggedSites: DEFAULT_FLAGGED, projects: [] };
+  let settings = { screenshotMinutes: 10, locationMinutes: 5, flaggedSites: DEFAULT_FLAGGED, projects: [] };
+  let location = null;      // last location sent to the EMS
+  let lastLocAt = 0;
   let lastShotAt = 0;
   let lastSaveAt = 0;
   let timers = [];
@@ -136,6 +139,21 @@ function createTracker({ powerMonitor, desktopCapturer, screen, dataDir, onChang
     if (!idleSince && Date.now() - lastShotAt >= every) takeScreenshot('interval');
   }
 
+  // ── Location (every settings.locationMinutes while checked in) ──
+  async function locate(kind = 'live') {
+    if (!running || (paused && kind === 'live')) return;
+    lastLocAt = Date.now();
+    try {
+      location = await getLocation();
+      await ems.saveLocation(location, kind);
+    } catch (e) { lastError = `location: ${e.message}`; }
+    onChange();
+  }
+  function intervalLocate() {
+    const every = Math.max(1, Number(settings.locationMinutes) || 5) * 60 * 1000;
+    if (Date.now() - lastLocAt >= every) locate();
+  }
+
   // ── Project timer (timesheet) ──────────────────────────
   function readTimer() { try { return JSON.parse(fs.readFileSync(timerFile, 'utf8')); } catch (_) { return null; } }
   function startProject(project, note = '') {
@@ -173,10 +191,11 @@ function createTracker({ powerMonitor, desktopCapturer, screen, dataDir, onChang
     timers = [
       setInterval(() => sample().catch(() => {}), SAMPLE_S * 1000),
       setInterval(() => beat(), HEARTBEAT_MS),
-      setInterval(() => { if (Date.now() - lastSaveAt >= SAVE_EVERY_MS) save(); intervalShot(); }, 30 * 1000),
+      setInterval(() => { if (Date.now() - lastSaveAt >= SAVE_EVERY_MS) save(); intervalShot(); intervalLocate(); }, 30 * 1000),
       setInterval(() => loadSettings(), 60 * 60 * 1000)
     ];
     setTimeout(() => takeScreenshot('check-in'), 60 * 1000);
+    locate('checkin');
     onChange();
   }
 
@@ -184,6 +203,7 @@ function createTracker({ powerMonitor, desktopCapturer, screen, dataDir, onChang
     if (!running) return;
     await stopProject();
     await save();
+    if (writeCheckOut) await Promise.race([locate('checkout'), new Promise(r => setTimeout(r, 6000))]);
     timers.forEach(clearInterval); timers = [];
     running = false; onBreak = false;
     if (writeCheckOut) { try { await ems.checkOut(reason); } catch (e) { lastError = e.message; } }
@@ -191,16 +211,19 @@ function createTracker({ powerMonitor, desktopCapturer, screen, dataDir, onChang
   }
 
   function setBreak(on) { onBreak = !!on; beat(); onChange(); }
-  function setPaused(on) { paused = !!on; if (on) beat(); onChange(); }
+  function setPaused(on) { paused = !!on; if (on) beat(); else locate(); onChange(); }
 
   function state() {
     const d = loadDay();
     const rec = ems.cached();
+    // Shown to the employee: attendance only. The tracked apps / websites / location / screenshots
+    // go to the EMS and are seen by the admin, not in this window.
+    const me = ems.me();
     return {
-      running, onBreak, paused, idle: !!idleSince, current, lastError, me: ems.me(),
+      running, onBreak, paused, idle: !!idleSince, lastError: lastError ? 'Connection problem — retrying…' : null,
+      me: me && { empId: me.empId, name: me.name, email: me.email },
       checkIn: rec && rec.checkIn, checkOut: rec && rec.checkOut, workedSecs: rec ? Number(rec.workedSeconds || 0) : 0,
-      activeSecs: d.activeSecs, idleSecs: d.idleSecs, breakSecs: d.breakSecs,
-      topApps: top(d.combined, 6, 1), projectTimer: readTimer(), projects: settings.projects || []
+      breakSecs: d.breakSecs, projectTimer: readTimer(), projects: settings.projects || []
     };
   }
 

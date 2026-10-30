@@ -123,7 +123,7 @@ _GrowthApex EMS_`
     } else if (/^Auto-Checkout/.test(rec.checkoutReason || '')) {
       const outMin = P.timeToMinutes(rec.checkOut);
       if (outMin == null || now - outMin < AUTO_OUT_MIN || outMin >= minutesOf(WORK_END)) continue;
-      const reason = rec.checkoutReason.replace(/^Auto-Checkout (|)$/g, '');
+      const reason = rec.checkoutReason.replace(/^Auto-Checkout \(|\)$/g, '');
       alert = {
         id: `autoout_${emp.id}_${date}_${rec.checkOut}`,
         personal: autoCheckoutMessage(first, rec.checkOut, rec.checkoutReason),

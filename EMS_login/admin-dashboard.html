@@ -325,7 +325,7 @@
     <div class="nav-item" onclick="showPage('worklogs',this)"><span class="nav-icon">📝</span><span>EOD Work Logs</span></div>
     <div class="nav-item" onclick="showPage('expenses',this)"><span class="nav-icon">💸</span><span>Expenses &amp; Claims</span></div>
     <div class="nav-item" onclick="showPage('noticeboard',this)"><span class="nav-icon">📢</span><span>Notice Board</span></div>
-    <div class="nav-item" onclick="showPage('tracker',this)"><span class="nav-icon">💻</span><span>Tracker (Screenshots)</span></div>
+    <div class="nav-item" onclick="showPage('tracker',this)"><span class="nav-icon">💻</span><span>Tracker (Location &amp; Screenshots)</span></div>
 
   </div>
   <div class="sidebar-footer">
@@ -529,6 +529,7 @@
         </div>
       </div>
       <div id="trk-summary" style="font-size:13px;margin-bottom:12px"></div>
+      <div id="trk-location" style="margin-bottom:14px"></div>
       <h4 style="margin:6px 0">📸 Screenshots</h4>
       <div id="trk-shots" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px"></div>
     </div>
@@ -1664,6 +1665,15 @@ function getDeviceInfoHtml(a) {
   const inLoc = locHtml(a.checkInLocation, a.checkInDistanceFromHomeKm, 'In');
   const outLoc = locHtml(a.checkOutLocation, a.checkOutDistanceFromHomeKm, 'Out');
   if (inLoc) parts.push(inLoc);
+  const live = a.trackerLocation;
+  if (live && (!a.checkOut || a.checkOut === '—')) {
+    if (live.error) parts.push(`<span style="color:#f87171">📍 Live: ${live.error}</span>`);
+    else {
+      const ago = Math.round((Date.now() - Date.parse(live.at)) / 60000);
+      const stale = ago > 15 ? ' style="color:#fbbf24"' : '';
+      parts.push(`<span${stale}>📍 Live: ${(live.place || 'Map').replace(/</g, '&lt;')}${live.source === 'ip' ? ' (approx.)' : ''} · ${ago < 1 ? 'now' : ago + ' min ago'}</span> · <a href="https://www.google.com/maps?q=${live.lat},${live.lng}" target="_blank" rel="noopener" style="color:var(--cyan)">Map</a> · <a href="#" onclick="openTrackerFor('${a.empId}','${a.date}');return false" style="color:var(--cyan)">Route</a>`);
+    }
+  }
   if (outLoc) parts.push(outLoc);
   if (a.activeSeconds) {
     const m = Math.round(a.activeSeconds / 60);
@@ -2485,6 +2495,40 @@ function openScreenshot(img) {
   if (w) w.document.body.innerHTML = '<img style="max-width:100%">', w.document.querySelector('img').src = img.src;
 }
 
+// Live location + the day's route from the Tracker app (attendance.trackerLocation / locationTrail)
+function renderTrackerLocation(rec) {
+  const el = document.getElementById('trk-location');
+  const esc = v => String(v || '').replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+  const time = iso => new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+  const trail = (rec && rec.locationTrail) || [];
+  const live = rec && rec.trackerLocation;
+  if (!trail.length && !live) { el.innerHTML = '<div style="color:var(--muted);font-size:13px">📍 No location from the Tracker app for this day.</div>'; return; }
+  const cur = live && !live.error ? live : trail[trail.length - 1];
+  const open = rec.checkOut === '—' || !rec.checkOut;
+  const d = 0.004;
+  const map = cur ? `<iframe title="Location" style="width:100%;height:260px;border:1px solid var(--border);border-radius:10px" loading="lazy"
+    src="https://www.openstreetmap.org/export/embed.html?bbox=${cur.lng - d},${cur.lat - d},${cur.lng + d},${cur.lat + d}&layer=mapnik&marker=${cur.lat},${cur.lng}"></iframe>` : '';
+  // Google Maps route through up to 10 evenly spaced points of the day
+  const pts = trail.length > 10 ? Array.from({ length: 10 }, (_, i) => trail[Math.round(i * (trail.length - 1) / 9)]) : trail;
+  const route = pts.length > 1 ? ` · <a href="https://www.google.com/maps/dir/${pts.map(p => p.lat + ',' + p.lng).join('/')}" target="_blank" rel="noopener" style="color:var(--cyan)">Route on Google Maps</a>` : '';
+  el.innerHTML = `
+    <h4 style="margin:6px 0">📍 Location ${open ? '(live — updates every 5 min)' : '(checked out)'}</h4>
+    <div style="font-size:13px;margin-bottom:8px">${live && live.error ? `<span style="color:#f87171">⚠️ ${esc(live.error)}</span> · ` : ''}${cur ? `<b>${esc(cur.place || (cur.lat + ', ' + cur.lng))}</b>${(cur.source || cur.src) === 'ip' ? ' (approx. — Location is off on the laptop)' : ` (±${cur.accuracy || cur.acc || '?'} m)`} · ${time(cur.at)} · <a href="https://www.google.com/maps?q=${cur.lat},${cur.lng}" target="_blank" rel="noopener" style="color:var(--cyan)">Google Maps</a>` : ''}${route}</div>
+    ${map}
+    ${trail.length ? `<details style="margin-top:8px;font-size:12px"><summary style="cursor:pointer">🧭 Places today (${trail.length})</summary>
+      <div class="table-wrap"><table><thead><tr><th>Time</th><th>Place</th><th></th></tr></thead><tbody>
+      ${trail.map(p => `<tr><td>${time(p.at)}</td><td>${esc(p.place || '—')}${p.src === 'ip' ? ' (approx.)' : ''}</td><td><a href="https://www.google.com/maps?q=${p.lat},${p.lng}" target="_blank" rel="noopener" style="color:var(--cyan)">Map</a></td></tr>`).join('')}
+      </tbody></table></div></details>` : ''}`;
+}
+
+// From an attendance row: open the Tracker page on that employee + day
+function openTrackerFor(empId, date) {
+  showPage('tracker', document.querySelector(`[onclick^="showPage('tracker'"]`));
+  document.getElementById('trk-emp').value = empId;
+  document.getElementById('trk-date').value = date;
+  renderTrackerPage();
+}
+
 async function renderTrackerPage() {
   const empIdSel = document.getElementById('trk-emp').value;
   const date = document.getElementById('trk-date').value || emsToday();
@@ -2502,6 +2546,7 @@ async function renderTrackerPage() {
     ? `📅 In <b>${rec.checkIn || '—'}</b> · Out <b>${rec.checkOut || '—'}</b>${act ? ` · 🟢 Active <b>${dur(act.activeSecs || 0)}</b> · 💤 Idle <b>${dur(act.idleSecs || 0)}</b>${act.breakSecs ? ` · ☕ Break <b>${dur(act.breakSecs)}</b>` : ''} · <a href="#" onclick="showScreenTime('${empIdSel}','${date}');return false" style="color:var(--cyan)">Apps &amp; websites</a>` : ''}${act && act.source === 'tracker' ? ' · 💻 Tracker app' : ''}`
     : 'No attendance record for this day.';
 
+  renderTrackerLocation(rec);
   shotsEl.innerHTML = '<div style="color:var(--muted)">⏳ Loading…</div>';
   tsEl.innerHTML = '<div style="color:var(--muted)">⏳ Loading…</div>';
   try {

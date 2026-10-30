@@ -56,4 +56,5 @@ jobs:
           body: |
             Desktop tracker for the GrowthApex EMS.
             - Windows: GrowthApex-Tracker-Setup.exe (if Windows warns "protected your PC": More info → Run anyway)
-            - Mac: GrowthApex-Tracker.dmg (first time: right-click the app → Open)
+            - Mac: GrowthApex-Tracker.dmg — drag the app to Applications and open it once. If it says "Not Opened":
+              Done → System Settings → Privacy & Security → scroll down → "Open Anyway" → enter your Mac password

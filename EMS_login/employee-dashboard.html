@@ -150,6 +150,19 @@
     .page.active { display:block; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
+    /* ── Sliding "new Tracker version" banner ── */
+    .upd-banner { display:none; align-items:center; gap:10px; margin:0 0 16px; padding:0 0 0 14px; height:44px; border-radius:12px; overflow:hidden;
+      background:linear-gradient(90deg,#1e40af,#0e7fb8 55%,#10b981); color:#fff; font-weight:700; font-size:14px; box-shadow:0 6px 18px rgba(14,127,184,.25); }
+    .upd-banner.show { display:flex; }
+    .upd-banner .tag { flex:none; background:rgba(255,255,255,.2); padding:4px 10px; border-radius:999px; font-size:12px; letter-spacing:.3px; }
+    .upd-track { flex:1; overflow:hidden; white-space:nowrap; mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent); }
+    .upd-track > span { display:inline-block; padding-left:100%; animation:updSlide 22s linear infinite; }
+    .upd-banner:hover .upd-track > span { animation-play-state:paused; }
+    .upd-banner a { color:#fff; text-decoration:underline; text-underline-offset:3px; margin:0 6px; }
+    .upd-banner .x { flex:none; height:100%; padding:0 14px; background:rgba(0,0,0,.12); border:0; color:#fff; font-size:16px; cursor:pointer; }
+    @keyframes updSlide { from { transform:translateX(0); } to { transform:translateX(-100%); } }
+    @media (prefers-reduced-motion: reduce) { .upd-track > span { animation:none; padding-left:0; } }
+
     .empty-state { text-align:center; padding:40px 20px; color:var(--muted); }
     .empty-state div { font-size:36px; margin-bottom:12px; }
 
@@ -319,6 +332,13 @@
     </div>
   </div>
 
+  <!-- New Tracker app version (filled from the GitHub release, see showTrackerUpdateBanner) -->
+  <div class="upd-banner" id="upd-banner" role="status">
+    <span class="tag">🎉 NEW</span>
+    <div class="upd-track"><span id="upd-text"></span></div>
+    <button class="x" title="Hide" onclick="hideTrackerUpdateBanner()">✕</button>
+  </div>
+
   <!-- Dashboard -->
   <div class="page active" id="page-dashboard">
     <div id="emp-hero"></div>
@@ -410,8 +430,9 @@
           <a class="btn btn-green" href="https://github.com/growthapex05-ux/growthapex/releases/latest/download/GrowthApex-Tracker-Setup.exe">⬇ Download for Windows</a>
           <a class="btn btn-green" href="https://github.com/growthapex05-ux/growthapex/releases/latest/download/GrowthApex-Tracker.dmg">⬇ Download for Mac</a>
         </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px">Windows: if it says "protected your PC" → More info → Run anyway. Mac: drag the app to Applications and open it; if it says "Not Opened" → Done → System Settings → Privacy &amp; Security → "Open Anyway".</div>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:8px">📍 Your location is taken only at Check-In and Check-Out. 🖥️ While you are checked in, the names of the apps and websites you use (and for how long) are recorded from ActivityWatch on your laptop — no screenshots, keystrokes or message contents.</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px">📍 On the website your location is taken only at Check-In and Check-Out. 🖥️ While you are checked in, the names of the apps and websites you use (and for how long) are recorded. 💻 If you use the GrowthApex Tracker app, it also shares your laptop's location every 5 minutes and takes a screenshot of your screen every 10 minutes while you are checked in — nothing is recorded after you check out. No keystrokes or passwords are recorded.</div>
     </div>
     <div class="section-card">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
@@ -1114,6 +1135,36 @@
     renderScreenActivityStatus(act);
     saveScreenStatus(act);
   }
+
+  // Sliding banner: latest GrowthApex Tracker release (tags tracker-vX.Y.Z). Hidden per version once closed.
+  const TRACKER_DL = 'https://github.com/growthapex05-ux/growthapex/releases/latest/download/';
+  let trackerLatest = null;
+  async function showTrackerUpdateBanner() {
+    try {
+      let ver = null;
+      try { ver = sessionStorage.getItem('ems_tracker_ver'); } catch (_) {}
+      if (!ver) {
+        const res = await fetch('https://api.github.com/repos/growthapex05-ux/growthapex/releases?per_page=10');
+        const rel = (await res.json()).find(r => !r.draft && !r.prerelease && /^tracker-v/.test(r.tag_name));
+        if (!rel) return;
+        ver = rel.tag_name.replace('tracker-v', '');
+        try { sessionStorage.setItem('ems_tracker_ver', ver); } catch (_) {}
+      }
+      if (ver === '1.0.0') return; // first release — nothing to update from
+      trackerLatest = ver;
+      try { if (localStorage.getItem('ems_tracker_banner_hidden') === ver) return; } catch (_) {}
+      const links = `<a href="${TRACKER_DL}GrowthApex-Tracker-Setup.exe">⬇ Download for Windows</a> · <a href="${TRACKER_DL}GrowthApex-Tracker.dmg">⬇ Download for Mac</a>`;
+      document.getElementById('upd-text').innerHTML =
+        `New GrowthApex Tracker v${ver} is available — please install it on your laptop: ${links} ` +
+        `&nbsp;&nbsp;•&nbsp;&nbsp; Already on the new version? Use <b>Check for updates</b> in the app.`;
+      document.getElementById('upd-banner').classList.add('show');
+    } catch (_) { /* no banner if GitHub is unreachable */ }
+  }
+  function hideTrackerUpdateBanner() {
+    document.getElementById('upd-banner').classList.remove('show');
+    try { if (trackerLatest) localStorage.setItem('ems_tracker_banner_hidden', trackerLatest); } catch (_) {}
+  }
+  showTrackerUpdateBanner();
 
   function renderScreenActivityStatus(act) {
     const el = document.getElementById('screen-activity-status');
