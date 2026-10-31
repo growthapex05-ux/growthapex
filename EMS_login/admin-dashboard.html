@@ -553,6 +553,11 @@
           <label>🚨 Siren on employee laptop after (minutes idle / offline) — 0 = off</label>
           <input id="trk-set-siren" class="search-input" type="number" min="0" max="120" style="width:100%">
         </div>
+        <div class="form-group">
+          <label>📍 Auto check-out if employee moves this far from check-in (metres) — 0 = off</label>
+          <input id="trk-set-geo" class="search-input" type="number" min="0" max="5000" style="width:100%">
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">Laptop location is accurate to ~20–60 m, so values under 50 m may check people out by mistake. 100–200 m is safer.</div>
+        </div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:12px">
         <div class="form-group">
@@ -2512,7 +2517,7 @@ function payrollFor(emp, monthVal) {
 // ── Tracker page: screenshots + timesheet for one employee / day (desktop app data) ──
 // Tracker app settings: admin/config.tracker (read by every Tracker app once an hour).
 // Defaults match tracker/src/tracker.js.
-const TRACKER_DEFAULTS = { screenshotMinutes: 10, locationMinutes: 5, sirenMinutes: 10, projects: [],
+const TRACKER_DEFAULTS = { screenshotMinutes: 10, locationMinutes: 5, sirenMinutes: 10, geofenceMeters: 0, projects: [],
   flaggedSites: ['youtube.com', 'instagram.com', 'facebook.com', 'netflix.com', 'hotstar.com', 'primevideo.com', 'x.com', 'reddit.com'] };
 let trackerSettingsLoaded = false;
 async function loadTrackerSettings() {
@@ -2521,6 +2526,7 @@ async function loadTrackerSettings() {
     document.getElementById('trk-set-shot').value = t.screenshotMinutes;
     document.getElementById('trk-set-loc').value = t.locationMinutes;
     document.getElementById('trk-set-siren').value = t.sirenMinutes;
+    document.getElementById('trk-set-geo').value = t.geofenceMeters;
     document.getElementById('trk-set-flag').value = (t.flaggedSites || []).join('\n');
     document.getElementById('trk-set-proj').value = (t.projects || []).join('\n');
     trackerSettingsLoaded = true;
@@ -2533,6 +2539,7 @@ async function saveTrackerSettings() {
     screenshotMinutes: num('trk-set-shot', 2, 120, TRACKER_DEFAULTS.screenshotMinutes),
     locationMinutes: num('trk-set-loc', 1, 120, TRACKER_DEFAULTS.locationMinutes),
     sirenMinutes: num('trk-set-siren', 0, 120, TRACKER_DEFAULTS.sirenMinutes),
+    geofenceMeters: num('trk-set-geo', 0, 5000, TRACKER_DEFAULTS.geofenceMeters),
     flaggedSites: lines('trk-set-flag').map(x => x.toLowerCase()),
     projects: lines('trk-set-proj')
   };

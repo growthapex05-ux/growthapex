@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const ems = require('./ems');
 const { currentActivity } = require('./activity');
-const { getLocation } = require('./location');
+const { getLocation, distanceKm } = require('./location');
 
 const SAMPLE_S = 5;
 const IDLE_AFTER_S = 180;              // no mouse/keyboard for 3 min = idle
@@ -24,11 +24,14 @@ function createTracker({ powerMonitor, desktopCapturer, screen, safeStorage, dat
   let paused = false;       // screen locked / PC asleep
   let current = null;
   let idleSince = null;
-  let settings = { screenshotMinutes: 10, locationMinutes: 5, sirenMinutes: 10, flaggedSites: DEFAULT_FLAGGED, projects: [] };
+  let settings = { screenshotMinutes: 10, locationMinutes: 5, sirenMinutes: 10, geofenceMeters: 0, flaggedSites: DEFAULT_FLAGGED, projects: [] };
   let location = null;      // last location sent to the EMS
   let lastBeatOkAt = 0;     // last heartbeat the EMS confirmed (no internet = Firestore just waits, never fails)
   let autoCheckedOut = false; // the EMS checked this employee out (not the employee)
   let lastLocAt = 0;
+  let geoAnchor = null;     // check-in location; employee is auto-checked-out if they move too far from it
+  let geoStrikes = 0;       // consecutive location fixes beyond the fence (2 needed, so one bad GPS fix is ignored)
+  let geoAlert = null;      // message for the siren after a geofence auto check-out
   let lastShotAt = 0;
   let lastSaveAt = 0;
   let timers = [];
@@ -185,12 +188,34 @@ function createTracker({ powerMonitor, desktopCapturer, screen, safeStorage, dat
     try {
       location = await getLocation();
       await ems.saveLocation(location, kind);
+      if (kind === 'checkin' && location && !location.error) { geoAnchor = { lat: location.lat, lng: location.lng }; geoStrikes = 0; }
+      else await checkGeofence();
     } catch (e) { lastError = `location: ${e.message}`; }
     onChange();
   }
+
+  // Auto check-out when the laptop moves more than settings.geofenceMeters from the check-in spot.
+  // Guards against GPS drift: the move must be bigger than the reading's own accuracy, and must show
+  // up on two fixes in a row. Laptop location is only accurate to ~20–60 m, so very small fences
+  // (like 10 m) effectively trigger around the accuracy of each reading.
+  async function checkGeofence() {
+    const fence = Number(settings.geofenceMeters) || 0;
+    if (!fence || !running || onBreak || paused || !geoAnchor || !location || location.error) return;
+    const meters = Math.round(distanceKm(geoAnchor, location) * 1000);
+    const acc = Number(location.accuracy) || 0;
+    if (meters > fence && meters > acc) {
+      geoStrikes++;
+      if (geoStrikes >= 2) {
+        geoStrikes = 0;
+        geoAlert = `You moved ${meters} m from your check-in location, so you were checked out automatically. Tap Check-In when you are back.`;
+        await stop(true, `Auto-Checkout (Left work location — ${meters} m away)`);
+      }
+    } else geoStrikes = 0;
+  }
   function intervalLocate() {
-    const every = Math.max(1, Number(settings.locationMinutes) || 5) * 60 * 1000;
-    if (Date.now() - lastLocAt >= every) locate();
+    let mins = Math.max(1, Number(settings.locationMinutes) || 5);
+    if (Number(settings.geofenceMeters) > 0) mins = Math.min(mins, 1); // check every minute so a geofence exit is caught fast
+    if (Date.now() - lastLocAt >= mins * 60 * 1000) locate();
   }
 
   // ── Project timer (timesheet) ──────────────────────────
@@ -224,6 +249,7 @@ function createTracker({ powerMonitor, desktopCapturer, screen, safeStorage, dat
     if (running) return;
     await ems.checkIn();
     running = true; onBreak = false; paused = false; autoCheckedOut = false; lastBeatOkAt = Date.now();
+    geoAnchor = null; geoStrikes = 0; geoAlert = null;
     loadDay();
     await loadSettings();
     ems.saveStatus({}).catch(() => {});
@@ -253,8 +279,11 @@ function createTracker({ powerMonitor, desktopCapturer, screen, safeStorage, dat
   // offline (no confirmed heartbeat for OFFLINE_SIREN_MIN), idle while checked in, or checked out
   // by the system. → message or null
   function alarm() {
+    if (!ems.me()) return null;
+    // A geofence auto check-out always notifies — independent of the siren setting and office hours
+    if (!running && geoAlert) { const m = geoAlert; geoAlert = null; return m; }
     const lim = Number(settings.sirenMinutes ?? 10);
-    if (!lim || !ems.me()) return null;
+    if (!lim) return null;
     const [h, m] = ems.timeIST().split(':').map(Number);
     const mins = h * 60 + m;
     const sunday = new Date(`${ems.todayIST()}T12:00:00`).getDay() === 0;
