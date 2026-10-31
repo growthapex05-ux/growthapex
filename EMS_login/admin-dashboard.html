@@ -1705,7 +1705,7 @@ function getDeviceInfoHtml(a) {
     else {
       const ago = Math.round((Date.now() - Date.parse(live.at)) / 60000);
       const stale = ago > 15 ? ' style="color:#fbbf24"' : '';
-      parts.push(`<span${stale}>📍 Live: ${(live.place || 'Map').replace(/</g, '&lt;')}${live.source === 'ip' ? ' (approx.)' : ''} · ${ago < 1 ? 'now' : ago + ' min ago'}</span> · <a href="https://www.google.com/maps?q=${live.lat},${live.lng}" target="_blank" rel="noopener" style="color:var(--cyan)">Map</a> · <a href="#" onclick="openTrackerFor('${a.empId}','${a.date}');return false" style="color:var(--cyan)">Route</a>`);
+      parts.push(`<span${stale}>📍 Live: ${(live.place || 'Map').replace(/</g, '&lt;')}${live.osDenied ? ' ⚠️ (Location OFF — city only)' : live.source === 'ip' ? ' (approx.)' : ''} · ${ago < 1 ? 'now' : ago + ' min ago'}</span> · <a href="https://www.google.com/maps?q=${live.lat},${live.lng}" target="_blank" rel="noopener" style="color:var(--cyan)">Map</a> · <a href="#" onclick="openTrackerFor('${a.empId}','${a.date}');return false" style="color:var(--cyan)">Route</a>`);
     }
   }
   if (outLoc) parts.push(outLoc);

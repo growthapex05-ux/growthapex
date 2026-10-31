@@ -65,8 +65,9 @@ async function getLocation() {
     if (p && p.lat != null) return { ...p, source: 'gps', place: await placeName(p.lat, p.lng), at };
     osError = (p && p.error) || null;
   } catch (e) { osError = e.message; }
-  try { return { ...(await ipLocation()), source: 'ip', osError, at }; }
-  catch (e) { return { error: `location unavailable (${osError || e.message})`, at }; }
+  const denied = /denied|permission|disabled|not allowed|kCLError|1/i.test(String(osError || ''));
+  try { return { ...(await ipLocation()), source: 'ip', osError, osDenied: denied, at }; }
+  catch (e) { return { error: `location unavailable (${osError || e.message})`, osDenied: denied, at }; }
 }
 
 module.exports = { allowGeolocation, getLocation, distanceKm };

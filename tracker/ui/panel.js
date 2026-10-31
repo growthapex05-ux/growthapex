@@ -37,6 +37,7 @@ function render(s) {
   if (dl.childElementCount !== (s.projects || []).length) dl.innerHTML = (s.projects || []).map(p => `<option value="${String(p).replace(/"/g, '&quot;')}">`).join('');
   $('err').textContent = s.lastError ? `⚠️ ${s.lastError}` : '';
   if (s.running && !s.idle && !s.lastError) $('siren').classList.remove('show');
+  $('locoff').style.display = s.running && s.locationOff ? 'flex' : 'none';
 }
 
 const act = (fn) => async () => { try { await fn(); } catch (e) { $('err').textContent = String(e.message || e); } render(await window.tracker.state()); };

@@ -317,7 +317,8 @@ function createTracker({ powerMonitor, desktopCapturer, screen, safeStorage, dat
       me: me && { empId: me.empId, name: me.name, email: me.email },
       checkIn: rec && rec.checkIn, checkOut: rec && rec.checkOut, workedSecs: rec ? Number(rec.workedSeconds || 0) : 0,
       beatAt: rec && rec.lastHeartbeat ? Date.parse(rec.lastHeartbeat) : null,
-      breakSecs: d.breakSecs, projectTimer: readTimer(), projects: settings.projects || []
+      breakSecs: d.breakSecs, projectTimer: readTimer(), projects: settings.projects || [],
+      locationOff: !!(location && location.osDenied)
     };
   }
 
