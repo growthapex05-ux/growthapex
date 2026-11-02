@@ -1049,8 +1049,26 @@
 <script src="/EMS_login/ems-reports.js"></script>
 <script>
 // ─── Auth Guard ───────────────────────────────────────────────
+const ADMIN_EMAIL = 'growthapex05@gmail.com';
 const sess = EMS_DB.getSession();
 if (!sess || sess.role !== 'admin') { window.location.href = '/EMS_login/'; }
+
+// Verify the Firebase Auth session is really alive and is the admin account.
+// Without this, a stale localStorage session shows the dashboard while every
+// Firestore call is rejected with "Missing or insufficient permissions".
+let adminAuthReady = false;
+auth.onAuthStateChanged(user => {
+  const ok = user && (user.email || '').toLowerCase() === ADMIN_EMAIL;
+  if (!ok) {
+    if (adminAuthReady) return; // already handled / signing out
+    adminAuthReady = true;
+    try { EMS_DB.clearSession && EMS_DB.clearSession(); } catch (_) {}
+    alert('Your admin session has expired. Please log in again.');
+    window.location.href = '/EMS_login/';
+    return;
+  }
+  adminAuthReady = true;
+});
 
 // ─── Real-time Cache & Listeners ────────────────────────────────
 const cache = {
