@@ -2573,8 +2573,18 @@ function renderTrackerLocation(rec) {
   const cur = live && !live.error ? live : trail[trail.length - 1];
   const open = rec.checkOut === '—' || !rec.checkOut;
   const d = 0.004;
-  const map = cur ? `<iframe title="Location" style="width:100%;height:260px;border:1px solid var(--border);border-radius:10px" loading="lazy"
-    src="https://www.openstreetmap.org/export/embed.html?bbox=${cur.lng - d},${cur.lat - d},${cur.lng + d},${cur.lat + d}&layer=mapnik&marker=${cur.lat},${cur.lng}"></iframe>` : '';
+  // Map (OpenStreetMap) and Satellite (Google) views, switchable; plus a Google Earth 3D link.
+  const osm = cur ? `https://www.openstreetmap.org/export/embed.html?bbox=${cur.lng - d},${cur.lat - d},${cur.lng + d},${cur.lat + d}&layer=mapnik&marker=${cur.lat},${cur.lng}` : '';
+  const sat = cur ? `https://maps.google.com/maps?q=${cur.lat},${cur.lng}&t=k&z=18&output=embed` : '';
+  const earth3d = cur ? `https://earth.google.com/web/@${cur.lat},${cur.lng},0a,300d,35y,0h,45t,0r` : '';
+  const mapBtn = 'padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--soft);cursor:pointer;font-size:12px;font-weight:600';
+  const map = cur ? `
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <button style="${mapBtn}" onclick="document.getElementById('trk-map').src='${osm}';this.style.background='var(--brand-soft)';this.nextElementSibling.style.background='var(--soft)'">🗺 Map</button>
+      <button style="${mapBtn}" onclick="document.getElementById('trk-map').src='${sat}';this.style.background='var(--brand-soft)';this.previousElementSibling.style.background='var(--soft)'">🛰 Satellite</button>
+      <a href="${earth3d}" target="_blank" rel="noopener" style="${mapBtn};text-decoration:none;color:var(--text);display:inline-flex;align-items:center">🌍 3D view (Google Earth)</a>
+    </div>
+    <iframe id="trk-map" title="Location" style="width:100%;height:300px;border:1px solid var(--border);border-radius:10px" loading="lazy" src="${osm}"></iframe>` : '';
   // Google Maps route through up to 10 evenly spaced points of the day
   const pts = trail.length > 10 ? Array.from({ length: 10 }, (_, i) => trail[Math.round(i * (trail.length - 1) / 9)]) : trail;
   const route = pts.length > 1 ? ` · <a href="https://www.google.com/maps/dir/${pts.map(p => p.lat + ',' + p.lng).join('/')}" target="_blank" rel="noopener" style="color:var(--cyan)">Route on Google Maps</a>` : '';
