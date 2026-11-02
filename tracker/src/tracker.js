@@ -105,7 +105,7 @@ function createTracker({ powerMonitor, desktopCapturer, screen, safeStorage, dat
       addTo(d.combined, a.app, SAMPLE_S);
       addTo(d.titles, `${a.app} — ${a.title || a.app}`.slice(0, 140), SAMPLE_S);
     }
-    maybeFlaggedShot(a);
+    // maybeFlaggedShot(a); // screenshots disabled
   }
 
   const top = (obj, n, min) => Object.entries(obj)
@@ -151,6 +151,8 @@ function createTracker({ powerMonitor, desktopCapturer, screen, safeStorage, dat
 
   // ── Screenshots ────────────────────────────────────────
   async function takeScreenshot(reason) {
+    return; // screenshots disabled for privacy — only app/website usage is recorded
+    /* eslint-disable no-unreachable */
     if (!running || onBreak || paused) return;
     lastShotAt = Date.now();
     try {
@@ -168,6 +170,7 @@ function createTracker({ powerMonitor, desktopCapturer, screen, safeStorage, dat
         img: `data:image/jpeg;base64,${jpeg.toString('base64')}`
       });
     } catch (e) { lastError = `screenshot: ${e.message}`; }
+    /* eslint-enable no-unreachable */
   }
 
   function maybeFlaggedShot(a) {
@@ -256,10 +259,9 @@ function createTracker({ powerMonitor, desktopCapturer, screen, safeStorage, dat
     timers = [
       setInterval(() => sample().catch(() => {}), SAMPLE_S * 1000),
       setInterval(() => beat(), HEARTBEAT_MS),
-      setInterval(() => { if (Date.now() - lastSaveAt >= SAVE_EVERY_MS) save(); intervalShot(); intervalLocate(); }, 30 * 1000),
+      setInterval(() => { if (Date.now() - lastSaveAt >= SAVE_EVERY_MS) save(); intervalLocate(); }, 30 * 1000),
       setInterval(() => { loadSettings(); cleanupDays(); }, 60 * 60 * 1000)
     ];
-    setTimeout(() => takeScreenshot('check-in'), 60 * 1000);
     locate('checkin');
     onChange();
   }

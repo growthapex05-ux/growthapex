@@ -26,7 +26,7 @@ function render(s) {
   $('break').disabled = !s.running;
   $('break').textContent = s.onBreak ? '▶ End break' : '☕ Start break';
   $('privacy').textContent = s.running
-    ? 'Work tracking is on while you are checked in. Your activity is shared with the GrowthApex admin.'
+    ? 'Work tracking is on. Which apps & websites you use (and your location) are shared with the GrowthApex admin. No screenshots.'
     : 'Tracking is off — nothing is recorded while you are checked out.';
 
   const t = s.projectTimer;

@@ -325,7 +325,7 @@
     <div class="nav-item" onclick="showPage('worklogs',this)"><span class="nav-icon">📝</span><span>EOD Work Logs</span></div>
     <div class="nav-item" onclick="showPage('expenses',this)"><span class="nav-icon">💸</span><span>Expenses &amp; Claims</span></div>
     <div class="nav-item" onclick="showPage('noticeboard',this)"><span class="nav-icon">📢</span><span>Notice Board</span></div>
-    <div class="nav-item" onclick="showPage('tracker',this)"><span class="nav-icon">💻</span><span>Tracker (Location &amp; Screenshots)</span></div>
+    <div class="nav-item" onclick="showPage('tracker',this)"><span class="nav-icon">💻</span><span>Tracker (Activity &amp; Location)</span></div>
 
   </div>
   <div class="sidebar-footer">
@@ -530,8 +530,8 @@
       </div>
       <div id="trk-summary" style="font-size:13px;margin-bottom:12px"></div>
       <div id="trk-location" style="margin-bottom:14px"></div>
-      <h4 style="margin:6px 0">📸 Screenshots</h4>
-      <div id="trk-shots" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px"></div>
+      <div style="font-size:12px;color:var(--muted);background:var(--soft);border:1px solid var(--border);border-radius:10px;padding:10px 12px">🔒 Screenshots are turned off for privacy. The app records which apps &amp; websites each employee uses (and for how long) and their location — see "Apps &amp; websites" above.</div>
+      <div id="trk-shots" style="display:none"></div>
     </div>
     <div class="section-card">
       <div class="section-head"><h3>⏱ Timesheet (project time)</h3></div>
@@ -541,10 +541,6 @@
       <div class="section-head"><h3>⚙️ Tracker Settings</h3></div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Applies to every employee's Tracker app within 1 hour — no reinstall needed.</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:12px">
-        <div class="form-group">
-          <label>📸 Screenshot every (minutes)</label>
-          <input id="trk-set-shot" class="search-input" type="number" min="2" max="120" style="width:100%">
-        </div>
         <div class="form-group">
           <label>📍 Location every (minutes)</label>
           <input id="trk-set-loc" class="search-input" type="number" min="1" max="120" style="width:100%">
@@ -2523,7 +2519,6 @@ let trackerSettingsLoaded = false;
 async function loadTrackerSettings() {
   try {
     const t = { ...TRACKER_DEFAULTS, ...((await EMS_DB.getAdmin()).tracker || {}) };
-    document.getElementById('trk-set-shot').value = t.screenshotMinutes;
     document.getElementById('trk-set-loc').value = t.locationMinutes;
     document.getElementById('trk-set-siren').value = t.sirenMinutes;
     document.getElementById('trk-set-geo').value = t.geofenceMeters;
@@ -2536,7 +2531,6 @@ async function saveTrackerSettings() {
   const lines = id => [...new Set(document.getElementById(id).value.split('\n').map(x => x.trim()).filter(Boolean))];
   const num = (id, min, max, def) => { const n = parseInt(document.getElementById(id).value, 10); return isNaN(n) ? def : Math.min(max, Math.max(min, n)); };
   const tracker = {
-    screenshotMinutes: num('trk-set-shot', 2, 120, TRACKER_DEFAULTS.screenshotMinutes),
     locationMinutes: num('trk-set-loc', 1, 120, TRACKER_DEFAULTS.locationMinutes),
     sirenMinutes: num('trk-set-siren', 0, 120, TRACKER_DEFAULTS.sirenMinutes),
     geofenceMeters: num('trk-set-geo', 0, 5000, TRACKER_DEFAULTS.geofenceMeters),
@@ -2620,22 +2614,10 @@ async function renderTrackerPage() {
     : 'No attendance record for this day.';
 
   renderTrackerLocation(rec);
-  shotsEl.innerHTML = '<div style="color:var(--muted)">⏳ Loading…</div>';
   tsEl.innerHTML = '<div style="color:var(--muted)">⏳ Loading…</div>';
   try {
-    const [shots, ts] = await Promise.all([
-      db.collection('screenshots').where('empId', '==', empIdSel).where('date', '==', date).get(),
-      db.collection('timesheets').where('empId', '==', empIdSel).where('date', '==', date).get()
-    ]);
-    const list = shots.docs.map(d => d.data()).sort((a, b) => (a.at < b.at ? -1 : 1));
-    shotsEl.innerHTML = list.length ? list.map(x => `
-      <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--soft,rgba(255,255,255,.03))">
-        <img src="${x.img}" alt="" loading="lazy" style="width:100%;display:block;cursor:zoom-in" onclick="openScreenshot(this)">
-        <div style="padding:6px 8px;font-size:11px;line-height:1.4">
-          <b>${time(x.at)}</b> ${x.reason === 'flagged' ? '<span class="badge badge-red">flagged</span>' : ''}<br>
-          <span style="color:var(--muted)">${esc(x.site || x.app)}${x.title ? ' — ' + esc(x.title) : ''}</span>
-        </div>
-      </div>`).join('') : '<div class="empty-state"><div>📸</div>No screenshots for this day (the Tracker app takes them while checked in)</div>';
+    // Screenshots are off for privacy — only the timesheet is loaded here now.
+    const ts = await db.collection('timesheets').where('empId', '==', empIdSel).where('date', '==', date).get();
 
     const rows = ts.docs.map(d => d.data()).sort((a, b) => (a.start < b.start ? -1 : 1));
     const total = rows.reduce((t, r) => t + (r.secs || 0), 0);
@@ -2645,8 +2627,7 @@ async function renderTrackerPage() {
       <tr><td colspan="4" style="text-align:right"><b>Total</b></td><td><b>${dur(total)}</b></td></tr></tbody></table></div>`
       : '<div class="empty-state"><div>⏱</div>No project time logged this day</div>';
   } catch (e) {
-    shotsEl.innerHTML = `<div class="empty-state"><div>❌</div>${esc(e.message)}</div>`;
-    tsEl.innerHTML = '';
+    tsEl.innerHTML = `<div class="empty-state"><div>❌</div>${esc(e.message)}</div>`;
   }
 }
 
