@@ -4,6 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EMS Login — GrowthApex</title>
+  <!-- PWA: installable as an app on Android & iPhone -->
+  <link rel="manifest" href="/EMS_login/manifest.webmanifest">
+  <meta name="theme-color" content="#1e40af">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="GrowthApex">
+  <link rel="apple-touch-icon" href="/EMS_login/icon-512.png">
+  <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/EMS_login/sw.js').catch(function(){});});}</script>
   <link rel="shortcut icon" type="image/svg+xml" href="../assets/images/logo/favicon.svg">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Urbanist:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>

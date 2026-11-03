@@ -1,0 +1,13 @@
+{
+  "appId": "in.growthapex.ems",
+  "appName": "GrowthApex",
+  "webDir": "www",
+  "server": {
+    "url": "https://growthapex.in/EMS_login/index.html",
+    "androidScheme": "https",
+    "cleartext": false
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}

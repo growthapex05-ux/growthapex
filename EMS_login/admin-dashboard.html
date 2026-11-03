@@ -3,6 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- PWA: installable as an app on Android & iPhone -->
+  <link rel="manifest" href="/EMS_login/manifest.webmanifest">
+  <meta name="theme-color" content="#1e40af">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="GrowthApex Admin">
+  <link rel="apple-touch-icon" href="/EMS_login/icon-512.png">
+  <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/EMS_login/sw.js').catch(function(){});});}</script>
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
@@ -578,11 +587,26 @@
       <button class="btn btn-primary" id="trk-set-save" onclick="saveTrackerSettings()">💾 Save settings</button>
     </div>
     <div class="section-card">
-      <div class="section-head"><h3>⬇ Download the app for employees</h3></div>
+      <div class="section-head"><h3>⬇ Desktop Tracker — for employees</h3></div>
       <div style="font-size:13px;line-height:1.7">
         Windows: <a href="https://github.com/growthapex05-ux/growthapex/releases/latest/download/GrowthApex-Tracker-Setup.exe" style="color:var(--cyan)">GrowthApex-Tracker-Setup.exe</a><br>
         Mac: <a href="https://github.com/growthapex05-ux/growthapex/releases/latest/download/GrowthApex-Tracker.dmg" style="color:var(--cyan)">GrowthApex-Tracker.dmg</a><br>
-        <span style="color:var(--muted)">Screenshots are kept for 7 days.</span>
+        <span style="color:var(--muted)">Runs in the background — tracks app/website time and laptop location while checked in.</span>
+      </div>
+    </div>
+    <div class="section-card">
+      <div class="section-head"><h3>📱 Phone app (APK) — reliable GPS check-in</h3></div>
+      <div style="font-size:13px;line-height:1.7">
+        Android: <a href="https://github.com/growthapex05-ux/growthapex/releases/latest/download/GrowthApex.apk" style="color:var(--cyan)">GrowthApex.apk</a>
+        <span style="color:var(--muted)">— send to employees; they open it to install (allow "Install unknown apps"), log in, and check in/out with real phone GPS.</span><br>
+        iPhone: open <b>growthapex.in/EMS_login</b> in Safari → Share → <b>Add to Home Screen</b> (installs as an app; no APK on iPhone).
+      </div>
+    </div>
+    <div class="section-card">
+      <div class="section-head"><h3>🖥️ Admin app — Windows</h3></div>
+      <div style="font-size:13px;line-height:1.7">
+        Windows: <a href="https://github.com/growthapex05-ux/growthapex/releases/latest/download/GrowthApex-Admin-Setup.exe" style="color:var(--cyan)">GrowthApex-Admin-Setup.exe</a><br>
+        <span style="color:var(--muted)">Full admin dashboard as a desktop app, with live offline alerts as Windows notifications. On a phone, install this dashboard from Safari/Chrome → Add to Home Screen / Install app.</span>
       </div>
     </div>
   </div>

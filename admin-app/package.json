@@ -1,0 +1,42 @@
+{
+  "name": "growthapex-admin",
+  "productName": "GrowthApex Admin",
+  "version": "1.0.0",
+  "description": "GrowthApex EMS admin dashboard as a Windows desktop app",
+  "main": "main.js",
+  "author": "GrowthApex",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win --publish never"
+  },
+  "devDependencies": {
+    "electron": "44.7.2",
+    "electron-builder": "26.17.0"
+  },
+  "build": {
+    "appId": "in.growthapex.admin",
+    "productName": "GrowthApex Admin",
+    "npmRebuild": false,
+    "files": [
+      "main.js",
+      "assets/**",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ],
+      "icon": "assets/icon.png",
+      "artifactName": "GrowthApex-Admin-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "GrowthApex Admin"
+    }
+  }
+}

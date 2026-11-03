@@ -2,3 +2,10 @@
 *-firebase-adminsdk-*.json
 growthapex-f811b-firebase-adminsdk-fbsvc-7e9de58021.json
 chaostocalm-a1c3e-firebase-adminsdk-fbsvc-b237df8fa3.json
+
+# Desktop / mobile app build artifacts (built in CI, not committed)
+admin-app/node_modules/
+admin-app/dist/
+apk/node_modules/
+apk/android/
+apk/GrowthApex.apk

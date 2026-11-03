@@ -1,0 +1,50 @@
+name: Build GrowthApex Admin
+
+# Builds the Windows desktop admin app (.exe) and attaches it to a GitHub Release.
+# Start it by pushing a tag like admin-v1.0.0 (or run it manually from the Actions tab).
+# Download link used by the EMS: /releases/latest/download/GrowthApex-Admin-Setup.exe
+
+on:
+  push:
+    tags: ['admin-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        working-directory: admin-app
+        run: npm install
+
+      - name: Build installer
+        working-directory: admin-app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npm run dist:win
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: admin-win
+          path: admin-app/dist/GrowthApex-Admin-Setup.exe
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: admin-app/dist/GrowthApex-Admin-Setup.exe
+          name: GrowthApex Admin ${{ github.ref_name }}
+          body: |
+            GrowthApex EMS admin dashboard as a Windows app.
+            - Windows: GrowthApex-Admin-Setup.exe (if Windows warns "protected your PC": More info -> Run anyway)
+            - Log in with the admin email and password. Everything from the web dashboard works here,
+              including live offline alerts as desktop notifications.

@@ -1,0 +1,77 @@
+name: Build GrowthApex APK
+
+# Builds the Android app (.apk) that wraps the live EMS site and attaches it to a
+# GitHub Release. Employees install it to check in/out with real phone GPS location.
+# Start it by pushing a tag like apk-v1.0.0 (or run it manually from the Actions tab).
+# Download link used by the EMS: /releases/latest/download/GrowthApex.apk
+
+on:
+  push:
+    tags: ['apk-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Capacitor
+        working-directory: apk
+        run: npm install
+
+      - name: Generate Android project
+        working-directory: apk
+        run: npx cap add android
+
+      - name: Add location permission + startup request
+        working-directory: apk
+        run: |
+          MF=android/app/src/main/AndroidManifest.xml
+          sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />#' "$MF"
+          cp android-template/MainActivity.java android/app/src/main/java/in/growthapex/ems/MainActivity.java
+          echo "----- AndroidManifest permissions -----"
+          grep permission "$MF" || true
+
+      - name: Build debug APK
+        working-directory: apk/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Rename APK
+        working-directory: apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk GrowthApex.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GrowthApex-apk
+          path: apk/GrowthApex.apk
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: apk/GrowthApex.apk
+          name: GrowthApex App ${{ github.ref_name }}
+          body: |
+            GrowthApex EMS Android app.
+            - Download GrowthApex.apk on an Android phone and open it to install
+              (allow "Install unknown apps" when asked).
+            - Log in with Employee ID (or admin email) + password.
+            - Allow Location when prompted so check-in/out records your real GPS location.

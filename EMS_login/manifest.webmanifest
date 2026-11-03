@@ -1,0 +1,15 @@
+{
+  "name": "GrowthApex EMS",
+  "short_name": "GrowthApex",
+  "description": "GrowthApex Employee Management — attendance, check-in/out, tasks, payroll and live location tracking.",
+  "start_url": "/EMS_login/index.html",
+  "scope": "/EMS_login/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0e1627",
+  "theme_color": "#1e40af",
+  "icons": [
+    { "src": "/EMS_login/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/EMS_login/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
