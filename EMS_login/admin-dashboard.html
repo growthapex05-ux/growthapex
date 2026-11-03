@@ -11,6 +11,15 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700;800&family=Urbanist:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" crossorigin="anonymous">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous"></script>
+  <style>
+    @media (max-width: 820px){ #livemap-layout{ grid-template-columns:1fr !important } #livemap{ height:360px !important } #livemap-list{ max-height:none !important } }
+    .lm-pin{ background:#2563eb;color:#fff;border-radius:999px;padding:2px 7px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.35);border:2px solid #fff }
+    .lm-pin.off{ background:#dc2626 } .lm-pin.away{ background:#f59e0b } .lm-pin.approx{ background:#6b7280 }
+    .lm-card{ border:1px solid var(--border);border-radius:12px;padding:10px 12px;background:var(--card,#fff);cursor:pointer;transition:.15s }
+    .lm-card:hover{ border-color:var(--cyan);transform:translateY(-1px) }
+  </style>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     :root{
@@ -326,6 +335,7 @@
     <div class="nav-item" onclick="showPage('expenses',this)"><span class="nav-icon">💸</span><span>Expenses &amp; Claims</span></div>
     <div class="nav-item" onclick="showPage('noticeboard',this)"><span class="nav-icon">📢</span><span>Notice Board</span></div>
     <div class="nav-item" onclick="showPage('tracker',this)"><span class="nav-icon">💻</span><span>Tracker (Activity &amp; Location)</span></div>
+    <div class="nav-item" onclick="showPage('livemap',this)"><span class="nav-icon">🗺️</span><span>Live Map <span id="livemap-dot" style="display:none;width:8px;height:8px;border-radius:50%;background:#ef4444;margin-left:4px"></span></span></div>
 
   </div>
   <div class="sidebar-footer">
@@ -574,6 +584,26 @@
         Mac: <a href="https://github.com/growthapex05-ux/growthapex/releases/latest/download/GrowthApex-Tracker.dmg" style="color:var(--cyan)">GrowthApex-Tracker.dmg</a><br>
         <span style="color:var(--muted)">Screenshots are kept for 7 days.</span>
       </div>
+    </div>
+  </div>
+
+  <!-- ── Live Tracking Map ── -->
+  <div class="page" id="page-livemap">
+    <div id="livemap-offline-banner" style="display:none;background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;border-radius:14px;padding:12px 16px;margin-bottom:14px;font-size:13px;font-weight:600;box-shadow:0 6px 20px rgba(220,38,38,.25)"></div>
+    <div class="section-card">
+      <div class="section-head">
+        <h3>🗺️ Live Tracking — all employees</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <span id="livemap-count" style="font-size:12px;color:var(--muted)"></span>
+          <button class="btn btn-primary" onclick="renderLiveMap(true)">🔄 Refresh &amp; fit</button>
+          <button class="btn" id="livemap-notif-btn" onclick="enableOfflineNotifications()" style="display:none">🔔 Enable alerts</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;align-items:start" id="livemap-layout">
+        <div id="livemap" style="width:100%;height:500px;border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--soft)"></div>
+        <div id="livemap-list" style="max-height:500px;overflow:auto;display:flex;flex-direction:column;gap:8px"></div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:10px">🟢 Online (heartbeat &lt;1 min) · 🟡 Away/reconnecting · 🔴 Offline (PC closed &gt;3 min). Location updates automatically every few minutes while an employee is checked in. Laptop GPS is accurate to ~20–60 m; "approx." means the laptop's precise location is off and only the city is known.</div>
     </div>
   </div>
 
@@ -1106,6 +1136,10 @@ function onDataUpdated() {
   listenersInitialized = true;
   updateNotificationDot();
   triggerUpdate();
+  ensureOfflineWatcher();
+  checkOfflineAlerts();
+  const lm = document.getElementById('page-livemap');
+  if (lm && lm.classList.contains('active')) renderLiveMap(false);
 }
 
 function updateNotificationDot() {
@@ -1281,7 +1315,7 @@ function toggleSidebar() {
 }
 
 // ─── Page Navigation ──────────────────────────────────────────
-const titles = { overview:'Overview', employees:'Employees', attendance:'Attendance', tasks:'Tasks', leaves:'Leave Requests', salary:'Payroll', letterpad:'Letter Pad & Documents', reports:'WhatsApp Reports', worklogs:'EOD Work Logs', expenses:'Expense Claims', noticeboard:'Company Notice Board', tracker:'GrowthApex Tracker', analytics:'AI Performance & Productivity Analytics' };
+const titles = { overview:'Overview', employees:'Employees', attendance:'Attendance', tasks:'Tasks', leaves:'Leave Requests', salary:'Payroll', letterpad:'Letter Pad & Documents', reports:'WhatsApp Reports', worklogs:'EOD Work Logs', expenses:'Expense Claims', noticeboard:'Company Notice Board', tracker:'GrowthApex Tracker', analytics:'AI Performance & Productivity Analytics', livemap:'Live Tracking Map' };
 function showPage(id, el) {
   // Close sidebar on mobile navigation
   const sidebar = document.querySelector('.sidebar');
@@ -1301,6 +1335,7 @@ function showPage(id, el) {
   if (id==='leaves') renderAdminHolidays();
   if (id==='reports') initReportsPage();
   if (id==='tracker') initTrackerPage();
+  if (id==='livemap') initLiveMap();
   if (id==='analytics') renderAnalyticsPage();
   if (id==='worklogs') renderWorkLogs();
   if (id==='expenses') renderExpenses();
@@ -2614,6 +2649,157 @@ function renderTrackerLocation(rec) {
       <div class="table-wrap"><table><thead><tr><th>Time</th><th>Place</th><th></th></tr></thead><tbody>
       ${trail.map(p => `<tr><td>${time(p.at)}</td><td>${esc(p.place || '—')}${p.src === 'ip' ? ' (approx.)' : ''}</td><td><a href="https://www.google.com/maps?q=${p.lat},${p.lng}" target="_blank" rel="noopener" style="color:var(--cyan)">Map</a></td></tr>`).join('')}
       </tbody></table></div></details>` : ''}`;
+}
+
+// ─── Live Tracking Map (all employees) ─────────────────────────
+let lmMap = null, lmMarkers = {}, lmInited = false;
+
+function empNameOf(empId) {
+  const e = (cache.employees || []).find(x => x.id === empId);
+  return e ? e.name : empId;
+}
+function isCheckedInToday(a) {
+  return a && a.date === emsToday() && a.checkIn && a.checkIn !== '—';
+}
+function lmStatus(a) {
+  // → { key:'online'|'away'|'offline'|'out', label, cls }
+  if (a.checkOut && a.checkOut !== '—') {
+    const auto = a.checkoutReason && /auto|pc|closed|offline|siren|location/i.test(a.checkoutReason);
+    return auto ? { key:'offline', label:'🔴 Offline (' + a.checkoutReason + ')', cls:'off' }
+                : { key:'out', label:'⚪ Checked out', cls:'approx' };
+  }
+  if (!a.lastHeartbeat) return { key:'online', label:'🟢 Checked in', cls:'' };
+  const diff = Date.now() - Date.parse(a.lastHeartbeat);
+  if (diff <= 60000)  return a.activityStatus === 'idle'
+      ? { key:'away', label:'🟡 Idle (away)', cls:'away' }
+      : { key:'online', label:'🟢 Active working', cls:'' };
+  if (diff <= 180000) return { key:'away', label:'🟡 Away / reconnecting', cls:'away' };
+  return { key:'offline', label:'🔴 Offline (PC closed)', cls:'off' };
+}
+
+function initLiveMap() {
+  if (!lmInited) {
+    if (typeof L === 'undefined') {
+      document.getElementById('livemap').innerHTML = '<div style="padding:20px;color:var(--muted);font-size:13px">Map library could not load (check internet). The list on the right still works.</div>';
+    } else {
+      lmMap = L.map('livemap', { zoomControl: true }).setView([20.5937, 78.9629], 5); // India
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19, attribution: '© OpenStreetMap'
+      }).addTo(lmMap);
+    }
+    lmInited = true;
+  }
+  if (lmMap) setTimeout(() => lmMap.invalidateSize(), 150);
+  // Offer to enable browser notifications
+  const nb = document.getElementById('livemap-notif-btn');
+  if (nb && 'Notification' in window && Notification.permission === 'default') nb.style.display = '';
+  renderLiveMap(true);
+}
+
+function renderLiveMap(fit) {
+  const listEl = document.getElementById('livemap-list');
+  const countEl = document.getElementById('livemap-count');
+  if (!listEl) return;
+  const today = (cache.attendance || []).filter(isCheckedInToday);
+  // Sort: online first, then away, then offline
+  const order = { online:0, away:1, offline:2, out:3 };
+  const rows = today.map(a => ({ a, s: lmStatus(a) })).sort((x,y) => order[x.s.key]-order[y.s.key]);
+
+  const withLoc = [];
+  listEl.innerHTML = rows.length ? '' : '<div style="color:var(--muted);font-size:13px;padding:10px">No one is checked in right now.</div>';
+  const seen = {};
+  rows.forEach(({ a, s }) => {
+    seen[a.empId] = true;
+    const live = a.trackerLocation;
+    const name = empNameOf(a.empId);
+    const esc = v => String(v || '').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+    let locLine;
+    if (live && !live.error && live.lat != null) {
+      const ago = Math.round((Date.now() - Date.parse(live.at)) / 60000);
+      const approx = (live.source === 'ip' || live.osDenied);
+      locLine = `📍 ${esc(live.place || (live.lat.toFixed(4)+', '+live.lng.toFixed(4)))}${approx ? ' <span style="color:#9ca3af">(approx.)</span>' : ` (±${live.accuracy||'?'} m)`} · ${ago<1?'now':ago+' min ago'}`;
+      withLoc.push({ a, s, live, approx, name });
+    } else {
+      locLine = `<span style="color:#f59e0b">📍 Location not received — app may be old or location is off</span>`;
+    }
+    const card = document.createElement('div');
+    card.className = 'lm-card';
+    card.innerHTML = `<div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+        <b style="font-size:14px">${esc(name)}</b><span style="font-size:11px">${s.label}</span></div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px">${locLine}</div>`;
+    if (live && !live.error && live.lat != null) card.onclick = () => { if (lmMap) lmMap.setView([live.lat, live.lng], 16); };
+    listEl.appendChild(card);
+  });
+  countEl.textContent = `${rows.length} checked in · ${withLoc.length} on map`;
+
+  // Markers
+  if (lmMap) {
+    Object.keys(lmMarkers).forEach(id => { if (!seen[id]) { lmMap.removeLayer(lmMarkers[id]); delete lmMarkers[id]; } });
+    const bounds = [];
+    withLoc.forEach(({ a, s, live, approx, name }) => {
+      const cls = s.key === 'offline' ? 'off' : s.key === 'away' ? 'away' : approx ? 'approx' : '';
+      const icon = L.divIcon({ className:'', html:`<div class="lm-pin ${cls}">${name.split(' ')[0]}</div>`, iconSize:null });
+      if (lmMarkers[a.empId]) lmMarkers[a.empId].setLatLng([live.lat, live.lng]).setIcon(icon);
+      else lmMarkers[a.empId] = L.marker([live.lat, live.lng], { icon }).addTo(lmMap);
+      lmMarkers[a.empId].bindPopup(`<b>${name}</b><br>${s.label}<br>${(live.place||'')}<br><small>${approx?'approx. (city)':'±'+(live.accuracy||'?')+' m'}</small>`);
+      bounds.push([live.lat, live.lng]);
+    });
+    if (fit && bounds.length) lmMap.fitBounds(bounds, { padding:[40,40], maxZoom:16 });
+  }
+}
+
+// ─── Offline alerts to admin ───────────────────────────────────
+let offlineAlertState = {};   // empId -> { lastNotified }
+let offlineWatcherStarted = false;
+function ensureOfflineWatcher() {
+  if (offlineWatcherStarted) return;
+  offlineWatcherStarted = true;
+  setInterval(checkOfflineAlerts, 30000);
+}
+function enableOfflineNotifications() {
+  if (!('Notification' in window)) { toast('This browser does not support notifications', 'warning'); return; }
+  Notification.requestPermission().then(p => {
+    const nb = document.getElementById('livemap-notif-btn');
+    if (nb) nb.style.display = p === 'granted' ? 'none' : '';
+    if (p === 'granted') toast('Offline alerts enabled — you will be notified when someone goes offline', 'success');
+  });
+}
+function notifyAdmin(title, body) {
+  try { if ('Notification' in window && Notification.permission === 'granted') new Notification(title, { body, tag: title }); } catch (_) {}
+}
+function checkOfflineAlerts() {
+  const today = (cache.attendance || []).filter(isCheckedInToday);
+  const offlineNow = [];
+  today.forEach(a => { if (lmStatus(a).key === 'offline') offlineNow.push(a); });
+  const offIds = {};
+  offlineNow.forEach(a => {
+    offIds[a.empId] = true;
+    const st = offlineAlertState[a.empId];
+    if (!st) {
+      offlineAlertState[a.empId] = { lastNotified: Date.now() };
+      const name = empNameOf(a.empId);
+      toast(`🔴 ${name} is offline (PC closed / no heartbeat)`, 'error');
+      notifyAdmin(`⚠️ ${name} went offline`, `${name} is no longer connected. Last seen a few minutes ago.`);
+    } else if (Date.now() - st.lastNotified > 5 * 60000) {
+      st.lastNotified = Date.now();
+      const name = empNameOf(a.empId);
+      notifyAdmin(`⚠️ ${name} still offline`, `${name} has been offline for a while.`);
+    }
+  });
+  // Clear state for those back online / properly done
+  Object.keys(offlineAlertState).forEach(id => {
+    if (!offIds[id]) { const name = empNameOf(id); toast(`🟢 ${name} is back online`, 'success'); delete offlineAlertState[id]; }
+  });
+  // Nav dot + banner
+  const dot = document.getElementById('livemap-dot');
+  if (dot) dot.style.display = offlineNow.length ? 'inline-block' : 'none';
+  const banner = document.getElementById('livemap-offline-banner');
+  if (banner) {
+    if (offlineNow.length) {
+      banner.style.display = '';
+      banner.innerHTML = `⚠️ ${offlineNow.length} offline: ` + offlineNow.map(a => empNameOf(a.empId)).join(', ');
+    } else banner.style.display = 'none';
+  }
 }
 
 // From an attendance row: open the Tracker page on that employee + day
