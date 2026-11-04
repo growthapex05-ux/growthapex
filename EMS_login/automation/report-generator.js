@@ -1,5 +1,6 @@
 const admin = require('firebase-admin');
 const path = require('path');
+const { cachedGet, cachedQuery, parallelGet } = require('./cache');
 
 function initializeFirebase() {
   const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || 'serviceAccountKey.json';
@@ -25,35 +26,34 @@ const {
 async function generateDailyReport(db, targetDateStr = null) {
   const todayStr = targetDateStr || formatDateString(new Date());
   
-  // 1. Fetch active employees
+  // 1-4. Parallel fetch (cached) — single concurrent batch instead of 4 sequential round-trips
+  const [attSnap, leavesSnap, tasksSnap] = await Promise.all([
+    cachedQuery(db, 'attendance', 'date', '==', todayStr),
+    cachedGet(db, 'leaves'),
+    cachedGet(db, 'tasks'),
+  ]);
+
+  // 1. Active employees (uses shared helper; cache is reused if already fetched)
   const employees = await getActiveEmployees(db);
   const employeeMap = {};
-  employees.forEach(emp => {
-    employeeMap[emp.id] = emp;
-  });
+  employees.forEach(emp => { employeeMap[emp.id] = emp; });
 
   if (employees.length === 0) {
     return `⚠️ *GROWTHAPEX EMS - DAILY REPORT* ⚠️\n📅 *Date:* ${todayStr}\n\nNo active employees found in the database.`;
   }
 
-  // 2. Fetch today's attendance
-  const attSnap = await db.collection('attendance')
-    .where('date', '==', todayStr)
-    .get();
-  
+  // 2. Attendance map (from cached snap)
   const attendanceMap = {};
   attSnap.forEach(doc => {
     const data = doc.data();
     attendanceMap[data.empId] = data;
   });
 
-  // 3. Fetch leaves active today
-  const leavesSnap = await db.collection('leaves').get();
+  // 3. Leaves array (from cached snap)
   const allLeaves = [];
   leavesSnap.forEach(doc => allLeaves.push(doc.data()));
 
-  // 4. Fetch all tasks (open/pending tasks + tasks created/completed today)
-  const tasksSnap = await db.collection('tasks').get();
+  // 4. Tasks array (from cached snap)
   const allTasks = [];
   tasksSnap.forEach(doc => {
     allTasks.push({ id: doc.id, ...doc.data() });
@@ -189,11 +189,12 @@ async function generateDailyReport(db, targetDateStr = null) {
 async function generateLoginReport(db, targetDateStr = null) {
   const dateStr = targetDateStr || formatDateString(new Date());
 
+  // All 4 fetches run in parallel and are served from cache when possible
   const [loginsSnap, attSnap, empSnap, leavesSnap] = await Promise.all([
-    db.collection('logins').where('date', '==', dateStr).get(),
-    db.collection('attendance').where('date', '==', dateStr).get(),
-    db.collection('employees').get(),
-    db.collection('leaves').get()
+    cachedQuery(db, 'logins',      'date', '==', dateStr),
+    cachedQuery(db, 'attendance',  'date', '==', dateStr),
+    cachedGet(db, 'employees'),
+    cachedGet(db, 'leaves'),
   ]);
 
   const empMap = {};

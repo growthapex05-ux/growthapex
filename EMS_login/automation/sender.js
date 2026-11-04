@@ -4,6 +4,8 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const axios = require('axios');
 const fs = require('fs');
+const { whatsappLimiter } = require('./rate-limiter');
+
 
 // Helper to extract invite code from a WhatsApp chat link
 function getInviteCode(link) {
@@ -98,6 +100,7 @@ async function sendViaWhatsappWeb(message, inviteLink, groupJid) {
         // 2. Send the message
         if (targetJid) {
           console.log(`Sending report to JID: ${targetJid}...`);
+          await whatsappLimiter.acquire();  // rate limit before WA send
           await client.sendMessage(targetJid, message);
           console.log("🎉 Report sent successfully via WhatsApp Web!");
           
@@ -157,6 +160,8 @@ async function sendViaGreenApi(message, groupJid) {
 
   await assertGreenApiAuthorized(instanceId, apiToken);
 
+  // Acquire a rate-limit token before hitting the API
+  await whatsappLimiter.acquire();
   console.log(`Sending message to group ${groupJid} via Green-API...`);
   const url = `${greenApiBase()}/waInstance${instanceId}/sendMessage/${apiToken}`;
 

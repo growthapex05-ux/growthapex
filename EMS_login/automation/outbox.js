@@ -4,6 +4,7 @@ const net = require('net');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const gen = require('./report-generator');
+const { whatsappLimiter, sleep: rateSleep, sendBatch } = require('./rate-limiter');
 const { sendReport } = require('./sender');
 const { sendEmail, emailSubject, emailEnabled } = require('./email-sender');
 
@@ -231,8 +232,16 @@ async function flush(db) {
       dequeue(item.id);
       continue;
     }
+    // Rate-limit: acquire token before each queued message send
+    if (item.channel !== 'email') await whatsappLimiter.acquire();
     const result = await deliver(db, item);
-    if (result === 'sent') sent++;
+    if (result === 'sent') {
+      sent++;
+      // Inter-message cooldown: avoid burst when flushing many queued items
+      if (item.channel !== 'email' && items.indexOf(item) < items.length - 1) {
+        await rateSleep(parseInt(process.env.FLUSH_DELAY_MS || '2000', 10));
+      }
+    }
     // Stop early if sending is broken (e.g. WhatsApp logged out) instead of hammering every item
     // (a failing email must not hold up WhatsApp messages behind it)
     if (result === 'queued' && item.channel !== 'email') break;
