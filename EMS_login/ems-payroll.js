@@ -153,6 +153,9 @@
     const perDay = Math.round(baseSalary / STANDARD_WORKING_DAYS);
     const joinDate = validDate(emp.joinDate) ? emp.joinDate : null;
     const advance = emp.advanceDeduction !== undefined && emp.advanceDeduction !== '' ? Number(emp.advanceDeduction) || 0 : 0;
+    // Optional one-off deduction with its own label (e.g. a penalty), kept separate from advance.
+    const otherDeduction = emp.otherDeduction !== undefined && emp.otherDeduction !== '' ? Number(emp.otherDeduction) || 0 : 0;
+    const otherDeductionNote = emp.otherDeductionNote || 'Other deduction';
 
     const result = {
       empId: emp.id, name: emp.name, monthVal, today, baseSalary, perDay, totalWorkingDays,
@@ -258,8 +261,10 @@
       earnedSoFar: monthOver ? monthTotal : earnedSoFar,
       monthTotal,
       advance,
-      netSoFar: Math.max(0, (monthOver ? monthTotal : earnedSoFar) - advance),
-      netPayable: Math.max(0, monthTotal - advance),
+      otherDeduction,
+      otherDeductionNote,
+      netSoFar: Math.max(0, (monthOver ? monthTotal : earnedSoFar) - advance - otherDeduction),
+      netPayable: Math.max(0, monthTotal - advance - otherDeduction),
       monthOver
     };
     result.worked = +result.worked.toFixed(2);
@@ -337,6 +342,7 @@
           ${row(s.monthOver ? 'Earned this month' : 'Earned so far', money(s.earnedSoFar), '#059669')}
           ${row(`Deduction (${num(r.unpaidDays)} unpaid days)`, s.deduction ? '-' + money(s.deduction) : '₹0', s.deduction ? '#dc2626' : '')}
           ${row('Advance deduction', s.advance ? '-' + money(s.advance) : '₹0', s.advance ? '#dc2626' : '')}
+          ${s.otherDeduction ? row(s.otherDeductionNote, '-' + money(s.otherDeduction), '#dc2626') : ''}
           ${row(s.monthOver ? 'Net payable' : 'Net (so far)', money(s.netSoFar), '#059669', true)}
           ${s.monthOver ? '' : row('If full month attended (estimate)', money(s.netPayable), 'var(--cyan,#22d3ee)')}
         </div>

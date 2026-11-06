@@ -2575,6 +2575,8 @@ function payrollFor(emp, monthVal) {
     totalDeductionDays: s.unpaidDays,
     absentDeduction: s.salary.deduction,
     advanceDeduction: s.salary.advance,
+    otherDeduction: s.salary.otherDeduction,
+    otherDeductionNote: s.salary.otherDeductionNote,
     netPayable: s.salary.netPayable,
     basic, hra, special: earnedSalary - (basic + hra),
     leaveData: {
@@ -3015,6 +3017,8 @@ function openSalarySlipModal(empId, monthVal) {
   const earnedAfterAbsent = pay.earnedSalary;
   const leaveData = pay.leaveData;
   const advanceDeduction = pay.advanceDeduction;
+  const otherDeduction = pay.otherDeduction || 0;
+  const otherDeductionNote = pay.otherDeductionNote || 'Other Deduction';
   const netPayable = pay.netPayable;
 
   const basic = Math.round(earnedSalary * 0.60);
@@ -3022,7 +3026,7 @@ function openSalarySlipModal(empId, monthVal) {
   const special = earnedSalary - (basic + hra);
 
   // Store active salary slip data for WhatsApp share & export
-  currentSalarySlipData = { emp, monthVal, monthName, earnedSalary: earnedAfterAbsent, grossEarned, advanceDeduction, netPayable, basic, hra, special, daysDetails, leaveData, absentDaysSlip, totalDeductionDaysSlip, absentDeductionSlip };
+  currentSalarySlipData = { emp, monthVal, monthName, earnedSalary: earnedAfterAbsent, grossEarned, advanceDeduction, otherDeduction, otherDeductionNote, netPayable, basic, hra, special, daysDetails, leaveData, absentDaysSlip, totalDeductionDaysSlip, absentDeductionSlip };
 
   // Update release button state
   const btnRelease = document.getElementById('btn-release-slip');
@@ -3131,8 +3135,8 @@ function openSalarySlipModal(empId, monthVal) {
           <tr>
             <td style="border:1px solid #e5e7eb;padding:7px">House Rent Allowance (HRA 30%)</td>
             <td style="border:1px solid #e5e7eb;padding:7px;text-align:right">${money(hra)}</td>
-            <td style="border:1px solid #e5e7eb;padding:7px;color:#dc2626">PF / ESI Deduction</td>
-            <td style="border:1px solid #e5e7eb;padding:7px;text-align:right;color:#16a34a">₹0 (Nil)</td>
+            <td style="border:1px solid #e5e7eb;padding:7px;color:#dc2626">${otherDeduction > 0 ? otherDeductionNote : 'PF / ESI Deduction'}</td>
+            <td style="border:1px solid #e5e7eb;padding:7px;text-align:right;color:${otherDeduction > 0 ? '#dc2626' : '#16a34a'}">${otherDeduction > 0 ? '-' + money(otherDeduction) : '₹0 (Nil)'}</td>
           </tr>
           <tr>
             <td style="border:1px solid #e5e7eb;padding:7px">Special / Performance Allowance</td>
@@ -3144,7 +3148,7 @@ function openSalarySlipModal(empId, monthVal) {
             <td style="border:1px solid #e5e7eb;padding:7px;font-weight:700">—</td>
             <td style="border:1px solid #e5e7eb;padding:7px;text-align:right">—</td>
             <td style="border:1px solid #e5e7eb;padding:7px;font-weight:700">Total Deductions</td>
-            <td style="border:1px solid #e5e7eb;padding:7px;text-align:right;font-weight:700;color:#dc2626">-${money(advanceDeduction + absentDeductionSlip)}</td>
+            <td style="border:1px solid #e5e7eb;padding:7px;text-align:right;font-weight:700;color:#dc2626">-${money(advanceDeduction + absentDeductionSlip + otherDeduction)}</td>
           </tr>
           <tr style="background:#f0fdf4;font-weight:700">
             <td style="border:1px solid #e5e7eb;padding:9px;color:#166534">Gross Earnings</td>
@@ -3338,7 +3342,7 @@ function sendSalarySlipWhatsApp() {
     toast('No active salary slip data found', 'warning');
     return;
   }
-  const { emp, monthName, netPayable, earnedSalary, advanceDeduction, basic, hra, special, daysDetails, leaveData } = currentSalarySlipData;
+  const { emp, monthName, netPayable, earnedSalary, advanceDeduction, otherDeduction, otherDeductionNote, basic, hra, special, daysDetails, leaveData } = currentSalarySlipData;
   
   let targetPhone = (emp.phone || '').trim().replace(/\D/g, '');
   if (!targetPhone || targetPhone.length < 10) {
@@ -3369,7 +3373,7 @@ function sendSalarySlipWhatsApp() {
   - Basic Pay (60%): ₹${Number(basic).toLocaleString('en-IN')}
   - House Rent Allowance (30%): ₹${Number(hra).toLocaleString('en-IN')}
   - Special Allowances: ₹${Number(special).toLocaleString('en-IN')}
-• Deductions (Advance): -₹${Number(advanceDeduction).toLocaleString('en-IN')}
+• Deductions (Advance): -₹${Number(advanceDeduction).toLocaleString('en-IN')}${Number(otherDeduction) > 0 ? `\n• ${otherDeductionNote}: -₹${Number(otherDeduction).toLocaleString('en-IN')}` : ''}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
 💰 *NET PAYABLE SALARY:* ₹${Number(netPayable).toLocaleString('en-IN')}
