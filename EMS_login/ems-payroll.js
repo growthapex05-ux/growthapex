@@ -5,7 +5,7 @@
 //
 // Rules
 //  • Working days = Monday–Saturday. Sundays are paid off.
-//  • Salary per day = monthly salary ÷ working days in that month.
+//  • Salary per day = monthly salary ÷ 26 (fixed standard working days, every month).
 //  • Present = 1 day, Half-day = ½ worked + ½ leave.
 //  • A past working day with no check-in and no approved leave = ABSENT (unpaid).
 //  • Leave: 1.5 days every month, reset at the start of each month — unused leave does not carry
@@ -21,6 +21,9 @@
 (function (root) {
   const MONTHLY_LEAVE_CREDIT = 1.5;
   const LATE_AFTER_MIN = 10 * 60; // check-in after 10:00 = late
+  // Per-day salary basis: fixed 26 working days (Mon–Sat standard), regardless of
+  // how many working days the calendar month actually has.
+  const STANDARD_WORKING_DAYS = 26;
 
   function pad(n) { return String(n).padStart(2, '0'); }
   function ymd(y, m, d) { return `${y}-${pad(m)}-${pad(d)}`; }
@@ -147,7 +150,7 @@
     const monthEnd = ymd(y, m, daysInMonth(y, m));
     const baseSalary = Number(emp.salary || 0);
     const totalWorkingDays = workingDaysInMonth(y, m);
-    const perDay = totalWorkingDays ? Math.round(baseSalary / totalWorkingDays) : 0;
+    const perDay = Math.round(baseSalary / STANDARD_WORKING_DAYS);
     const joinDate = validDate(emp.joinDate) ? emp.joinDate : null;
     const advance = emp.advanceDeduction !== undefined && emp.advanceDeduction !== '' ? Number(emp.advanceDeduction) || 0 : 0;
 
