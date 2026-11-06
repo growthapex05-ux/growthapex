@@ -3174,49 +3174,39 @@ function downloadSalarySlipPDF() {
   const container = document.getElementById('salary-slip-container');
   if (!container || !container.children.length) return;
 
-  const targetEl = container.querySelector('.salary-slip-box') || container;
-  const empName = (currentSalarySlipData && currentSalarySlipData.emp && currentSalarySlipData.emp.name) 
+  const srcBox = container.querySelector('.salary-slip-box') || container;
+  const empName = (currentSalarySlipData && currentSalarySlipData.emp && currentSalarySlipData.emp.name)
     ? currentSalarySlipData.emp.name.replace(/\s+/g, '_') : 'Employee';
 
-  if (typeof html2pdf !== 'undefined') {
-    const opt = {
-      margin:       [5, 5, 5, 5],
-      filename:     `GrowthApex_Salary_Slip_${empName}.pdf`,
-      image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { 
-        scale: 2, 
-        useCORS: true, 
-        logging: false,
-        onclone: (clonedDoc) => {
-          const mOverlay = clonedDoc.getElementById('modal-salary-slip');
-          if (mOverlay) {
-            mOverlay.style.position = 'static';
-            mOverlay.style.display = 'block';
-            mOverlay.style.background = '#ffffff';
-            mOverlay.style.padding = '0';
-            mOverlay.style.margin = '0';
-          }
-          const mBox = mOverlay ? mOverlay.querySelector('.modal') : null;
-          if (mBox) {
-            mBox.style.position = 'static';
-            mBox.style.maxWidth = '100%';
-            mBox.style.width = '100%';
-            mBox.style.padding = '0';
-            mBox.style.margin = '0';
-            mBox.style.boxShadow = 'none';
-          }
-        }
-      },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
+  if (typeof html2pdf === 'undefined') { printSalarySlip(); return; }
 
-    html2pdf().set(opt).from(targetEl).save().catch(err => {
-      console.error('PDF export error:', err);
-      printSalarySlip();
-    });
-  } else {
-    printSalarySlip();
-  }
+  // Render from an ISOLATED clone pinned to the top-left, so the dashboard
+  // layout (sidebar/modal centering) can't offset or clip the slip in the PDF.
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'position:fixed;left:0;top:0;width:800px;background:#ffffff;z-index:-1;pointer-events:none;';
+  const clone = srcBox.cloneNode(true);
+  clone.style.maxWidth = '800px';
+  clone.style.width = '800px';
+  clone.style.margin = '0';
+  clone.style.border = 'none';
+  clone.style.borderRadius = '0';
+  wrap.appendChild(clone);
+  document.body.appendChild(wrap);
+
+  const cleanup = () => { if (wrap.parentNode) wrap.parentNode.removeChild(wrap); };
+
+  const opt = {
+    margin:       [6, 6, 6, 6],
+    filename:     `GrowthApex_Salary_Slip_${empName}.pdf`,
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff', windowWidth: 800 },
+    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak:    { mode: ['avoid-all', 'css'] }
+  };
+
+  html2pdf().set(opt).from(clone).save()
+    .then(cleanup)
+    .catch(err => { cleanup(); console.error('PDF export error:', err); printSalarySlip(); });
 }
 
 function printSalarySlip() {
